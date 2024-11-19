@@ -1,0 +1,11 @@
+cloudeng.io/cmdutil v0.0.0-20241113171112-2102962e1386 h1:aJobHqW3BgARhAlNsanhk/eU4RICaXV6iXKc8Ot/tt0=
+cloudeng.io/cmdutil v0.0.0-20241113171112-2102962e1386/go.mod h1:VmWWlXqETCbKuEhI4YcP/r5ki7LGCXZqEI+1lIoHY2k=
+cloudeng.io/file v0.0.0-20241013003937-7fc58708a1c1 h1:aAMDb2sRGeJa/5G7gtM4VNENTfbPkoHzBcNZSceYuYU=
+cloudeng.io/file v0.0.0-20241013003937-7fc58708a1c1/go.mod h1:kmcVscnnJO90nqQc4QV4E4bVNjYZTqrHPSu1OAfxFYk=
+cloudeng.io/macos v0.0.0-20241113171112-2102962e1386 h1:uSIzu1HY+cmsYzv9QJAUW66YITmzseMYFsVZpXGrgt4=
+cloudeng.io/macos v0.0.0-20241113171112-2102962e1386/go.mod h1:YIATBdTwPbivzrQol4V8Nnpw2ZMJotroiJxuTAopFgM=
+github.com/keybase/go-keychain v0.0.0-20231219164618-57a3676c3af6 h1:IsMZxCuZqKuao2vNdfD82fjjgPLfyHLpR41Z88viRWs=
+github.com/keybase/go-keychain v0.0.0-20231219164618-57a3676c3af6/go.mod h1:3VeWNIJaW+O5xpRQbPp0Ybqu1vJd/pm7s2F473HRrkw=
+gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
+gopkg.in/yaml.v3 v3.0.1 h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=
+gopkg.in/yaml.v3 v3.0.1/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
