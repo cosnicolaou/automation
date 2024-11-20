@@ -70,7 +70,7 @@ func (c *Config) Display(ctx context.Context, flags any, args []string) error {
 	}
 
 	if fv.ScheduleFile != "" {
-		schedules, err := scheduler.ParseConfigFile(ctx, fv.ScheduleFile, system.Devices)
+		schedules, err := scheduler.ParseConfigFile(ctx, fv.ScheduleFile, system)
 		if err != nil {
 			return err
 		}
