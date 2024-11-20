@@ -11,15 +11,16 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/cosnicolaou/lutron/protocol"
+	"github.com/cosnicolaou/automation/net/streamconn"
 	"gopkg.in/yaml.v3"
 )
 
 type Action struct {
-	DeviceName string
-	Device     Device
-	ActionName string
-	Action     Operation
+	DeviceName       string
+	Device           Device
+	ActionName       string
+	Action           Operation
+	ActionParameters []string
 }
 
 type Controller interface {
@@ -50,10 +51,12 @@ type Device interface {
 type Option func(*Options)
 
 type Options struct {
-	Logger          *slog.Logger
-	Interactive     io.Writer
-	ProtocolSession protocol.Session
-	Custom          any
+	Logger      *slog.Logger
+	Interactive io.Writer
+	Session     streamconn.Session
+	Devices     SupportedDevices
+	Controllers SupportedControllers
+	Custom      any
 }
 
 func WithLogger(l *slog.Logger) Option {
@@ -62,9 +65,9 @@ func WithLogger(l *slog.Logger) Option {
 	}
 }
 
-func WithSession(c protocol.Session) Option {
+func WithSession(c streamconn.Session) Option {
 	return func(o *Options) {
-		o.ProtocolSession = c
+		o.Session = c
 	}
 }
 
@@ -74,20 +77,32 @@ func WithCustom(c any) Option {
 	}
 }
 
+func WithDevices(d SupportedDevices) Option {
+	return func(o *Options) {
+		o.Devices = d
+	}
+}
+
+func WithControllers(c SupportedControllers) Option {
+	return func(o *Options) {
+		o.Controllers = c
+	}
+}
+
 type SupportedControllers map[string]func(typ string, opts Options) (Controller, error)
 
 type SupportedDevices map[string]func(typ string, opts Options) (Device, error)
 
-func BuildDevices(controllerCfg []ControllerConfig, deviceCfg []DeviceConfig, supportedControllers SupportedControllers, supportedDevices SupportedDevices, opts ...Option) (map[string]Controller, map[string]Device, error) {
+func BuildDevices(controllerCfg []ControllerConfig, deviceCfg []DeviceConfig, opts ...Option) (map[string]Controller, map[string]Device, error) {
 	var options Options
 	for _, opt := range opts {
 		opt(&options)
 	}
-	controllers, err := CreateControllers(controllerCfg, supportedControllers, options)
+	controllers, err := CreateControllers(controllerCfg, options)
 	if err != nil {
 		return nil, nil, err
 	}
-	devices, err := CreateDevices(deviceCfg, supportedDevices, options)
+	devices, err := CreateDevices(deviceCfg, options)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -99,14 +114,18 @@ func BuildDevices(controllerCfg []ControllerConfig, deviceCfg []DeviceConfig, su
 	return controllers, devices, nil
 }
 
-func CreateControllers(config []ControllerConfig, supported SupportedControllers, opts Options) (map[string]Controller, error) {
+func CreateControllers(config []ControllerConfig, options Options) (map[string]Controller, error) {
 	controllers := map[string]Controller{}
+	availableControllers := options.Controllers
+	if availableControllers == nil {
+		availableControllers = AvailableControllers
+	}
 	for _, ctrlcfg := range config {
-		f, ok := supported[ctrlcfg.Type]
+		f, ok := availableControllers[ctrlcfg.Type]
 		if !ok {
 			return nil, fmt.Errorf("unsupported controller type: %s", ctrlcfg.Type)
 		}
-		ctrl, err := f(ctrlcfg.Type, opts)
+		ctrl, err := f(ctrlcfg.Type, options)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create controller %v: %w", ctrlcfg.Type, err)
 		}
@@ -119,14 +138,18 @@ func CreateControllers(config []ControllerConfig, supported SupportedControllers
 	return controllers, nil
 }
 
-func CreateDevices(config []DeviceConfig, supported SupportedDevices, opts Options) (map[string]Device, error) {
+func CreateDevices(config []DeviceConfig, options Options) (map[string]Device, error) {
 	devices := map[string]Device{}
+	availableDevices := options.Devices
+	if availableDevices == nil {
+		availableDevices = AvailableDevices
+	}
 	for _, devcfg := range config {
-		f, ok := supported[devcfg.Type]
+		f, ok := availableDevices[devcfg.Type]
 		if !ok {
 			return nil, fmt.Errorf("unsupported device type: %s", devcfg.Type)
 		}
-		dev, err := f(devcfg.Type, opts)
+		dev, err := f(devcfg.Type, options)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create device %v: %w", devcfg.Type, err)
 		}

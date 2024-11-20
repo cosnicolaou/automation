@@ -191,7 +191,7 @@ func (cfg SystemConfig) CreateSystem(place string, opts ...Option) (System, erro
 			return System{}, err
 		}
 	}
-	ctrl, dev, err := BuildDevices(cfg.Controllers, cfg.Devices, AvailableControllers, AvailableDevices, opts...)
+	ctrl, dev, err := BuildDevices(cfg.Controllers, cfg.Devices, opts...)
 	if err != nil {
 		return System{}, err
 	}
