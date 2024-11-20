@@ -2,13 +2,14 @@
 // Use of this source code is governed by the Apache-2.0
 // license that can be found in the LICENSE file.
 
-package streamconn
+package telnet
 
 import (
 	"context"
 	"log/slog"
 	"time"
 
+	"github.com/cosnicolaou/automation/net/streamconn"
 	"github.com/ziutek/telnet"
 )
 
@@ -18,7 +19,7 @@ type telnetConn struct {
 	logger  *slog.Logger
 }
 
-func DialTelnet(ctx context.Context, addr string, timeout time.Duration, logger *slog.Logger) (Transport, error) {
+func Dial(ctx context.Context, addr string, timeout time.Duration, logger *slog.Logger) (streamconn.Transport, error) {
 	logger.Log(ctx, slog.LevelInfo, "dialing telnet", "addr", addr)
 	conn, err := telnet.Dial("tcp", addr)
 	if err != nil {

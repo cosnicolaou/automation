@@ -2,7 +2,7 @@
 // Use of this source code is governed by the Apache-2.0
 // license that can be found in the LICENSE file.
 
-package streamconn_test
+package telnet_test
 
 import (
 	"bytes"
@@ -14,15 +14,16 @@ import (
 	"time"
 
 	"github.com/cosnicolaou/automation/net/streamconn"
-	"github.com/reiver/go-telnet"
+	"github.com/cosnicolaou/automation/net/streamconn/telnet"
+	telnetserver "github.com/reiver/go-telnet"
 )
 
-func runServer(t *testing.T, handler telnet.Handler, wg *sync.WaitGroup) net.Listener {
+func runServer(t *testing.T, handler telnetserver.Handler, wg *sync.WaitGroup) net.Listener {
 	listener, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
 		t.Fatal(err)
 	}
-	server := &telnet.Server{
+	server := &telnetserver.Server{
 		Handler: handler,
 	}
 	go func() {
@@ -36,7 +37,7 @@ func TestClient(t *testing.T) {
 	ctx := context.Background()
 	var wg sync.WaitGroup
 	wg.Add(1)
-	server := runServer(t, telnet.EchoHandler, &wg)
+	server := runServer(t, telnetserver.EchoHandler, &wg)
 	defer func() {
 		server.Close()
 		wg.Wait()
@@ -46,7 +47,7 @@ func TestClient(t *testing.T) {
 	logger := slog.New(slog.NewJSONHandler(logRecorder, nil))
 	addr := server.Addr().String()
 
-	transport, err := streamconn.DialTelnet(ctx, addr, time.Minute, logger)
+	transport, err := telnet.Dial(ctx, addr, time.Minute, logger)
 	if err != nil {
 		t.Fatal(err)
 	}
