@@ -7,7 +7,6 @@ package testutil
 import (
 	"context"
 	"fmt"
-	"io"
 	"strings"
 	"time"
 
@@ -59,8 +58,9 @@ func (d *MockDevice) ControlledBy() devices.Controller {
 
 func (d *MockDevice) Operations() map[string]devices.Operation {
 	return map[string]devices.Operation{
-		"on":  d.On,
-		"off": d.Off,
+		"on":      d.On,
+		"off":     d.Off,
+		"another": d.Another,
 	}
 }
 
@@ -75,12 +75,17 @@ func (d *MockDevice) Timeout() time.Duration {
 	return time.Second
 }
 
-func (d *MockDevice) On(ctx context.Context, out io.Writer, args ...string) error {
-	fmt.Fprintf(out, "device[%s].On: [%d] %v\n", d.Name, len(args), strings.Join(args, "--"))
+func (d *MockDevice) On(ctx context.Context, opts devices.OperationArgs) error {
+	fmt.Fprintf(opts.Writer, "device[%s].On: [%d] %v\n", d.Name, len(opts.Args), strings.Join(opts.Args, "--"))
 	return nil
 }
 
-func (d *MockDevice) Off(ctx context.Context, out io.Writer, args ...string) error {
-	fmt.Fprintf(out, "device[%s].Off: [%d] %v\n", d.Name, len(args), strings.Join(args, "--"))
+func (d *MockDevice) Off(ctx context.Context, opts devices.OperationArgs) error {
+	fmt.Fprintf(opts.Writer, "device[%s].Off: [%d] %v\n", d.Name, len(opts.Args), strings.Join(opts.Args, "--"))
+	return nil
+}
+
+func (d *MockDevice) Another(ctx context.Context, opts devices.OperationArgs) error {
+	fmt.Fprintf(opts.Writer, "device[%s].Another: [%d] %v\n", d.Name, len(opts.Args), strings.Join(opts.Args, "--"))
 	return nil
 }

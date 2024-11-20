@@ -136,7 +136,7 @@ func TestBuildDevices(t *testing.T) {
 		t.Fatalf("failed to unmarshal devices: %v", err)
 	}
 
-	controllers, devices, err := devices.BuildDevices(ctrls, devs, supportedControllers, supportedDevices)
+	controllers, devices, err := devices.BuildDevices(ctrls, devs)
 
 	if err != nil {
 		t.Fatalf("failed to build devices: %v", err)
@@ -206,11 +206,14 @@ func TestOperations(t *testing.T) {
 		t.Fatalf("failed to parse system config: %v", err)
 	}
 
-	var out strings.Builder
+	out := &strings.Builder{}
+	opts := devices.OperationOptions{
+		Writer: out,
+	}
 
 	dev := system.Devices["d"]
 	pars := dev.Config().Operations["on"]
-	if err := dev.Operations()["on"](ctx, &out, pars...); err != nil {
+	if err := dev.Operations()["on"](ctx, opts, pars...); err != nil {
 		t.Errorf("failed to perform operation: %v", err)
 	}
 
@@ -222,7 +225,7 @@ func TestOperations(t *testing.T) {
 
 	ctrl := system.Controllers["c"]
 	pars = ctrl.Config().Operations["enable"]
-	if err := ctrl.Operations()["enable"](ctx, &out, pars...); err != nil {
+	if err := ctrl.Operations()["enable"](ctx, opts, pars...); err != nil {
 		t.Errorf("failed to perform operation: %v", err)
 	}
 	if got, want := out.String(), "controller[c].Enable: [3] on--command--quoted with space\n"; got != want {
@@ -232,7 +235,7 @@ func TestOperations(t *testing.T) {
 	out.Reset()
 
 	pars = ctrl.Config().Operations["disable"]
-	if err := ctrl.Operations()["disable"](ctx, &out, pars...); err != nil {
+	if err := ctrl.Operations()["disable"](ctx, opts, pars...); err != nil {
 		t.Errorf("failed to perform operation: %v", err)
 	}
 	if got, want := out.String(), "controller[c].Disable: [2] off--command\n"; got != want {

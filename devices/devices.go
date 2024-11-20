@@ -16,11 +16,18 @@ import (
 )
 
 type Action struct {
-	DeviceName       string
-	Device           Device
-	ActionName       string
-	Action           Operation
-	ActionParameters []string
+	DeviceName   string
+	Device       Device
+	ActionName   string
+	Action       Operation
+	ActionWriter io.Writer
+	ActionArgs   []string
+}
+
+type OperationArgs struct {
+	Writer io.Writer
+	Logger *slog.Logger
+	Args   []string
 }
 
 type Controller interface {
@@ -33,7 +40,7 @@ type Controller interface {
 	Implementation() any
 }
 
-type Operation func(ctx context.Context, writer io.Writer, args ...string) error
+type Operation func(ctx context.Context, opts OperationArgs) error
 
 type Device interface {
 	SetConfig(DeviceConfigCommon)

@@ -11,12 +11,15 @@ import (
 	"strings"
 
 	"github.com/cosnicolaou/automation/devices"
+	"github.com/cosnicolaou/automation/scheduler"
 	"gopkg.in/yaml.v3"
 )
 
 type ConfigFileFlags struct {
-	KeysFile   string `subcmd:"keys,$HOME/.lutron-keys.yaml,path/URI to a file containing keys"`
-	SystemFile string `subcmd:"system,$HOME/.lutron-system.yaml,path to a file containing the lutron system configuration"`
+	KeysFile       string `subcmd:"keys,$HOME/.lutron-keys.yaml,path/URI to a file containing keys"`
+	SystemFile     string `subcmd:"system,$HOME/.lutron-system.yaml,path to a file containing the lutron system configuration"`
+	SystemLocation string `subcmd:"location,,location of the system"`
+	ScheduleFile   string `subcmd:"schedule,$HOME/.lutron-schedule.yaml,path to a file containing the lutron schedule configuration"`
 }
 
 type ConfigFlags struct {
@@ -43,7 +46,7 @@ func (c *Config) Display(ctx context.Context, flags any, args []string) error {
 		return err
 	}
 
-	system, err := devices.ParseSystemConfigFile(ctx, "", fv.SystemFile)
+	system, err := devices.ParseSystemConfigFile(ctx, fv.SystemLocation, fv.SystemFile)
 	if err != nil {
 		return err
 	}
@@ -64,6 +67,17 @@ func (c *Config) Display(ctx context.Context, flags any, args []string) error {
 		fmt.Printf("Device: %v\n", marshalYAML("  ", device.Config()))
 		fmt.Printf("Device Controlled By: %v\n", device.ControlledByName())
 		fmt.Printf("Device Custom Config: %v\n", marshalYAML("  ", device.CustomConfig()))
+	}
+
+	if fv.ScheduleFile != "" {
+		schedules, err := scheduler.ParseConfigFile(ctx, fv.ScheduleFile, system.Devices)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("Schedules:\n")
+		for _, sched := range schedules.Schedules {
+			fmt.Printf("  %v\n", sched)
+		}
 	}
 
 	return nil

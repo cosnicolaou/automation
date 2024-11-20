@@ -37,7 +37,11 @@ func (c *Control) runOp(ctx context.Context, system devices.System, nameAndOp st
 		if len(args) == 0 {
 			args = pars
 		}
-		if err := fn(ctx, os.Stdout, args...); err != nil {
+		opts := devices.OperationArgs{
+			Writer: os.Stdout,
+			Args:   args,
+		}
+		if err := fn(ctx, opts); err != nil {
 			return fmt.Errorf("failed to run operation: %v: %v", op, err)
 		}
 		return nil
@@ -46,7 +50,11 @@ func (c *Control) runOp(ctx context.Context, system devices.System, nameAndOp st
 		if len(args) == 0 {
 			args = pars
 		}
-		if err := fn(ctx, os.Stdout, args...); err != nil {
+		opts := devices.OperationArgs{
+			Writer: os.Stdout,
+			Args:   args,
+		}
+		if err := fn(ctx, opts); err != nil {
 			return fmt.Errorf("failed to run operation: %v: %v", op, err)
 		}
 		return nil

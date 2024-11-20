@@ -7,7 +7,6 @@ package testutil
 import (
 	"context"
 	"fmt"
-	"io"
 	"strings"
 
 	"github.com/cosnicolaou/automation/devices"
@@ -40,13 +39,13 @@ func (c *MockController) UnmarshalYAML(node *yaml.Node) error {
 	return node.Decode(&c.Detail)
 }
 
-func (c *MockController) Enable(ctx context.Context, out io.Writer, args ...string) error {
-	fmt.Fprintf(out, "controller[%s].Enable: [%d] %v\n", c.Name, len(args), strings.Join(args, "--"))
+func (c *MockController) Enable(ctx context.Context, opts devices.OperationArgs) error {
+	fmt.Fprintf(opts.Writer, "controller[%s].Enable: [%d] %v\n", c.Name, len(opts.Args), strings.Join(opts.Args, "--"))
 	return nil
 }
 
-func (c *MockController) Disable(ctx context.Context, out io.Writer, args ...string) error {
-	fmt.Fprintf(out, "controller[%s].Disable: [%d] %v\n", c.Name, len(args), strings.Join(args, "--"))
+func (c *MockController) Disable(ctx context.Context, opts devices.OperationArgs) error {
+	fmt.Fprintf(opts.Writer, "controller[%s].Disable: [%d] %v\n", c.Name, len(opts.Args), strings.Join(opts.Args, "--"))
 	return nil
 }
 
