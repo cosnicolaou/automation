@@ -7,6 +7,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"log/slog"
+	"os"
 	"slices"
 	"strings"
 
@@ -41,12 +43,16 @@ func marshalYAML(indent string, v any) string {
 
 func (c *Config) Display(ctx context.Context, flags any, args []string) error {
 	fv := flags.(*ConfigFlags)
+
 	keys, err := ReadKeysFile(ctx, fv.KeysFile)
 	if err != nil {
 		return err
 	}
 
-	system, err := devices.ParseSystemConfigFile(ctx, fv.SystemLocation, fv.SystemFile)
+	opts := []devices.Option{
+		devices.WithLogger(slog.New(slog.NewTextHandler(os.Stderr, nil)))}
+
+	system, err := devices.ParseSystemConfigFile(ctx, fv.SystemLocation, fv.SystemFile, opts...)
 	if err != nil {
 		return err
 	}

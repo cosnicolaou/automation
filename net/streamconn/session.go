@@ -26,10 +26,14 @@ type session struct {
 	mu   sync.Mutex
 	err  error
 	conn Transport
-	idle *IdleTimer
+	idle IdleReset
 }
 
-func NewSession(t Transport, idle *IdleTimer) Session {
+type IdleReset interface {
+	Reset()
+}
+
+func NewSession(t Transport, idle IdleReset) Session {
 	return &session{conn: t, idle: idle}
 }
 

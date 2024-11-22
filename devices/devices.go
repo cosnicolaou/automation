@@ -132,6 +132,9 @@ func CreateControllers(config []ControllerConfig, options Options) (map[string]C
 		if !ok {
 			return nil, fmt.Errorf("unsupported controller type: %s", ctrlcfg.Type)
 		}
+		if f == nil {
+			return nil, fmt.Errorf("unsupported controller type, nil new function: %s", ctrlcfg.Type)
+		}
 		ctrl, err := f(ctrlcfg.Type, options)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create controller %v: %w", ctrlcfg.Type, err)
@@ -155,6 +158,9 @@ func CreateDevices(config []DeviceConfig, options Options) (map[string]Device, e
 		f, ok := availableDevices[devcfg.Type]
 		if !ok {
 			return nil, fmt.Errorf("unsupported device type: %s", devcfg.Type)
+		}
+		if f == nil {
+			return nil, fmt.Errorf("unsupported device type, nil new function: %s", devcfg.Type)
 		}
 		dev, err := f(devcfg.Type, options)
 		if err != nil {
