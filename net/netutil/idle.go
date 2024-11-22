@@ -12,9 +12,8 @@ import (
 
 type IdleTimer struct {
 	mu        sync.Mutex
+	ticker    *time.Ticker
 	idleTime  time.Duration
-	elapsed   time.Duration
-	last      time.Time
 	stopCh    chan struct{}
 	stoppedCh chan struct{}
 }
@@ -23,7 +22,7 @@ type IdleTimer struct {
 func NewIdleTimer(d time.Duration) *IdleTimer {
 	return &IdleTimer{
 		idleTime:  d,
-		last:      time.Now(),
+		ticker:    time.NewTicker(d),
 		stopCh:    make(chan struct{}),
 		stoppedCh: make(chan struct{}),
 	}
@@ -33,35 +32,7 @@ func NewIdleTimer(d time.Duration) *IdleTimer {
 func (d *IdleTimer) Reset() {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	d.elapsed = 0
-	d.last = time.Now()
-}
-
-// Expired returns true if the idle timer has expired.
-func (d *IdleTimer) Expired() bool {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	return time.Now().After(d.last.Add(d.idleTime))
-}
-
-// ExpiredAndRest returns true if the idle timer has expired and resets the timer
-// in that case.
-func (d *IdleTimer) ExpiredAndRest() bool {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	if time.Now().After(d.last.Add(d.idleTime)) {
-		d.elapsed = 0
-		d.last = time.Now()
-		return true
-	}
-	return false
-}
-
-// Remaining returns the remaining time before the idle timer expires.
-func (d *IdleTimer) Remaining() time.Duration {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	return d.last.Add(d.idleTime).Sub(time.Now())
+	d.ticker.Reset(d.idleTime)
 }
 
 // Wait waits for the idle to expire, for the channel to be closed or the
@@ -71,11 +42,8 @@ func (d *IdleTimer) Wait(ctx context.Context, expired func(context.Context) erro
 	defer close(d.stoppedCh)
 	for {
 		select {
-		case <-time.After(d.Remaining()):
-			if d.ExpiredAndRest() {
-				expired(ctx)
-			}
-			//			d.Reset()
+		case <-d.ticker.C:
+			expired(ctx)
 		case <-ctx.Done():
 			return
 		case <-d.stopCh:
@@ -87,6 +55,7 @@ func (d *IdleTimer) Wait(ctx context.Context, expired func(context.Context) erro
 // StopWait stops the idle timer watcher and waits for it to do so,
 // or for the context to be canceled.
 func (d *IdleTimer) StopWait(ctx context.Context) error {
+	d.ticker.Stop()
 	close(d.stopCh)
 	select {
 	case <-d.stoppedCh:
