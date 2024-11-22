@@ -5,9 +5,13 @@
 package streamconn_test
 
 import (
+	"context"
+	"fmt"
+	"sync"
 	"testing"
 	"time"
 
+	"cloudeng.io/errors"
 	"github.com/cosnicolaou/automation/net/streamconn"
 )
 
@@ -32,4 +36,81 @@ func TestIdleTime(t *testing.T) {
 	if got, want := timer.Expired(), true; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
+}
+
+func TestWatcherStartStop(t *testing.T) {
+	ctx := context.Background()
+	timer := streamconn.NewIdleTimer(time.Millisecond)
+
+	readyCh := make(chan struct{})
+	waitCh := make(chan time.Time)
+
+	mytime := time.Now()
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	go func() {
+		timer.Wait(ctx, func(ctx context.Context) error {
+			<-readyCh
+			waitCh <- mytime
+			close(waitCh)
+			return nil
+		})
+		wg.Done()
+	}()
+
+	// Allow thje expire function to be execute and capture its
+	// output (via waitCh).
+	readyCh <- struct{}{}
+	if got, want := <-waitCh, mytime; !got.Equal(want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+	fmt.Printf("wainting for stop\n")
+	if err := timer.StopWait(ctx); err != nil {
+		t.Fatal(err)
+	}
+	fmt.Printf("wg.Wait\n")
+	wg.Wait()
+	t.FailNow()
+
+	timer = streamconn.NewIdleTimer(time.Hour)
+	wg.Add(1)
+	go func() {
+		timer.Wait(ctx, func(ctx context.Context) error {
+			<-readyCh
+			return nil
+		})
+		wg.Done()
+	}()
+
+	var errs errors.M
+	go func() {
+		//errs.Append(timer.StopWait(ctx))
+	}()
+	wg.Wait()
+
+	if errs.Err() != nil {
+		t.Fatal(errs.Err())
+	}
+
+	fmt.Printf("er %v\n", errs.Err())
+	t.Fail()
+	/*
+		ctx, cancel := context.WithCancel(context.Background())
+
+
+		var errs errors.M
+		go timer.Watcher(ctx, func(ctx context.Context) error {
+			cancel()
+			errs.Append(errors.New("error"))
+			return errs.Err()
+		})
+
+
+
+
+		if err := timer.StopWatcher(ctx); err != nil {
+			t.Fatal(err)
+		}
+	*/
 }
