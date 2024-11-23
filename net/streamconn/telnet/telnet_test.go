@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cosnicolaou/automation/net/netutil"
 	"github.com/cosnicolaou/automation/net/streamconn"
 	"github.com/cosnicolaou/automation/net/streamconn/telnet"
 	telnetserver "github.com/reiver/go-telnet"
@@ -52,7 +53,7 @@ func TestClient(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	idle := streamconn.NewIdleTimer(10 * time.Minute)
+	idle := netutil.NewIdleTimer(10 * time.Minute)
 	s := streamconn.NewSession(transport, idle)
 	s.Send(ctx, []byte("hello\r\n"))
 	s.Send(ctx, []byte("world\r\n"))

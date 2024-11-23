@@ -12,6 +12,7 @@ import (
 	"github.com/cosnicolaou/automation/net/netutil"
 )
 
+// Manager manages a session with an idle timer.
 type Manager struct {
 	mu      sync.Mutex
 	idle    *netutil.IdleTimer
@@ -22,21 +23,22 @@ func NewManager() *Manager {
 	return &Manager{}
 }
 
+// Session returns the current session, or nil if it the idle
+// timer has expired.
 func (m *Manager) Session() Session {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.session
 }
 
-func (m *Manager) ManageSession(sess Session, idle *netutil.IdleTimer) {
+// ManageSession sets the session and idle timer to be managed and
+// calls the idle timer's Wait method in a goroutine.
+func (m *Manager) ManageSession(ctx context.Context, sess Session, idle *netutil.IdleTimer) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.session = sess
 	m.idle = idle
-}
-
-func (m *Manager) Watch(ctx context.Context) {
-	go m.idle.Wait(ctx, m.Expired)
+	go m.idle.Wait(ctx, m.expired)
 }
 
 func (m *Manager) closeUnderlyingUnlocked(ctx context.Context) error {
@@ -49,13 +51,14 @@ func (m *Manager) closeUnderlyingUnlocked(ctx context.Context) error {
 	return err
 }
 
-func (m *Manager) Expired(ctx context.Context) error {
+func (m *Manager) expired(ctx context.Context) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.closeUnderlyingUnlocked(ctx)
 }
 
-func (m *Manager) Close(ctx context.Context, timeout time.Duration) error {
+// Stop closes the session and stops the idle timer.
+func (m *Manager) Stop(ctx context.Context, timeout time.Duration) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	err := m.closeUnderlyingUnlocked(ctx)
@@ -64,5 +67,7 @@ func (m *Manager) Close(ctx context.Context, timeout time.Duration) error {
 	if serr := m.idle.StopWait(ctx); serr != nil && err == nil {
 		return serr
 	}
+	m.idle = nil
+	m.session = nil
 	return err
 }

@@ -140,6 +140,6 @@ func TestStopWaitHang(t *testing.T) {
 	ctx, cancel := context.WithTimeout(ctx, time.Millisecond*10)
 	defer cancel()
 	if err := timer.StopWait(ctx); !errors.Is(err, context.DeadlineExceeded) {
-		t.Fatal(err)
+		t.Fatalf("unexpected or missing error: %v", err)
 	}
 }
