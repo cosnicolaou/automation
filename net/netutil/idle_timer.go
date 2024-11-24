@@ -40,36 +40,28 @@ func (d *IdleTimer) Reset() {
 	}
 }
 
-func (d *IdleTimer) expire() {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	d.expired = true
-	d.ticker.Stop()
-	d.stopCh = nil
-	d.stoppedCh = nil
-}
-
-func (d *IdleTimer) prep() chan struct{} {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	d.expired = false
-	d.ticker = time.NewTicker(d.idleTime)
-	d.stopCh = make(chan struct{})
-	d.stoppedCh = make(chan struct{})
-	return d.stoppedCh
-}
-
 // Wait waits for the idle to expire, for the channel to be closed or the
 // context to be canceled. The close function is called when the idle timer
 // expires or the context canceled, but not when the channel is closed.
 func (d *IdleTimer) Wait(ctx context.Context, expired func(context.Context) error) {
-	stoppedCh := d.prep()
-	defer close(stoppedCh)
+	d.mu.Lock()
+	d.expired = false
+	d.ticker = time.NewTicker(d.idleTime)
+	d.stopCh = make(chan struct{})
+	d.stoppedCh = make(chan struct{})
+	ch := d.stoppedCh
+	d.mu.Unlock()
+	defer close(ch)
 	for {
 		select {
 		case <-d.ticker.C:
 			expired(ctx)
-			d.expire()
+			d.mu.Lock()
+			d.expired = true
+			d.ticker.Stop()
+			d.stopCh = nil
+			d.stoppedCh = nil
+			d.mu.Unlock()
 			return
 		case <-ctx.Done():
 			return
@@ -83,13 +75,15 @@ func (d *IdleTimer) Wait(ctx context.Context, expired func(context.Context) erro
 // or for the context to be canceled.
 func (d *IdleTimer) StopWait(ctx context.Context) error {
 	d.mu.Lock()
-	defer d.mu.Unlock()
 	if d.expired {
+		d.mu.Unlock()
 		return nil
 	}
 	close(d.stopCh)
+	stoppedCh := d.stoppedCh
+	d.mu.Unlock()
 	select {
-	case <-d.stoppedCh:
+	case <-stoppedCh:
 	case <-ctx.Done():
 		return ctx.Err()
 	}

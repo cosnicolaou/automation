@@ -14,14 +14,92 @@ import (
 	"github.com/cosnicolaou/automation/net/netutil"
 )
 
-func TestWait(t *testing.T) {
+func TestIdleWait(t *testing.T) {
 	ctx := context.Background()
+
 	timerTick := time.Millisecond * 10
 	timer := netutil.NewIdleTimer(timerTick)
 	var wg sync.WaitGroup
-	wg.Add(1)
-	ticks := make(chan time.Time, 10000)
 
+	iterations := 40
+	ticks := make(chan time.Time, iterations)
+	startTimes := make([]time.Time, iterations)
+
+	// Run the idle timer iteration times.
+	for i := 0; i < iterations; i++ {
+		wg.Add(1)
+		startTimes[i] = time.Now()
+		go func() {
+			timer.Wait(ctx, func(ctx context.Context) error {
+				ticks <- time.Now()
+				return nil
+			})
+			wg.Done()
+		}()
+		wg.Wait()
+		time.Sleep(timerTick)
+		// Calls to stop wait can be interleaved with the timer expiring.
+		if i%10 == 0 {
+			if err := timer.StopWait(ctx); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+
+	time.Sleep(time.Second)
+	if err := timer.StopWait(ctx); err != nil {
+		t.Fatal(err)
+	}
+	// Multiple calls to stop Wait are safe.
+	if err := timer.StopWait(ctx); err != nil {
+		t.Fatal(err)
+	}
+	close(ticks)
+	if got, want := len(ticks), iterations; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+
+	first := <-ticks
+	last := first
+	i := 1
+	for tck := range ticks {
+		tickTime := tck.Sub(startTimes[i])
+		// Expect each tick to be approximately timerTick after
+		// the timer was started, allow timerTick's slack.
+		if tickTime == 0 || tickTime > timerTick*2 {
+			t.Errorf("unexpected tick time: %v", tickTime)
+		}
+		iterTime := tck.Sub(last)
+		// expect approximately 2 * timerTick times between iterations,
+		// allow timerTick's slack.
+		if iterTime == 0 || iterTime > timerTick*3 {
+			t.Errorf("unexpected tick time: %v", iterTime)
+		}
+		last = tck
+		i++
+	}
+}
+
+func TestIdleReset(t *testing.T) {
+	ctx := context.Background()
+
+	timerTick := time.Millisecond * 10
+	timer := netutil.NewIdleTimer(timerTick)
+
+	var wg sync.WaitGroup
+	var ticks = make(chan time.Time, 1)
+
+	numResets := 500
+	resetDelay := time.Millisecond
+	go func() {
+		for i := 0; i < numResets; i++ {
+			time.Sleep(resetDelay)
+			timer.Reset()
+		}
+	}()
+
+	wg.Add(1)
+	start := time.Now()
 	go func() {
 		timer.Wait(ctx, func(ctx context.Context) error {
 			ticks <- time.Now()
@@ -29,42 +107,16 @@ func TestWait(t *testing.T) {
 		})
 		wg.Done()
 	}()
-
-	time.Sleep(time.Second)
-	if err := timer.StopWait(ctx); err != nil {
-		t.Fatal(err)
-	}
 	wg.Wait()
-	close(ticks)
-	if nticks := len(ticks); nticks < 40 {
-		t.Errorf("expected at least 40 ticks, got %v", nticks)
-	}
-	nticks := len(ticks)
-	first := <-ticks
-	last := first
-	for tck := range ticks {
-		tickTime := tck.Sub(last)
-		if tickTime == 0 || tickTime > timerTick*2 {
-			t.Errorf("unexpected tick time: %v", tickTime)
-		}
-		last = tck
-	}
 
-	approx := func(actual, expected time.Duration) bool {
-		slack := timerTick * 5
-		if actual <= expected-slack || actual >= expected+slack {
-			return false
-		}
-		return true
+	expireTime := <-ticks
+	// The reset should have kept the timer going for at least numResets * resetDelay.
+	if got, want := expireTime.Sub(start), time.Duration(numResets)*resetDelay; got < want {
+		t.Errorf("got %v, want %v", got, want)
 	}
-
-	if got, want := last.Sub(first), timerTick*time.Duration(nticks); !approx(got, want) {
-		t.Errorf("got %v, want < %v", got, want)
-	}
-
 }
 
-func TestStopWait(t *testing.T) {
+func TestIdleStopWait(t *testing.T) {
 	ctx := context.Background()
 	timer := netutil.NewIdleTimer(time.Millisecond)
 
@@ -100,7 +152,7 @@ func TestStopWait(t *testing.T) {
 
 }
 
-func TestStopWaitCancel(t *testing.T) {
+func TestIdleStopWaitCancel(t *testing.T) {
 	ctx := context.Background()
 	timer := netutil.NewIdleTimer(time.Hour)
 	var wg sync.WaitGroup
@@ -120,7 +172,7 @@ func TestStopWaitCancel(t *testing.T) {
 	wg.Wait()
 }
 
-func TestStopWaitHang(t *testing.T) {
+func TestIdleStopWaitHang(t *testing.T) {
 	ctx := context.Background()
 	timer := netutil.NewIdleTimer(time.Millisecond)
 	readyCh := make(chan struct{})

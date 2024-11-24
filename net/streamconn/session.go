@@ -7,6 +7,8 @@ package streamconn
 import (
 	"context"
 	"sync"
+
+	"github.com/cosnicolaou/automation/net/netutil"
 )
 
 type Transport interface {
@@ -26,14 +28,10 @@ type session struct {
 	mu   sync.Mutex
 	err  error
 	conn Transport
-	idle IdleReset
+	idle netutil.IdleReset
 }
 
-type IdleReset interface {
-	Reset()
-}
-
-func NewSession(t Transport, idle IdleReset) Session {
+func NewSession(t Transport, idle netutil.IdleReset) Session {
 	return &session{conn: t, idle: idle}
 }
 
