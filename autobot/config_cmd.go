@@ -72,7 +72,7 @@ func (c *Config) Display(ctx context.Context, flags any, args []string) error {
 	for _, device := range system.Devices {
 		fmt.Printf("Device: %v\n", marshalYAML("  ", device.Config()))
 		fmt.Printf("Device Controlled By: %v\n", device.ControlledByName())
-		fmt.Printf("Device Custom Config: %v\n", marshalYAML("  ", device.CustomConfig()))
+		fmt.Printf("Device Custom Config:\n%v\n", marshalYAML("  ", device.CustomConfig()))
 	}
 
 	if fv.ScheduleFile != "" {
@@ -99,8 +99,12 @@ func opNames[Map ~map[string]V, V any](m Map) []string {
 }
 
 func (c *Config) Operations(ctx context.Context, flags any, args []string) error {
+
 	fv := flags.(*ConfigFlags)
-	system, err := devices.ParseSystemConfigFile(ctx, "", fv.SystemFile)
+	opts := []devices.Option{
+		devices.WithLogger(slog.New(slog.NewTextHandler(os.Stderr, nil)))}
+
+	system, err := devices.ParseSystemConfigFile(ctx, "", fv.SystemFile, opts...)
 	if err != nil {
 		return err
 	}

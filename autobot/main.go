@@ -42,9 +42,11 @@ commands:
 
 func cli() *subcmd.CommandSetYAML {
 	cmd := subcmd.MustFromYAML(cmdSpec)
+
 	control := &Control{}
 	cmd.Set("control", "run").MustRunner(control.Run, &ControlFlags{})
 	cmd.Set("control", "script").MustRunner(control.RunScript, &ControlScriptFlags{})
+
 	config := &Config{}
 	cmd.Set("config", "display").MustRunner(config.Display, &ConfigFlags{})
 	cmd.Set("config", "operations").MustRunner(config.Operations, &ConfigFlags{})
