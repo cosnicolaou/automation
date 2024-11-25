@@ -7,6 +7,7 @@ package scheduler
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"cloudeng.io/cmdutil/cmdyaml"
 	"cloudeng.io/datetime"
@@ -70,6 +71,8 @@ type actionWithArg struct {
 	When   timeOfDay `yaml:"when" cmd:"the time of day when the action is to be taken"`
 	Action string    `yaml:"action" cmd:"the action to be taken"`
 	Args   []string  `yaml:"args,flow" cmd:"the argument to be passed to the action"`
+	Before string    `yaml:"before" cmd:"the action that must be taken before this one if it is scheduled for the same time"`
+	After  string    `yaml:"after" cmd:"the action that must be taken after this one if it is scheduled for the same time"`
 }
 
 type actionScheduleConfig struct {
@@ -162,9 +165,79 @@ func (cfg schedulesConfig) createSchedules(sys devices.System) (Schedules, error
 					ActionArgs: withargs.Args,
 				}})
 		}
-		annual.Actions.Sort()
+
+		ordered, err := orderOperations(annual.Actions, csched.ActionsWithArgs)
+		if err != nil {
+			return Schedules{}, err
+		}
+		annual.Actions = ordered
 		sched.Schedules = append(sched.Schedules, annual)
 	}
 	sched.System = sys
 	return sched, nil
+}
+
+func validate(withArgs actionWithArg) (before bool, name string, err error) {
+	if len(withArgs.Before) != 0 && len(withArgs.After) != 0 {
+		return false, "", fmt.Errorf("action %v cannot have both before and after specified", withArgs.Action)
+	}
+	name = withArgs.Before
+	before = true
+	if len(name) == 0 {
+		name = withArgs.After
+		before = false
+	}
+	if name == withArgs.Action {
+		return false, "", fmt.Errorf("action %v cannot be before or after itself", withArgs.Action)
+	}
+	return
+}
+
+func orderOperations(actions schedule.Actions[devices.Action], withArgs []actionWithArg) (schedule.Actions[devices.Action], error) {
+
+	actions.Sort()
+
+	order := map[string]int{}
+	for i, a := range actions {
+		order[a.Name] = i
+	}
+
+	for _, wa := range withArgs {
+		if len(wa.Before) == 0 && len(wa.After) == 0 {
+			continue
+		}
+		before, target, err := validate(wa)
+		if err != nil {
+			return nil, err
+		}
+
+		targetPos := order[target]
+		cPos := order[wa.Action]
+
+		if actions[targetPos].Due != actions[cPos].Due {
+			return nil, fmt.Errorf("action %v is not scheduled for the same time as %v", target, wa.Action)
+		}
+
+		if before {
+			if cPos != targetPos-1 {
+				tmp := slices.Insert(actions, targetPos, actions[cPos])
+				delPos := posPostInsertion(cPos, targetPos)
+				return slices.Delete(tmp, delPos, delPos+1), nil
+			}
+			continue
+		}
+		if cPos != targetPos+1 {
+			tmp := slices.Insert(actions, targetPos+1, actions[cPos])
+			delPos := posPostInsertion(cPos, targetPos)
+			return slices.Delete(tmp, delPos, delPos+1), nil
+		}
+	}
+	return actions, nil
+}
+
+func posPostInsertion(cPos, targetPos int) int {
+	if cPos >= targetPos {
+		return cPos + 1
+	}
+	return cPos
 }

@@ -6,7 +6,9 @@ package scheduler_test
 
 import (
 	"context"
+	"fmt"
 	"reflect"
+	"slices"
 	"testing"
 	"time"
 
@@ -29,6 +31,14 @@ devices:
 `
 
 const schedule_config = `
+shared:
+  abc: &abc
+    device: device
+    actions:
+      a: 12:00
+      b: 12:00
+      c: 12:00
+
 schedules:
   - name: simple
     device: device
@@ -81,14 +91,53 @@ schedules:
     ranges:
        - 01/22:2
        - 11/22:12/28
-    actions:
-      on: 12:00
-      off: 16:00
     actions_with_args:
       - action: another
         when: 12:00
+        before: on
         args: ["arg1", "arg2"]
+    actions:
+      on: 12:00
+      off: 16:00
     device: device
+
+  - name: order-1 
+    <<: *abc
+
+  - name: order-2
+    <<: *abc
+    actions_with_args:
+      - action: d
+        when: 12:00
+
+  - name: order-3
+    <<: *abc
+    actions_with_args:
+      - action: d
+        before: a
+        when: 12:00
+
+  - name: order-4
+    <<: *abc
+    actions_with_args:
+      - action: d
+        after: a
+        when: 12:00
+
+  - name: order-5
+    <<: *abc
+    actions_with_args:
+      - action: d
+        after: c
+        when: 12:00
+
+  - name: order-6
+    <<: *abc
+    actions_with_args:
+      - action: d
+        before: c
+        when: 12:00
+
 `
 
 var supportedDevices = devices.SupportedDevices{
@@ -129,7 +178,7 @@ func TestParseActions(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if got, want := len(scheds.Schedules), 8; got != want {
+	if got, want := len(scheds.Schedules), 14; got != want {
 		t.Fatalf("got %d schedules, want %d", got, want)
 	}
 
@@ -140,6 +189,7 @@ func TestParseActions(t *testing.T) {
 	if got, want := len(simple.Actions), 2; got != want {
 		t.Fatalf("got %d actions, want %d", got, want)
 	}
+
 	if got, want := simple.Actions[0], (schedule.Action[devices.Action]{
 		Name: "on",
 		Due:  datetime.NewTimeOfDay(0, 0, 1),
@@ -178,6 +228,7 @@ func TestParseActions(t *testing.T) {
 	}); !reflect.DeepEqual(got, want) {
 		t.Errorf("got %#v, want %#v", got, want)
 	}
+
 }
 
 func scheduledTimes(t *testing.T, scheds scheduler.Schedules, sys devices.System, year int, name string) []time.Time {
@@ -249,6 +300,49 @@ func TestParseSchedules(t *testing.T) {
 	scheduled = scheduledTimes(t, scheds, sys, 2023, "ranges")
 	if got, want := len(scheduled), (10+28+9+28)*2; got != want {
 		t.Errorf("got %d, want %d", got, want)
+	}
+
+}
+
+func TestParseOperationOrder(t *testing.T) {
+	ctx := context.Background()
+	sys, err := devices.ParseSystemConfig(ctx, "", []byte(devices_config),
+		devices.WithDevices(supportedDevices),
+		devices.WithControllers(supportedControllers))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scheds, err := scheduler.ParseConfig(ctx, []byte(schedule_config), sys)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i, tc := range []struct {
+		name     string
+		expected []string
+	}{
+		{"ranges", []string{"another", "on", "off"}},
+		{"order-1", []string{"a", "b", "c"}},
+		{"order-2", []string{"a", "b", "c", "d"}},
+		{"order-3", []string{"d", "a", "b", "c"}},
+		{"order-4", []string{"a", "d", "b", "c"}},
+		{"order-5", []string{"a", "b", "c", "d"}},
+		{"order-6", []string{"a", "b", "d", "c"}},
+	} {
+		if i != 3 {
+			//continue
+		}
+		sched := scheds.Lookup(tc.name)
+		names := []string{}
+		for _, sched := range sched.Actions {
+			names = append(names, sched.Name)
+		}
+		if got, want := names, tc.expected; !slices.Equal(got, want) {
+			fmt.Printf("Failed: %v\n", tc.name)
+			t.Errorf("%v: got %v, want %v", tc.name, got, want)
+		}
+
 	}
 
 }
