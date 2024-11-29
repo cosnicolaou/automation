@@ -8,6 +8,8 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
+	"time"
 
 	"cloudeng.io/cmdutil/cmdyaml"
 	"cloudeng.io/datetime"
@@ -16,15 +18,44 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+func parseFunctionAndDelta(s string) (datetime.DynamicTimeOfDay, time.Duration, error) {
+	pidx, nidx := strings.Index(s, "+"), strings.Index(s, "-")
+	if pidx != -1 && nidx != -1 {
+		return nil, 0, fmt.Errorf("dynamic time of day with multiple deltas: %v", s)
+	}
+	idx := max(pidx, nidx)
+	name := s
+	delta := ""
+	if idx != -1 {
+		name = s[:idx]
+		delta = s[idx:]
+	}
+	dyn, ok := DailyDynamic[name]
+	if !ok {
+		return nil, 0, fmt.Errorf("unknown dynamic time of day: %v", name)
+	}
+	deltaDur, err := time.ParseDuration(delta)
+	if err != nil {
+		return nil, 0, fmt.Errorf("invalid duration: %v", delta)
+	}
+	return dyn, deltaDur, nil
+}
+
 type monthList datetime.MonthList
-type timeOfDay datetime.TimeOfDay
+type timeOfDay string
 
 func (ml *monthList) UnmarshalYAML(node *yaml.Node) error {
 	return (*datetime.MonthList)(ml).Parse(node.Value)
 }
 
 func (t *timeOfDay) UnmarshalYAML(node *yaml.Node) error {
-	return (*datetime.TimeOfDay)(t).Parse(node.Value)
+	// Purely for validation.
+	var tod datetime.TimeOfDay
+	if tod.Parse(node.Value) == nil {
+		return nil
+	}
+	_, _, err := parseFunctionAndDelta(node.Value)
+	return err
 }
 
 type constraintsConfig struct {
@@ -56,9 +87,8 @@ func (dc *datesConfig) parse() (schedule.Dates, error) {
 		For:          datetime.MonthList(dc.For),
 		MirrorMonths: dc.MirrorMonths,
 	}
-	if err := d.Ranges.Parse(dc.Ranges); err != nil {
-		return schedule.Dates{}, err
-	}
+	var err error
+	d.Ranges, d.Dynamic, err = ParseDateRangesDynamic(dc.Ranges)
 	cc, err := dc.Constraints.parse()
 	if err != nil {
 		return schedule.Dates{}, err
@@ -165,7 +195,6 @@ func (cfg schedulesConfig) createSchedules(sys devices.System) (Schedules, error
 					ActionArgs: withargs.Args,
 				}})
 		}
-
 		ordered, err := orderOperations(annual.Actions, csched.ActionsWithArgs)
 		if err != nil {
 			return Schedules{}, err

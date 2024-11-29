@@ -138,6 +138,14 @@ schedules:
         before: c
         when: 12:00
 
+  - name: dynamic
+    for: jan,feb
+    ranges:
+      - summer
+      - winter
+    actions:
+      on: sunrise
+	  off: sunset	
 `
 
 var supportedDevices = devices.SupportedDevices{
@@ -178,7 +186,7 @@ func TestParseActions(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if got, want := len(scheds.Schedules), 14; got != want {
+	if got, want := len(scheds.Schedules), 15; got != want {
 		t.Fatalf("got %d schedules, want %d", got, want)
 	}
 
@@ -346,3 +354,4 @@ func TestParseOperationOrder(t *testing.T) {
 	}
 
 }
+
