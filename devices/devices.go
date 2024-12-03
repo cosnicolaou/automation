@@ -16,12 +16,12 @@ import (
 )
 
 type Action struct {
-	DeviceName   string
-	Device       Device
-	ActionName   string
-	Action       Operation
-	ActionWriter io.Writer
-	ActionArgs   []string
+	DeviceName string
+	Device     Device
+	Name       string
+	Op         Operation
+	Writer     io.Writer
+	Args       []string
 }
 
 type OperationArgs struct {

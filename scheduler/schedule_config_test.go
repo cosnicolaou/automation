@@ -14,6 +14,7 @@ import (
 
 	"cloudeng.io/datetime"
 	"cloudeng.io/datetime/schedule"
+	"cloudeng.io/geospatial/astronomy"
 	"github.com/cosnicolaou/automation/devices"
 	"github.com/cosnicolaou/automation/internal/testutil"
 	"github.com/cosnicolaou/automation/scheduler"
@@ -138,14 +139,35 @@ schedules:
         before: c
         when: 12:00
 
+  - name: order-7
+    <<: *abc
+    actions_with_args:
+      - action: d
+        when: sunset
+
   - name: dynamic
-    for: jan,feb
+    device: device
+    for: feb
     ranges:
       - summer
       - winter
     actions:
-      on: sunrise
-	  off: sunset	
+      on: sunrise-30m
+      off: 5:00
+   
+
+  - name: daylight-saving-time
+    device: device
+    ranges: # California DST dates for 2024 are March 10 and November 3.
+       - 03/08:03/11
+       - 11/01:11/03
+    actions:
+       on: 2:00
+       off: 3:00
+    actions_with_args:
+      - action: another
+        when: 2:30
+        args: ["arg1", "arg2"]
 `
 
 var supportedDevices = devices.SupportedDevices{
@@ -186,7 +208,7 @@ func TestParseActions(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if got, want := len(scheds.Schedules), 15; got != want {
+	if got, want := len(scheds.Schedules), 17; got != want {
 		t.Fatalf("got %d schedules, want %d", got, want)
 	}
 
@@ -198,23 +220,27 @@ func TestParseActions(t *testing.T) {
 		t.Fatalf("got %d actions, want %d", got, want)
 	}
 
-	if got, want := simple.Actions[0], (schedule.Action[devices.Action]{
+	if got, want := simple.Actions[0], (schedule.Action[scheduler.Daily]{
 		Name: "on",
 		Due:  datetime.NewTimeOfDay(0, 0, 1),
-		Action: devices.Action{
-			DeviceName: "device",
-			ActionName: "on",
+		Action: scheduler.Daily{
+			Action: devices.Action{
+				DeviceName: "device",
+				Name:       "on",
+			},
 		},
 	}); !reflect.DeepEqual(got, want) {
 		t.Errorf("got %#v, want %#v", got, want)
 	}
 
-	if got, want := simple.Actions[1], (schedule.Action[devices.Action]{
+	if got, want := simple.Actions[1], (schedule.Action[scheduler.Daily]{
 		Name: "off",
 		Due:  datetime.NewTimeOfDay(0, 0, 2),
-		Action: devices.Action{
-			DeviceName: "device",
-			ActionName: "off",
+		Action: scheduler.Daily{
+			Action: devices.Action{
+				DeviceName: "device",
+				Name:       "off",
+			},
 		},
 	}); !reflect.DeepEqual(got, want) {
 		t.Errorf("got %#v, want %#v", got, want)
@@ -225,13 +251,15 @@ func TestParseActions(t *testing.T) {
 		t.Fatalf("got %d actions, want %d", got, want)
 	}
 
-	if got, want := args.Actions[1], (schedule.Action[devices.Action]{
+	if got, want := args.Actions[1], (schedule.Action[scheduler.Daily]{
 		Name: "off",
 		Due:  datetime.NewTimeOfDay(0, 0, 2),
-		Action: devices.Action{
-			DeviceName: "device",
-			ActionName: "off",
-			ActionArgs: []string{"3", "arg"},
+		Action: scheduler.Daily{
+			Action: devices.Action{
+				DeviceName: "device",
+				Name:       "off",
+				Args:       []string{"3", "arg"},
+			},
 		},
 	}); !reflect.DeepEqual(got, want) {
 		t.Errorf("got %#v, want %#v", got, want)
@@ -239,9 +267,9 @@ func TestParseActions(t *testing.T) {
 
 }
 
-func scheduledTimes(t *testing.T, scheds scheduler.Schedules, sys devices.System, year int, name string) []time.Time {
-	times := []time.Time{}
-	sr, err := scheduler.New(scheds.Lookup(name), sys)
+func scheduledActions(t *testing.T, scheds scheduler.Schedules, sys devices.System, year int, name string) ([]time.Time, []datetime.Date) {
+	s := scheds.Lookup(name)
+	sr, err := scheduler.New(s, sys)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -249,10 +277,17 @@ func scheduledTimes(t *testing.T, scheds scheduler.Schedules, sys devices.System
 		Year:  year,
 		Place: sys.Location,
 	}
-
+	times := []time.Time{}
+	dates := []datetime.Date{}
 	for active := range sr.Scheduled(yp) {
 		times = append(times, datetime.Time(yp, active.Date, active.Actions[0].Due))
+		dates = append(dates, active.Date)
 	}
+	return times, dates
+}
+
+func scheduledTimes(t *testing.T, scheds scheduler.Schedules, sys devices.System, year int, name string) []time.Time {
+	times, _ := scheduledActions(t, scheds, sys, year, name)
 	return times
 }
 
@@ -277,23 +312,23 @@ func TestParseSchedules(t *testing.T) {
 
 	// Jan and Feb, *2 for two unique times.
 	scheduled = scheduledTimes(t, scheds, sys, 2024, "months")
-	if got, want := len(scheduled), (31+29)*2; got != want {
+	if got, want := len(scheduled), (31 + 29); got != want {
 		t.Errorf("got %d, want %d", got, want)
 	}
 
 	scheduled = scheduledTimes(t, scheds, sys, 2023, "months")
-	if got, want := len(scheduled), (31+28)*2; got != want {
+	if got, want := len(scheduled), (31 + 28); got != want {
 		t.Errorf("got %d, want %d", got, want)
 	}
 
 	// Jan and Feb with two days missing
 	scheduled = scheduledTimes(t, scheds, sys, 2024, "exlusions")
-	if got, want := len(scheduled), (31+29-2)*2; got != want {
+	if got, want := len(scheduled), (31 + 29 - 2); got != want {
 		t.Errorf("got %d, want %d", got, want)
 	}
 
 	scheduled = scheduledTimes(t, scheds, sys, 2023, "exlusions")
-	if got, want := len(scheduled), (31+29-3)*2; got != want {
+	if got, want := len(scheduled), (31 + 29 - 3); got != want {
 		t.Errorf("got %d, want %d", got, want)
 	}
 
@@ -301,12 +336,12 @@ func TestParseSchedules(t *testing.T) {
 	// 10+28+9+28 days
 
 	scheduled = scheduledTimes(t, scheds, sys, 2024, "ranges")
-	if got, want := len(scheduled), (10+29+9+28)*2; got != want {
+	if got, want := len(scheduled), (10 + 29 + 9 + 28); got != want {
 		t.Errorf("got %d, want %d", got, want)
 	}
 
 	scheduled = scheduledTimes(t, scheds, sys, 2023, "ranges")
-	if got, want := len(scheduled), (10+28+9+28)*2; got != want {
+	if got, want := len(scheduled), (10 + 28 + 9 + 28); got != want {
 		t.Errorf("got %d, want %d", got, want)
 	}
 
@@ -326,7 +361,7 @@ func TestParseOperationOrder(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for i, tc := range []struct {
+	for _, tc := range []struct {
 		name     string
 		expected []string
 	}{
@@ -337,10 +372,8 @@ func TestParseOperationOrder(t *testing.T) {
 		{"order-4", []string{"a", "d", "b", "c"}},
 		{"order-5", []string{"a", "b", "c", "d"}},
 		{"order-6", []string{"a", "b", "d", "c"}},
+		{"order-7", []string{"d", "a", "b", "c"}},
 	} {
-		if i != 3 {
-			//continue
-		}
 		sched := scheds.Lookup(tc.name)
 		names := []string{}
 		for _, sched := range sched.Actions {
@@ -350,8 +383,57 @@ func TestParseOperationOrder(t *testing.T) {
 			fmt.Printf("Failed: %v\n", tc.name)
 			t.Errorf("%v: got %v, want %v", tc.name, got, want)
 		}
+	}
+}
 
+func datesForRange(year int, dr datetime.DateRangeList) []datetime.Date {
+	dates := []datetime.Date{}
+	for _, r := range dr {
+		for d := range r.Dates(year) {
+			dates = append(dates, d.Date())
+		}
+	}
+	return dates
+}
+
+func TestDynamic(t *testing.T) {
+	ctx := context.Background()
+	sys, err := devices.ParseSystemConfig(ctx, "", []byte(devices_config),
+		devices.WithDevices(supportedDevices),
+		devices.WithControllers(supportedControllers))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scheds, err := scheduler.ParseConfig(ctx, []byte(schedule_config), sys)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	nd := datetime.NewDate
+	ndr := datetime.NewDateRange
+
+	times, dates := scheduledActions(t, scheds, sys, 2024, "dynamic")
+
+	summer := astronomy.Summer{}.Evaluate(2024)
+	winter := astronomy.Winter{}.Evaluate(2024)
+
+	expected := datesForRange(2024,
+		datetime.DateRangeList{
+			ndr(summer.From().Date(), summer.To().Date()),
+			ndr(nd(2, 1), nd(2, 29)),
+			ndr(winter.From().Date(), nd(12, 31)),
+		})
+	slices.Sort(expected)
+	if got, want := dates, expected; !slices.Equal(got, want) {
+		t.Errorf("dates: got %v, want %v", got, want)
+	}
+
+	// Dynamic times will be 00:00:00 when returned for each day in the schedule.
+	for _, when := range times {
+		if when.Hour() != 0 || when.Minute() != 0 || when.Second() != 0 {
+			t.Errorf("time hours, mins and seconds %v should be zero", when)
+		}
 	}
 
 }
-

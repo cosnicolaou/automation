@@ -12,7 +12,6 @@ import (
 	"iter"
 	"log/slog"
 	"os"
-	"sync"
 	"time"
 
 	"cloudeng.io/datetime"
@@ -22,7 +21,7 @@ import (
 
 var OpTimeout = errors.New("op-timeout")
 
-func (s *Scheduler) runOps(ctx context.Context, due time.Time, active schedule.Active[devices.Action]) {
+func (s *Scheduler) runConsecutiveOps(ctx context.Context, due time.Time, active schedule.Active[Daily]) {
 	if len(active.Actions) == 0 {
 		return
 	}
@@ -30,70 +29,85 @@ func (s *Scheduler) runOps(ctx context.Context, due time.Time, active schedule.A
 		localAction := action.Action
 		timeout := localAction.Device.Timeout()
 		ctx, cancel := context.WithTimeoutCause(ctx, timeout, OpTimeout)
-		var errCh = make(chan error)
-		go func() {
-			opts := devices.OperationArgs{
-				Writer: s.opWriter,
-				Logger: s.logger,
-				Args:   action.Action.ActionArgs,
-			}
-			errCh <- localAction.Action(ctx, opts)
-		}()
-		var err error
-		select {
-		case <-ctx.Done():
-			err = ctx.Err()
-			cancel()
-		case err = <-errCh:
-			cancel()
+		opts := devices.OperationArgs{
+			Writer: s.opWriter,
+			Logger: s.logger,
+			Args:   action.Action.Args,
 		}
+		err := localAction.Action.Op(ctx, opts)
+		cancel()
 		if err != nil {
-			s.logger.Warn("failed", "op", localAction.ActionName, "due", due, "err", err)
+			s.logger.Warn("failed", "op", localAction.Name, "due", due, "err", err)
 		} else {
-			s.logger.Info("ok", "op", localAction.ActionName, "due", due)
+			s.logger.Info("ok", "op", localAction.Name, "due", due)
 		}
 	}
 }
 
-func (s *Scheduler) Scheduled(yp datetime.YearAndPlace) iter.Seq[schedule.Active[devices.Action]] {
-	return s.scheduler.Scheduled(yp)
+func (s *Scheduler) runSingleOp(ctx context.Context, due time.Time, action schedule.Action[Daily]) error {
+	op := action.Action
+	timeout := op.Device.Timeout()
+	ctx, cancel := context.WithTimeoutCause(ctx, timeout, OpTimeout)
+	defer cancel()
+	opts := devices.OperationArgs{
+		Writer: s.opWriter,
+		Logger: s.logger,
+		Args:   op.Args,
+	}
+	errCh := make(chan error)
+	go func() {
+		errCh <- op.Action.Op(ctx, opts)
+	}()
+	var err error
+	select {
+	case err = <-errCh:
+	case <-ctx.Done():
+		err = ctx.Err()
+	}
+	if err != nil {
+		s.logger.Warn("failed", "op", op.Name, "due", due, "err", err)
+	} else {
+		s.logger.Info("ok", "op", op.Name, "due", due)
+	}
+	return nil
 }
 
-func actionAndDeviceNames(active schedule.Active[devices.Action]) (actionNames, deviceNames []string) {
-	for _, a := range active.Actions {
-		actionNames = append(actionNames, a.Action.ActionName)
-		deviceNames = append(deviceNames, a.Action.DeviceName)
+func (s *Scheduler) RunDay(ctx context.Context, yp datetime.YearAndPlace, active schedule.Active[Daily]) error {
+	cd := active.Date.CalendarDate(yp.Year)
+	orderDailyOperationsDynamic(active.Actions, cd, s.place)
+	for _, action := range active.Actions {
+		dueAt := datetime.Time(yp, active.Date, action.Due)
+		now := s.timeSource.NowIn(s.place)
+		if now.Before(dueAt) {
+			delay := dueAt.Sub(now)
+			_, _, toStandardTime := datetime.DSTTransition(yp, now, active.Date, action.Due)
+			if toStandardTime {
+				// avoid an overly long delay when transitioning from DST to standard time.
+				delay -= time.Hour
+			}
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(delay):
+			}
+		}
+		if err := s.runSingleOp(ctx, dueAt, action); err != nil {
+			return err
+		}
 	}
-	return actionNames, deviceNames
+	return nil
 }
 
 func (s *Scheduler) RunYear(ctx context.Context, yp datetime.YearAndPlace) error {
-	var wg sync.WaitGroup
 	for active := range s.scheduler.Scheduled(yp) {
 		s.logger.Info("ok", "#actions", len(active.Actions))
 		if len(active.Actions) == 0 {
 			continue
 		}
-		dueAt := datetime.Time(yp, active.Date, active.Actions[0].Due)
-		select {
-		case <-ctx.Done():
-			wg.Wait()
-			return ctx.Err()
-		case <-time.After(dueAt.Sub(s.timeSource.NowIn(s.place))):
-			wg.Add(1)
-			go func() {
-				s.runOps(ctx, dueAt, active)
-				wg.Done()
-			}()
-			now := time.Now().In(s.place)
-			late := dueAt.Add(1 * time.Minute).In(s.place)
-			if now.After(late) {
-				actions, devices := actionAndDeviceNames(active)
-				s.logger.Warn("late", "due", dueAt, "late", late, "now", now, "actions", actions, "devices", devices)
-			}
+		if err := s.RunDay(ctx, yp, active); err != nil {
+			return err
 		}
 	}
-	wg.Wait()
 	return nil
 }
 
@@ -107,10 +121,22 @@ func (s *Scheduler) RunYears(ctx context.Context, yp datetime.YearAndPlace, nYea
 	return nil
 }
 
+func (s *Scheduler) Scheduled(yp datetime.YearAndPlace) iter.Seq[schedule.Active[Daily]] {
+	return s.scheduler.Scheduled(yp)
+}
+
+func actionAndDeviceNames(active schedule.Active[Daily]) (actionNames, deviceNames []string) {
+	for _, a := range active.Actions {
+		actionNames = append(actionNames, a.Action.Name)
+		deviceNames = append(deviceNames, a.Action.DeviceName)
+	}
+	return actionNames, deviceNames
+}
+
 type Scheduler struct {
 	options
-	schedule  schedule.Annual[devices.Action]
-	scheduler *schedule.AnnualScheduler[devices.Action]
+	schedule  schedule.Annual[Daily]
+	scheduler *schedule.AnnualScheduler[Daily]
 	place     *time.Location
 }
 
@@ -157,7 +183,7 @@ func WithOperationWriter(w io.Writer) Option {
 }
 
 // New creates a new scheduler for the supplied schedule and associated devices.
-func New(sched schedule.Annual[devices.Action], system devices.System, opts ...Option) (*Scheduler, error) {
+func New(sched schedule.Annual[Daily], system devices.System, opts ...Option) (*Scheduler, error) {
 	scheduler := &Scheduler{
 		schedule: sched,
 		place:    system.Location,
@@ -180,12 +206,12 @@ func New(sched schedule.Annual[devices.Action], system devices.System, opts ...O
 		if dev == nil {
 			return nil, fmt.Errorf("unknown device: %s", a.Action.DeviceName)
 		}
-		op := dev.Operations()[a.Action.ActionName]
+		op := dev.Operations()[a.Action.Name]
 		if op == nil {
-			return nil, fmt.Errorf("unknown operation: %s for device: %v", a.Action.ActionName, a.Action.DeviceName)
+			return nil, fmt.Errorf("unknown operation: %s for device: %v", a.Action.Name, a.Action.DeviceName)
 		}
 		sched.Actions[i].Action.Device = dev
-		sched.Actions[i].Action.Action = op
+		sched.Actions[i].Action.Action.Op = op
 	}
 	scheduler.logger = scheduler.logger.With("mod", "scheduler", "sched", sched.Name)
 	scheduler.scheduler = schedule.NewAnnualScheduler(sched)

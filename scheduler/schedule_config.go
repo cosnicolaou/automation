@@ -7,9 +7,6 @@ package scheduler
 import (
 	"context"
 	"fmt"
-	"slices"
-	"strings"
-	"time"
 
 	"cloudeng.io/cmdutil/cmdyaml"
 	"cloudeng.io/datetime"
@@ -18,44 +15,10 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func parseFunctionAndDelta(s string) (datetime.DynamicTimeOfDay, time.Duration, error) {
-	pidx, nidx := strings.Index(s, "+"), strings.Index(s, "-")
-	if pidx != -1 && nidx != -1 {
-		return nil, 0, fmt.Errorf("dynamic time of day with multiple deltas: %v", s)
-	}
-	idx := max(pidx, nidx)
-	name := s
-	delta := ""
-	if idx != -1 {
-		name = s[:idx]
-		delta = s[idx:]
-	}
-	dyn, ok := DailyDynamic[name]
-	if !ok {
-		return nil, 0, fmt.Errorf("unknown dynamic time of day: %v", name)
-	}
-	deltaDur, err := time.ParseDuration(delta)
-	if err != nil {
-		return nil, 0, fmt.Errorf("invalid duration: %v", delta)
-	}
-	return dyn, deltaDur, nil
-}
-
 type monthList datetime.MonthList
-type timeOfDay string
 
 func (ml *monthList) UnmarshalYAML(node *yaml.Node) error {
 	return (*datetime.MonthList)(ml).Parse(node.Value)
-}
-
-func (t *timeOfDay) UnmarshalYAML(node *yaml.Node) error {
-	// Purely for validation.
-	var tod datetime.TimeOfDay
-	if tod.Parse(node.Value) == nil {
-		return nil
-	}
-	_, _, err := parseFunctionAndDelta(node.Value)
-	return err
 }
 
 type constraintsConfig struct {
@@ -89,6 +52,9 @@ func (dc *datesConfig) parse() (schedule.Dates, error) {
 	}
 	var err error
 	d.Ranges, d.Dynamic, err = ParseDateRangesDynamic(dc.Ranges)
+	if err != nil {
+		return schedule.Dates{}, err
+	}
 	cc, err := dc.Constraints.parse()
 	if err != nil {
 		return schedule.Dates{}, err
@@ -119,16 +85,16 @@ type schedulesConfig struct {
 
 type Schedules struct {
 	System    devices.System
-	Schedules []schedule.Annual[devices.Action]
+	Schedules []schedule.Annual[Daily]
 }
 
-func (s Schedules) Lookup(name string) schedule.Annual[devices.Action] {
+func (s Schedules) Lookup(name string) schedule.Annual[Daily] {
 	for _, sched := range s.Schedules {
 		if sched.Name == name {
 			return sched
 		}
 	}
-	return schedule.Annual[devices.Action]{}
+	return schedule.Annual[Daily]{}
 }
 
 func ParseConfigFile(ctx context.Context, cfgFile string, system devices.System) (Schedules, error) {
@@ -163,7 +129,7 @@ func (cfg schedulesConfig) createSchedules(sys devices.System) (Schedules, error
 			return Schedules{}, fmt.Errorf("duplicate schedule name: %v", csched.Name)
 		}
 		names[csched.Name] = struct{}{}
-		var annual schedule.Annual[devices.Action]
+		var annual schedule.Annual[Daily]
 		annual.Name = csched.Name
 		dates, err := csched.Dates.parse()
 		if err != nil {
@@ -171,38 +137,56 @@ func (cfg schedulesConfig) createSchedules(sys devices.System) (Schedules, error
 		}
 		annual.Dates = dates
 		for name, when := range csched.Actions {
-			if _, ok := sys.Devices[csched.Device]; !ok {
-				return Schedules{}, fmt.Errorf("unknown device: %s", csched.Device)
+			due, dynDue, delta, err := ParseActionTimeDynamic(string(when))
+			if err != nil {
+				return Schedules{}, fmt.Errorf("failed to parse time of day %q for schedule %q, operation: %q: %v", when, csched.Name, name, err)
 			}
-			annual.Actions = append(annual.Actions, schedule.Action[devices.Action]{
-				Due:  datetime.TimeOfDay(when),
+			if _, ok := sys.Devices[csched.Device]; !ok {
+				return Schedules{}, fmt.Errorf("unknown device: %s for schedule %q", csched.Device, csched.Name)
+			}
+			annual.Actions = append(annual.Actions, schedule.Action[Daily]{
+				Due:  due,
 				Name: name,
-				Action: devices.Action{
-					DeviceName: csched.Device,
-					ActionName: name,
+				Action: Daily{
+					Action: devices.Action{
+						DeviceName: csched.Device,
+						Name:       name,
+					},
+					DynamicTimeOfDay: dynDue,
+					DynamicDelta:     delta,
 				}})
 		}
 		for _, withargs := range csched.ActionsWithArgs {
 			if _, ok := sys.Devices[csched.Device]; !ok {
-				return Schedules{}, fmt.Errorf("unknown device: %s", csched.Device)
+				return Schedules{}, fmt.Errorf("unknown device: %s for schedule %q", csched.Device, csched.Name)
 			}
-			annual.Actions = append(annual.Actions, schedule.Action[devices.Action]{
-				Due:  datetime.TimeOfDay(withargs.When),
+			due, dynDue, delta, err := ParseActionTimeDynamic(string(withargs.When))
+			if err != nil {
+				return Schedules{}, fmt.Errorf("failed to parse time of day %q for schedule %q, operation: %q: %v", withargs.When, csched.Name, withargs.Action, err)
+			}
+			annual.Actions = append(annual.Actions, schedule.Action[Daily]{
+				Due:  due,
 				Name: withargs.Action,
-				Action: devices.Action{
-					DeviceName: csched.Device,
-					ActionName: withargs.Action,
-					ActionArgs: withargs.Args,
+				Action: Daily{
+					Action: devices.Action{
+						DeviceName: csched.Device,
+						Name:       withargs.Action,
+						Args:       withargs.Args,
+					},
+					DynamicTimeOfDay: dynDue,
+					DynamicDelta:     delta,
 				}})
 		}
-		ordered, err := orderOperations(annual.Actions, csched.ActionsWithArgs)
+
+		annual.Actions.Sort()
+		annual.Actions, err = orderDailyOperationsStatic(annual.Actions, csched.ActionsWithArgs)
 		if err != nil {
-			return Schedules{}, err
+			return Schedules{}, fmt.Errorf("failed to order actions for schedule %q: %v", csched.Name, err)
 		}
-		annual.Actions = ordered
 		sched.Schedules = append(sched.Schedules, annual)
 	}
 	sched.System = sys
+
 	return sched, nil
 }
 
@@ -220,53 +204,4 @@ func validate(withArgs actionWithArg) (before bool, name string, err error) {
 		return false, "", fmt.Errorf("action %v cannot be before or after itself", withArgs.Action)
 	}
 	return
-}
-
-func orderOperations(actions schedule.Actions[devices.Action], withArgs []actionWithArg) (schedule.Actions[devices.Action], error) {
-
-	actions.Sort()
-
-	order := map[string]int{}
-	for i, a := range actions {
-		order[a.Name] = i
-	}
-
-	for _, wa := range withArgs {
-		if len(wa.Before) == 0 && len(wa.After) == 0 {
-			continue
-		}
-		before, target, err := validate(wa)
-		if err != nil {
-			return nil, err
-		}
-
-		targetPos := order[target]
-		cPos := order[wa.Action]
-
-		if actions[targetPos].Due != actions[cPos].Due {
-			return nil, fmt.Errorf("action %v is not scheduled for the same time as %v", target, wa.Action)
-		}
-
-		if before {
-			if cPos != targetPos-1 {
-				tmp := slices.Insert(actions, targetPos, actions[cPos])
-				delPos := posPostInsertion(cPos, targetPos)
-				return slices.Delete(tmp, delPos, delPos+1), nil
-			}
-			continue
-		}
-		if cPos != targetPos+1 {
-			tmp := slices.Insert(actions, targetPos+1, actions[cPos])
-			delPos := posPostInsertion(cPos, targetPos)
-			return slices.Delete(tmp, delPos, delPos+1), nil
-		}
-	}
-	return actions, nil
-}
-
-func posPostInsertion(cPos, targetPos int) int {
-	if cPos >= targetPos {
-		return cPos + 1
-	}
-	return cPos
 }
