@@ -50,7 +50,7 @@ schedules:
     device: device
     actions:
       on: 00:00:01
-    actions_with_args:
+    actions_detailed:
       - action: off
         when: 00:00:02
         args: ["3", arg]
@@ -92,7 +92,7 @@ schedules:
     ranges:
        - 01/22:2
        - 11/22:12/28
-    actions_with_args:
+    actions_detailed:
       - action: another
         when: 12:00
         before: on
@@ -107,41 +107,41 @@ schedules:
 
   - name: order-2
     <<: *abc
-    actions_with_args:
+    actions_detailed:
       - action: d
         when: 12:00
 
   - name: order-3
     <<: *abc
-    actions_with_args:
+    actions_detailed:
       - action: d
         before: a
         when: 12:00
 
   - name: order-4
     <<: *abc
-    actions_with_args:
+    actions_detailed:
       - action: d
         after: a
         when: 12:00
 
   - name: order-5
     <<: *abc
-    actions_with_args:
+    actions_detailed:
       - action: d
         after: c
         when: 12:00
 
   - name: order-6
     <<: *abc
-    actions_with_args:
+    actions_detailed:
       - action: d
         before: c
         when: 12:00
 
   - name: order-7
     <<: *abc
-    actions_with_args:
+    actions_detailed:
       - action: d
         when: sunset
 
@@ -164,7 +164,7 @@ schedules:
     actions:
        on: 2:00
        off: 3:00
-    actions_with_args:
+    actions_detailed:
       - action: another
         when: 2:30
         args: ["arg1", "arg2"]

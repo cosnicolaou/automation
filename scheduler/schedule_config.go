@@ -7,6 +7,7 @@ package scheduler
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"cloudeng.io/cmdutil/cmdyaml"
 	"cloudeng.io/datetime"
@@ -63,20 +64,21 @@ func (dc *datesConfig) parse() (schedule.Dates, error) {
 	return d, nil
 }
 
-type actionWithArg struct {
-	When   timeOfDay `yaml:"when" cmd:"the time of day when the action is to be taken"`
-	Action string    `yaml:"action" cmd:"the action to be taken"`
-	Args   []string  `yaml:"args,flow" cmd:"the argument to be passed to the action"`
-	Before string    `yaml:"before" cmd:"the action that must be taken before this one if it is scheduled for the same time"`
-	After  string    `yaml:"after" cmd:"the action that must be taken after this one if it is scheduled for the same time"`
+type actionDetailed struct {
+	When   timeOfDay     `yaml:"when" cmd:"time of day when the action is to be taken"`
+	Action string        `yaml:"action" cmd:"action to be taken"`
+	Args   []string      `yaml:"args,flow" cmd:"argument to be passed to the action"`
+	Before string        `yaml:"before" cmd:"action that must be taken before this one if it is scheduled for the same time"`
+	After  string        `yaml:"after" cmd:"action that must be taken after this one if it is scheduled for the same time"`
+	Repeat time.Duration `yaml:"repeat" cmd:"repeat the action every specified duration, starting at 'when'"`
 }
 
 type actionScheduleConfig struct {
-	Name            string               `yaml:"name" cmd:"the name of the schedule"`
-	Device          string               `yaml:"device" cmd:"the name of the device that the schedule applies to"`
-	Dates           datesConfig          `yaml:",inline" cmd:"the dates that the schedule applies to"`
-	Actions         map[string]timeOfDay `yaml:"actions" cmd:"the actions to be taken and when"`
-	ActionsWithArgs []actionWithArg      `yaml:"actions_with_args" cmd:"actions that accept arguments"`
+	Name            string               `yaml:"name" cmd:"name of the schedule"`
+	Device          string               `yaml:"device" cmd:"name of the device that the schedule applies to"`
+	Dates           datesConfig          `yaml:",inline" cmd:"dates that the schedule applies to"`
+	Actions         map[string]timeOfDay `yaml:"actions" cmd:"actions to be taken and when"`
+	ActionsWithArgs []actionDetailed     `yaml:"actions_detailed" cmd:"actions that accept arguments"`
 }
 
 type schedulesConfig struct {
@@ -121,6 +123,33 @@ func ParseConfig(ctx context.Context, cfgData []byte, system devices.System) (Sc
 	return pcfg, err
 }
 
+func (cfg schedulesConfig) createActions(sys devices.System, times, scheduleName, deviceName, actionName string, args []string) (schedule.Actions[Daily], error) {
+	var actionTimes ActionTimeList
+	if err := actionTimes.Parse(times); err != nil {
+		return nil, fmt.Errorf("failed to parse time of day %q for schedule %q, operation: %q: %v", times, scheduleName, actionName, err)
+	}
+	actions := schedule.Actions[Daily]{}
+	for _, actionTime := range actionTimes {
+		due, dynDue, delta := actionTime.Literal, actionTime.Dynamic, actionTime.Delta
+		if _, ok := sys.Devices[deviceName]; !ok {
+			return nil, fmt.Errorf("unknown device: %s for schedule %q", deviceName, scheduleName)
+		}
+		actions = append(actions, schedule.Action[Daily]{
+			Due:  due,
+			Name: actionName,
+			Action: Daily{
+				Action: devices.Action{
+					DeviceName: deviceName,
+					Name:       actionName,
+					Args:       args,
+				},
+				DynamicTimeOfDay: dynDue,
+				DynamicDelta:     delta,
+			}})
+	}
+	return actions, nil
+}
+
 func (cfg schedulesConfig) createSchedules(sys devices.System) (Schedules, error) {
 	var sched Schedules
 	names := map[string]struct{}{}
@@ -136,46 +165,20 @@ func (cfg schedulesConfig) createSchedules(sys devices.System) (Schedules, error
 			return Schedules{}, err
 		}
 		annual.Dates = dates
+
 		for name, when := range csched.Actions {
-			due, dynDue, delta, err := ParseActionTimeDynamic(string(when))
+			actions, err := cfg.createActions(sys, string(when), csched.Name, csched.Device, name, nil)
 			if err != nil {
-				return Schedules{}, fmt.Errorf("failed to parse time of day %q for schedule %q, operation: %q: %v", when, csched.Name, name, err)
+				return Schedules{}, err
 			}
-			if _, ok := sys.Devices[csched.Device]; !ok {
-				return Schedules{}, fmt.Errorf("unknown device: %s for schedule %q", csched.Device, csched.Name)
-			}
-			annual.Actions = append(annual.Actions, schedule.Action[Daily]{
-				Due:  due,
-				Name: name,
-				Action: Daily{
-					Action: devices.Action{
-						DeviceName: csched.Device,
-						Name:       name,
-					},
-					DynamicTimeOfDay: dynDue,
-					DynamicDelta:     delta,
-				}})
+			annual.Actions = append(annual.Actions, actions...)
 		}
 		for _, withargs := range csched.ActionsWithArgs {
-			if _, ok := sys.Devices[csched.Device]; !ok {
-				return Schedules{}, fmt.Errorf("unknown device: %s for schedule %q", csched.Device, csched.Name)
-			}
-			due, dynDue, delta, err := ParseActionTimeDynamic(string(withargs.When))
+			actions, err := cfg.createActions(sys, string(withargs.When), csched.Name, csched.Device, withargs.Action, withargs.Args)
 			if err != nil {
-				return Schedules{}, fmt.Errorf("failed to parse time of day %q for schedule %q, operation: %q: %v", withargs.When, csched.Name, withargs.Action, err)
+				return Schedules{}, err
 			}
-			annual.Actions = append(annual.Actions, schedule.Action[Daily]{
-				Due:  due,
-				Name: withargs.Action,
-				Action: Daily{
-					Action: devices.Action{
-						DeviceName: csched.Device,
-						Name:       withargs.Action,
-						Args:       withargs.Args,
-					},
-					DynamicTimeOfDay: dynDue,
-					DynamicDelta:     delta,
-				}})
+			annual.Actions = append(annual.Actions, actions...)
 		}
 
 		annual.Actions.Sort()
@@ -190,7 +193,7 @@ func (cfg schedulesConfig) createSchedules(sys devices.System) (Schedules, error
 	return sched, nil
 }
 
-func validate(withArgs actionWithArg) (before bool, name string, err error) {
+func validate(withArgs actionDetailed) (before bool, name string, err error) {
 	if len(withArgs.Before) != 0 && len(withArgs.After) != 0 {
 		return false, "", fmt.Errorf("action %v cannot have both before and after specified", withArgs.Action)
 	}
