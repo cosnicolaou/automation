@@ -3,6 +3,7 @@ module github.com/cosnicolaou/automation
 go 1.23.1
 
 require (
+	cloudeng.io/algo v0.0.0-20241113171112-2102962e1386 // indirect
 	cloudeng.io/cmdutil v0.0.0-20241113171112-2102962e1386 // indirect
 	cloudeng.io/file v0.0.0-20241013003937-7fc58708a1c1 // indirect
 	cloudeng.io/macos v0.0.0-20241113171112-2102962e1386 // indirect

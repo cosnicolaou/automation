@@ -6,9 +6,9 @@ package scheduler_test
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -155,7 +155,6 @@ schedules:
       on: sunrise-30m
       off: 5:00
    
-
   - name: daylight-saving-time
     device: device
     ranges: # California DST dates for 2024 are March 10 and November 3.
@@ -168,6 +167,40 @@ schedules:
       - action: another
         when: 2:30
         args: ["arg1", "arg2"]
+
+  - name: multi-time
+    device: device
+    actions:
+      on: 00:00:01,00:01:00
+      off: 00:00:02,00:02:00
+
+  - name: repeating
+    device: device
+    ranges:
+       - 03/09:03/10
+       - 11/02:11/03
+    actions:
+      on: 00:00:01
+    actions_detailed:
+      - action: off
+        when: 01:00:00
+        repeat: 1h
+      - action: another
+        when: 01:13:00
+        repeat: 13m
+
+  - name: repeating-bounded
+    device: device
+    ranges:
+       - 03/09:03/10
+       - 11/02:11/03
+    actions:
+      on: 00:00:01
+    actions_detailed:
+      - action: off
+        when: 01:0:00
+        repeat: 30m
+        num_repeats: 4
 `
 
 var supportedDevices = devices.SupportedDevices{
@@ -194,21 +227,30 @@ var supportedControllers = devices.SupportedControllers{
 	},
 }
 
-func TestParseActions(t *testing.T) {
-	ctx := context.Background()
-	sys, err := devices.ParseSystemConfig(ctx, "", []byte(devices_config),
+func createSystem(t *testing.T) devices.System {
+	sys, err := devices.ParseSystemConfig(context.Background(), "", []byte(devices_config),
 		devices.WithDevices(supportedDevices),
 		devices.WithControllers(supportedControllers))
 	if err != nil {
 		t.Fatal(err)
 	}
+	return sys
+}
 
+func createSchedules(t *testing.T, sys devices.System) scheduler.Schedules {
+	ctx := context.Background()
 	scheds, err := scheduler.ParseConfig(ctx, []byte(schedule_config), sys)
 	if err != nil {
 		t.Fatal(err)
 	}
+	return scheds
+}
 
-	if got, want := len(scheds.Schedules), 17; got != want {
+func TestParseActions(t *testing.T) {
+	sys := createSystem(t)
+	scheds := createSchedules(t, sys)
+
+	if got, want := len(scheds.Schedules), 20; got != want {
 		t.Fatalf("got %d schedules, want %d", got, want)
 	}
 
@@ -220,10 +262,10 @@ func TestParseActions(t *testing.T) {
 		t.Fatalf("got %d actions, want %d", got, want)
 	}
 
-	if got, want := simple.Actions[0], (schedule.Action[scheduler.Daily]{
+	if got, want := simple.Actions[0], (schedule.Action[scheduler.Action]{
 		Name: "on",
 		Due:  datetime.NewTimeOfDay(0, 0, 1),
-		Action: scheduler.Daily{
+		Action: scheduler.Action{
 			Action: devices.Action{
 				DeviceName: "device",
 				Name:       "on",
@@ -233,10 +275,10 @@ func TestParseActions(t *testing.T) {
 		t.Errorf("got %#v, want %#v", got, want)
 	}
 
-	if got, want := simple.Actions[1], (schedule.Action[scheduler.Daily]{
+	if got, want := simple.Actions[1], (schedule.Action[scheduler.Action]{
 		Name: "off",
 		Due:  datetime.NewTimeOfDay(0, 0, 2),
-		Action: scheduler.Daily{
+		Action: scheduler.Action{
 			Action: devices.Action{
 				DeviceName: "device",
 				Name:       "off",
@@ -251,10 +293,10 @@ func TestParseActions(t *testing.T) {
 		t.Fatalf("got %d actions, want %d", got, want)
 	}
 
-	if got, want := args.Actions[1], (schedule.Action[scheduler.Daily]{
+	if got, want := args.Actions[1], (schedule.Action[scheduler.Action]{
 		Name: "off",
 		Due:  datetime.NewTimeOfDay(0, 0, 2),
-		Action: scheduler.Daily{
+		Action: scheduler.Action{
 			Action: devices.Action{
 				DeviceName: "device",
 				Name:       "off",
@@ -265,6 +307,65 @@ func TestParseActions(t *testing.T) {
 		t.Errorf("got %#v, want %#v", got, want)
 	}
 
+	multi := scheds.Lookup("multi-time")
+	if got, want := len(multi.Actions), 4; got != want {
+		t.Fatalf("got %d actions, want %d", got, want)
+	}
+
+	if got, want := multi.Actions, (schedule.Actions[scheduler.Action]{
+		{Name: "on",
+			Due: datetime.NewTimeOfDay(0, 0, 1),
+			Action: scheduler.Action{
+				Action: devices.Action{
+					DeviceName: "device",
+					Name:       "on",
+				},
+			}},
+		{Name: "off",
+			Due: datetime.NewTimeOfDay(0, 0, 2),
+			Action: scheduler.Action{
+				Action: devices.Action{
+					DeviceName: "device",
+					Name:       "off",
+				},
+			}},
+		{Name: "on",
+			Due: datetime.NewTimeOfDay(0, 1, 0),
+			Action: scheduler.Action{
+				Action: devices.Action{
+					DeviceName: "device",
+					Name:       "on",
+				},
+			}},
+		{Name: "off",
+			Due: datetime.NewTimeOfDay(0, 2, 0),
+			Action: scheduler.Action{
+				Action: devices.Action{
+					DeviceName: "device",
+					Name:       "off",
+				},
+			},
+		}}); !reflect.DeepEqual(got, want) {
+		t.Errorf("got %#v, want %#v", got, want)
+	}
+
+	repeat := scheds.Lookup("repeating")
+	if got, want := len(repeat.Actions), 2; got != want {
+		t.Fatalf("got %d actions, want %d", got, want)
+	}
+
+	if got, want := repeat.Actions[1], (schedule.Action[scheduler.Action]{Name: "off",
+		Due: datetime.NewTimeOfDay(1, 0, 0),
+		Action: scheduler.Action{
+			Action: devices.Action{
+				DeviceName: "device",
+				Name:       "off",
+			},
+			Repeat: time.Hour,
+		},
+	}); !reflect.DeepEqual(got, want) {
+		t.Errorf("got %+v, want %+v", got, want)
+	}
 }
 
 func scheduledActions(t *testing.T, scheds scheduler.Schedules, sys devices.System, year int, name string) ([]time.Time, []datetime.Date) {
@@ -292,18 +393,8 @@ func scheduledTimes(t *testing.T, scheds scheduler.Schedules, sys devices.System
 }
 
 func TestParseSchedules(t *testing.T) {
-	ctx := context.Background()
-	sys, err := devices.ParseSystemConfig(ctx, "", []byte(devices_config),
-		devices.WithDevices(supportedDevices),
-		devices.WithControllers(supportedControllers))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	scheds, err := scheduler.ParseConfig(ctx, []byte(schedule_config), sys)
-	if err != nil {
-		t.Fatal(err)
-	}
+	sys := createSystem(t)
+	scheds := createSchedules(t, sys)
 
 	scheduled := scheduledTimes(t, scheds, sys, 2024, "simple")
 	if got, want := len(scheduled), 0; got != want {
@@ -348,18 +439,8 @@ func TestParseSchedules(t *testing.T) {
 }
 
 func TestParseOperationOrder(t *testing.T) {
-	ctx := context.Background()
-	sys, err := devices.ParseSystemConfig(ctx, "", []byte(devices_config),
-		devices.WithDevices(supportedDevices),
-		devices.WithControllers(supportedControllers))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	scheds, err := scheduler.ParseConfig(ctx, []byte(schedule_config), sys)
-	if err != nil {
-		t.Fatal(err)
-	}
+	sys := createSystem(t)
+	scheds := createSchedules(t, sys)
 
 	for _, tc := range []struct {
 		name     string
@@ -380,7 +461,6 @@ func TestParseOperationOrder(t *testing.T) {
 			names = append(names, sched.Name)
 		}
 		if got, want := names, tc.expected; !slices.Equal(got, want) {
-			fmt.Printf("Failed: %v\n", tc.name)
 			t.Errorf("%v: got %v, want %v", tc.name, got, want)
 		}
 	}
@@ -397,18 +477,8 @@ func datesForRange(year int, dr datetime.DateRangeList) []datetime.Date {
 }
 
 func TestDynamic(t *testing.T) {
-	ctx := context.Background()
-	sys, err := devices.ParseSystemConfig(ctx, "", []byte(devices_config),
-		devices.WithDevices(supportedDevices),
-		devices.WithControllers(supportedControllers))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	scheds, err := scheduler.ParseConfig(ctx, []byte(schedule_config), sys)
-	if err != nil {
-		t.Fatal(err)
-	}
+	sys := createSystem(t)
+	scheds := createSchedules(t, sys)
 
 	nd := datetime.NewDate
 	ndr := datetime.NewDateRange
@@ -435,5 +505,102 @@ func TestDynamic(t *testing.T) {
 			t.Errorf("time hours, mins and seconds %v should be zero", when)
 		}
 	}
+}
 
+const (
+	empty = `
+schedules:
+  - name: simple
+    device: device
+    actions:`
+	bad_times = `
+schedules:
+  - name: simple
+    device: device
+    actions:
+       on: 00:xx:01
+`
+	bad_op = `
+schedules:
+  - name: simple
+    device: device
+    actions:
+    actions_detailed:
+      - action: off
+        when: 00:00:02
+        before: foo
+`
+	diff_time = `
+schedules:
+  - name: simple
+    device: device
+    actions:
+      on: 00:00:01
+    actions_detailed:
+      - action: off
+        when: 00:00:02
+        before: on
+`
+	both_before_and_after = `
+schedules:
+  - name: simple
+    device: device
+    actions:
+      on: 00:00:01
+    actions_detailed:
+      - action: off
+        when: 00:00:02
+        before: on
+        after: on
+`
+	refer_to_self = `
+schedules:
+  - name: simple
+    device: device
+    actions:
+      on: 00:00:01
+    actions_detailed:
+      - action: off
+        when: 00:00:02
+        before: off
+`
+
+	repeat_zero = `
+schedules:
+  - name: simple
+    device: device
+    actions_detailed:
+      - action: off
+        repeat: 0s
+`
+)
+
+func TestValidation(t *testing.T) {
+	ctx := context.Background()
+	sys := createSystem(t)
+	for _, tc := range []struct {
+		cfg string
+		err string
+	}{
+		{empty, "no actions defined"},
+		{bad_times, "invalid time"},
+		{bad_op, "foo not found"},
+		{diff_time, "not scheduled for the same time"},
+		{both_before_and_after, "cannot have both before and after"},
+		{refer_to_self, "cannot be before or after itself"},
+		{repeat_zero, "repeat duration must be greater than zero"},
+	} {
+		_, err := scheduler.ParseConfig(ctx, []byte(tc.cfg), sys)
+		if err == nil || !strings.Contains(err.Error(), tc.err) {
+			t.Errorf("missing or unexpected error: %v, not %v", err, tc.err)
+		}
+	}
+
+}
+
+func TestMultiAndRepeat(t *testing.T) {
+
+	// impossible repeat values
+	// make sure it stops correctly, even on DST transitions
+	t.Fail()
 }

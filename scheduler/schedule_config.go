@@ -16,6 +16,20 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+type repeatDuration time.Duration
+
+func (rd *repeatDuration) UnmarshalYAML(node *yaml.Node) error {
+	d, err := time.ParseDuration(node.Value)
+	if err != nil {
+		return err
+	}
+	if d == 0 {
+		return fmt.Errorf("repeat duration must be greater than zero")
+	}
+	*rd = repeatDuration(d)
+	return nil
+}
+
 type monthList datetime.MonthList
 
 func (ml *monthList) UnmarshalYAML(node *yaml.Node) error {
@@ -65,12 +79,13 @@ func (dc *datesConfig) parse() (schedule.Dates, error) {
 }
 
 type actionDetailed struct {
-	When   timeOfDay     `yaml:"when" cmd:"time of day when the action is to be taken"`
-	Action string        `yaml:"action" cmd:"action to be taken"`
-	Args   []string      `yaml:"args,flow" cmd:"argument to be passed to the action"`
-	Before string        `yaml:"before" cmd:"action that must be taken before this one if it is scheduled for the same time"`
-	After  string        `yaml:"after" cmd:"action that must be taken after this one if it is scheduled for the same time"`
-	Repeat time.Duration `yaml:"repeat" cmd:"repeat the action every specified duration, starting at 'when'"`
+	When       timeOfDay      `yaml:"when" cmd:"time of day when the action is to be taken"`
+	Action     string         `yaml:"action" cmd:"action to be taken"`
+	Args       []string       `yaml:"args,flow" cmd:"argument to be passed to the action"`
+	Before     string         `yaml:"before" cmd:"action that must be taken before this one if it is scheduled for the same time"`
+	After      string         `yaml:"after" cmd:"action that must be taken after this one if it is scheduled for the same time"`
+	Repeat     repeatDuration `yaml:"repeat" cmd:"repeat the action every specified duration, starting at 'when'"`
+	NumRepeats int            `yaml:"num_repeats" cmd:"number of times to repeat"`
 }
 
 type actionScheduleConfig struct {
@@ -78,7 +93,7 @@ type actionScheduleConfig struct {
 	Device          string               `yaml:"device" cmd:"name of the device that the schedule applies to"`
 	Dates           datesConfig          `yaml:",inline" cmd:"dates that the schedule applies to"`
 	Actions         map[string]timeOfDay `yaml:"actions" cmd:"actions to be taken and when"`
-	ActionsWithArgs []actionDetailed     `yaml:"actions_detailed" cmd:"actions that accept arguments"`
+	ActionsDetailed []actionDetailed     `yaml:"actions_detailed" cmd:"actions that accept arguments"`
 }
 
 type schedulesConfig struct {
@@ -87,16 +102,16 @@ type schedulesConfig struct {
 
 type Schedules struct {
 	System    devices.System
-	Schedules []schedule.Annual[Daily]
+	Schedules []schedule.Annual[Action]
 }
 
-func (s Schedules) Lookup(name string) schedule.Annual[Daily] {
+func (s Schedules) Lookup(name string) schedule.Annual[Action] {
 	for _, sched := range s.Schedules {
 		if sched.Name == name {
 			return sched
 		}
 	}
-	return schedule.Annual[Daily]{}
+	return schedule.Annual[Action]{}
 }
 
 func ParseConfigFile(ctx context.Context, cfgFile string, system devices.System) (Schedules, error) {
@@ -123,28 +138,30 @@ func ParseConfig(ctx context.Context, cfgData []byte, system devices.System) (Sc
 	return pcfg, err
 }
 
-func (cfg schedulesConfig) createActions(sys devices.System, times, scheduleName, deviceName, actionName string, args []string) (schedule.Actions[Daily], error) {
+func (cfg schedulesConfig) createActions(sys devices.System, times, scheduleName, deviceName, actionName string, details actionDetailed) (schedule.Actions[Action], error) {
 	var actionTimes ActionTimeList
 	if err := actionTimes.Parse(times); err != nil {
 		return nil, fmt.Errorf("failed to parse time of day %q for schedule %q, operation: %q: %v", times, scheduleName, actionName, err)
 	}
-	actions := schedule.Actions[Daily]{}
+	actions := schedule.Actions[Action]{}
 	for _, actionTime := range actionTimes {
 		due, dynDue, delta := actionTime.Literal, actionTime.Dynamic, actionTime.Delta
 		if _, ok := sys.Devices[deviceName]; !ok {
 			return nil, fmt.Errorf("unknown device: %s for schedule %q", deviceName, scheduleName)
 		}
-		actions = append(actions, schedule.Action[Daily]{
+		actions = append(actions, schedule.Action[Action]{
 			Due:  due,
 			Name: actionName,
-			Action: Daily{
+			Action: Action{
 				Action: devices.Action{
 					DeviceName: deviceName,
 					Name:       actionName,
-					Args:       args,
+					Args:       details.Args,
 				},
 				DynamicTimeOfDay: dynDue,
 				DynamicDelta:     delta,
+				Repeat:           time.Duration(details.Repeat),
+				NumRepeats:       details.NumRepeats,
 			}})
 	}
 	return actions, nil
@@ -158,7 +175,7 @@ func (cfg schedulesConfig) createSchedules(sys devices.System) (Schedules, error
 			return Schedules{}, fmt.Errorf("duplicate schedule name: %v", csched.Name)
 		}
 		names[csched.Name] = struct{}{}
-		var annual schedule.Annual[Daily]
+		var annual schedule.Annual[Action]
 		annual.Name = csched.Name
 		dates, err := csched.Dates.parse()
 		if err != nil {
@@ -167,14 +184,14 @@ func (cfg schedulesConfig) createSchedules(sys devices.System) (Schedules, error
 		annual.Dates = dates
 
 		for name, when := range csched.Actions {
-			actions, err := cfg.createActions(sys, string(when), csched.Name, csched.Device, name, nil)
+			actions, err := cfg.createActions(sys, string(when), csched.Name, csched.Device, name, actionDetailed{})
 			if err != nil {
 				return Schedules{}, err
 			}
 			annual.Actions = append(annual.Actions, actions...)
 		}
-		for _, withargs := range csched.ActionsWithArgs {
-			actions, err := cfg.createActions(sys, string(withargs.When), csched.Name, csched.Device, withargs.Action, withargs.Args)
+		for _, details := range csched.ActionsDetailed {
+			actions, err := cfg.createActions(sys, string(details.When), csched.Name, csched.Device, details.Action, details)
 			if err != nil {
 				return Schedules{}, err
 			}
@@ -182,29 +199,16 @@ func (cfg schedulesConfig) createSchedules(sys devices.System) (Schedules, error
 		}
 
 		annual.Actions.Sort()
-		annual.Actions, err = orderDailyOperationsStatic(annual.Actions, csched.ActionsWithArgs)
+		annual.Actions, err = orderActionsStatic(annual.Actions, csched.ActionsDetailed)
 		if err != nil {
 			return Schedules{}, fmt.Errorf("failed to order actions for schedule %q: %v", csched.Name, err)
+		}
+		if len(annual.Actions) == 0 {
+			return Schedules{}, fmt.Errorf("no actions defined for schedule %q", csched.Name)
 		}
 		sched.Schedules = append(sched.Schedules, annual)
 	}
 	sched.System = sys
 
 	return sched, nil
-}
-
-func validate(withArgs actionDetailed) (before bool, name string, err error) {
-	if len(withArgs.Before) != 0 && len(withArgs.After) != 0 {
-		return false, "", fmt.Errorf("action %v cannot have both before and after specified", withArgs.Action)
-	}
-	name = withArgs.Before
-	before = true
-	if len(name) == 0 {
-		name = withArgs.After
-		before = false
-	}
-	if name == withArgs.Action {
-		return false, "", fmt.Errorf("action %v cannot be before or after itself", withArgs.Action)
-	}
-	return
 }

@@ -11,11 +11,13 @@ import (
 	"fmt"
 	"log/slog"
 	"slices"
+	"sort"
 	"sync"
 	"testing"
 	"time"
 
 	"cloudeng.io/datetime"
+	"cloudeng.io/datetime/schedule"
 	"cloudeng.io/errors"
 	"github.com/cosnicolaou/automation/devices"
 	"github.com/cosnicolaou/automation/internal/testutil"
@@ -60,7 +62,7 @@ func (t *timesource) tick(nextTick time.Time) {
 
 type testAction struct {
 	when   time.Time
-	action scheduler.Daily
+	action scheduler.Action
 }
 
 func subMilliseconds(yp datetime.YearAndPlace, date datetime.Date, tod datetime.TimeOfDay) time.Time {
@@ -131,6 +133,7 @@ type logEntry struct {
 	Sched      string    `json:"sched"`
 	Msg        string    `json:"msg"`
 	Op         string    `json:"op"`
+	Now        time.Time `json:"now"`
 	Due        time.Time `json:"due"`
 	NumActions int       `json:"#actions"`
 	Error      string    `json:"err"`
@@ -170,12 +173,7 @@ func newRecorder() *recorder {
 
 func setupSchedules(t *testing.T, schedule_config string) (devices.System, scheduler.Schedules) {
 	ctx := context.Background()
-	sys, err := devices.ParseSystemConfig(ctx, "", []byte(devices_config),
-		devices.WithDevices(supportedDevices),
-		devices.WithControllers(supportedControllers))
-	if err != nil {
-		t.Fatal(err)
-	}
+	sys := createSystem(t)
 	spec, err := scheduler.ParseConfig(ctx, []byte(schedule_config), sys)
 	if err != nil {
 		t.Fatal(err)
@@ -201,6 +199,7 @@ func runScheduler(ctx context.Context, t *testing.T, scheduler *scheduler.Schedu
 	wg.Add(1)
 	go func() {
 		errs.Append(scheduler.RunYear(ctx, yp))
+		fmt.Printf("RUNYEAR DONE: %v\n", errs.Err())
 		wg.Done()
 	}()
 	for _, t := range times {
@@ -213,6 +212,14 @@ func runScheduler(ctx context.Context, t *testing.T, scheduler *scheduler.Schedu
 	}
 }
 
+func createScheduler(t *testing.T, sys devices.System, schedule schedule.Annual[scheduler.Action], opts ...scheduler.Option) *scheduler.Scheduler {
+	scheduler, err := scheduler.New(schedule, sys, opts...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return scheduler
+}
+
 func TestScheduler(t *testing.T) {
 	ctx := context.Background()
 
@@ -222,11 +229,7 @@ func TestScheduler(t *testing.T) {
 
 	yp := datetime.YearAndPlace{Year: 2021, Place: sys.Location}
 
-	diningRoom := spec.Lookup("ranges")
-	scheduler, err := scheduler.New(diningRoom, sys, opts...)
-	if err != nil {
-		t.Fatal(err)
-	}
+	scheduler := createScheduler(t, sys, spec.Lookup("ranges"), opts...)
 
 	all, times := allScheduled(scheduler, yp)
 	runScheduler(ctx, t, scheduler, yp, ts, times)
@@ -316,10 +319,7 @@ func TestScheduleRealTime(t *testing.T) {
 		scheduler.WithLogger(logger),
 		scheduler.WithOperationWriter(deviceRecorder)}
 
-	scheduler, err := scheduler.New(sched, sys, opts...)
-	if err != nil {
-		t.Fatal(err)
-	}
+	scheduler := createScheduler(t, sys, sched, opts...)
 
 	all, _ := allScheduled(scheduler, yp)
 
@@ -391,10 +391,7 @@ func TestTimeout(t *testing.T) {
 		sched.Actions[0].Due = datetime.TimeOfDayFromTime(now.Add(time.Second))
 
 		opts := []scheduler.Option{scheduler.WithLogger(logger)}
-		scheduler, err := scheduler.New(sched, sys, opts...)
-		if err != nil {
-			t.Fatal(err)
-		}
+		scheduler := createScheduler(t, sys, sched, opts...)
 		if tc.cancel {
 			go func() {
 				time.Sleep(time.Second)
@@ -432,10 +429,7 @@ func TestMultiYear(t *testing.T) {
 		scheduler.WithLogger(logger),
 	}
 
-	scheduler, err := scheduler.New(spec.Lookup("multi-year"), sys, opts...)
-	if err != nil {
-		t.Fatal(err)
-	}
+	scheduler := createScheduler(t, sys, spec.Lookup("multi-year"), opts...)
 
 	all2023, times2023 := allScheduled(scheduler, yp)
 	all2024, times2024 := allScheduled(scheduler, datetime.YearAndPlace{Year: 2024, Place: yp.Place})
@@ -486,11 +480,7 @@ func TestDST(t *testing.T) {
 
 	yp := datetime.YearAndPlace{Year: 2024, Place: sys.Location}
 
-	dst := spec.Lookup("daylight-saving-time")
-	scheduler, err := scheduler.New(dst, sys, opts...)
-	if err != nil {
-		t.Fatal(err)
-	}
+	scheduler := createScheduler(t, sys, spec.Lookup("daylight-saving-time"), opts...)
 
 	all, times := allScheduled(scheduler, yp)
 	runScheduler(ctx, t, scheduler, yp, ts, times)
@@ -562,6 +552,171 @@ func TestDST(t *testing.T) {
 		if got, want := off.Due, all[i*3+2].when; !got.Equal(want) {
 			t.Errorf("%v: got %v, want %v", i, got, want)
 		}
+	}
+}
+
+func appendNRepeats(times []time.Time, start time.Time, n int, delta time.Duration) []time.Time {
+	for i := 1; i < n; i++ {
+		n := start.Add(delta * time.Duration(i))
+		if n.Day() != start.Day() {
+			break
+		}
+		times = append(times, n)
+	}
+	return times
+}
+func TestRepeats(t *testing.T) {
+	ctx := context.Background()
+
+	ts := &timesource{ch: make(chan time.Time, 1)}
+	_, logRecorder, opts := newRecordersAndLogger(ts)
+	sys, spec := setupSchedules(t, schedule_config)
+
+	yp := datetime.YearAndPlace{Year: 2024, Place: sys.Location}
+
+	scheduler := createScheduler(t, sys, spec.Lookup("repeating"), opts...)
+
+	//	ndays := 2 + 2
+	_, times := allScheduled(scheduler, yp)
+
+	// Fill out the timesource schedule with the repeats for each
+	// operation for each day.
+	// There are 3 actions for each day of the four days:
+	// 'on', 'off' and 'another' that start at 00:00:01, 01:00:00 and 01:33:00
+
+	// add repeats for 'off' operations, per day. Expect 23 on
+	// a normal day, 22 on ST-DST and 24 on ST-DST.
+	times = appendNRepeats(times, times[1], 23, time.Hour)
+	times = appendNRepeats(times, times[4], 22, time.Hour)
+	times = appendNRepeats(times, times[7], 23, time.Hour)
+	times = appendNRepeats(times, times[10], 24, time.Hour)
+
+	// add repeats for 'another' operations, per day. Expect 41 on
+	// a normal day, 40 on ST-DST and 42 on ST-DST.
+	period := time.Minute * 13
+	times = appendNRepeats(times, times[2], 106, period)
+	times = appendNRepeats(times, times[5], 105, period)
+	times = appendNRepeats(times, times[8], 109, period)
+	times = appendNRepeats(times, times[11], 107, period)
+
+	sort.Slice(times, func(i, j int) bool {
+		return times[i].Before(times[j])
+	})
+
+	fmt.Printf("LEN %v\n", len(times))
+	for i, t := range times {
+		fmt.Printf("% 5v: %v\n", i, t)
+	}
+	runScheduler(ctx, t, scheduler, yp, ts, times)
+
+	logs := logRecorder.Logs(t)
+	if err := containsError(logs); err != nil {
+		t.Fatal(err)
+	}
+
+	// Look at operations per day
+	nops := map[datetime.Date]map[string]int{}
+	duetimes := map[datetime.Date]map[string][]time.Time{}
+	nowtimes := map[datetime.Date]map[string][]time.Time{}
+
+	for _, l := range logs {
+		date := datetime.DateFromTime(l.Due)
+		if _, ok := nops[date]; !ok {
+			nops[date] = map[string]int{}
+			duetimes[date] = map[string][]time.Time{}
+			nowtimes[date] = map[string][]time.Time{}
+		}
+		nops[date][l.Op]++
+		duetimes[date][l.Op] = append(duetimes[date][l.Op], l.Due)
+		nowtimes[date][l.Op] = append(nowtimes[date][l.Op], l.Now)
+
+	}
+
+	days := []datetime.Date{}
+	for day := range nops {
+		days = append(days, day)
+	}
+	slices.Sort(days)
+	perdayOff := []int{}
+	perdayOn := []int{}
+	anotherDay := []int{}
+	for _, day := range days {
+		perdayOn = append(perdayOn, nops[day]["on"])
+		perdayOff = append(perdayOff, nops[day]["off"])
+		anotherDay = append(anotherDay, nops[day]["another"])
+	}
+
+	// One 'on' operation per day
+	if got, want := perdayOn, []int{1, 1, 1, 1}; !slices.Equal(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+
+	// The number of 'off' operations depends on ST/DST transitions.
+	// The transition from standard to daylight saving has 22 ops, normal days 23
+	// and Daylight saving to standard has 24 ops.
+	if got, want := perdayOff, []int{23, 22, 23, 24}; !slices.Equal(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+
+	fmt.Printf("<><<<<<< %v\n", anotherDay)
+
+	// The nowtimes will always be an hour apart, but the duetimes will
+	// include a 0 difference and a 2 hour difference during ST/DST transitions.
+	for _, day := range days {
+		prevNow := nowtimes[day]["off"][0]
+		for _, cur := range nowtimes[day]["off"][1:] {
+			if got, want := cur.Sub(prevNow), time.Hour; got != want {
+				t.Errorf("%v: %v: got %v, want %v", prevNow, cur, got, want)
+			}
+			prevNow = cur
+		}
+
+		prevDue := duetimes[day]["off"][0]
+		for i, cur := range duetimes[day]["off"][1:] {
+			expected := time.Hour
+			if day.Month() == 11 && day.Day() == 3 {
+				if i == 0 {
+					// first repeat is at 1am, which will be scheduled 2x
+					// with the same Due time.
+					expected = 0
+				}
+				if i == 1 {
+					// second repeat is set for 2am, which moves into ST,
+					// and hence differs by 2 hours from the previous due time
+					// which was 1am in DST.
+					expected = time.Hour * 2
+				}
+			}
+			if got, want := cur.Sub(prevDue), expected; got != want {
+				t.Errorf("%v: %v: %v: got %v, want %v", i, prevDue.IsDST(), cur.IsDST(), got, want)
+				t.Errorf("%v: %v: %v: got %v, want %v", i, prevDue, cur, got, want)
+			}
+			prevDue = cur
+		}
+
+	}
+
+}
+
+func TestDST2(t *testing.T) {
+	t.Fail()
+
+	start := time.Date(2024, 11, 03, 1, 0, 0, 0, time.Local)
+	n := start
+	for i := 0; i < 60*3; i++ {
+		fmt.Printf("%v\n", n)
+		n = n.Add(time.Minute)
+	}
+
+	start = time.Date(2024, 11, 01, 01, 13, 0, 0, time.Local)
+	for i := 0; i < 1000; i++ {
+		fmt.Printf("%v\n", start)
+		c := start.Add((time.Minute * 13) * time.Duration(i))
+		if c.Day() != 01 {
+			fmt.Printf("%v .. %v\n", i, c)
+			break
+		}
+
 	}
 
 }

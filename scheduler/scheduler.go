@@ -21,30 +21,7 @@ import (
 
 var OpTimeout = errors.New("op-timeout")
 
-func (s *Scheduler) runConsecutiveOps(ctx context.Context, due time.Time, active schedule.Active[Daily]) {
-	if len(active.Actions) == 0 {
-		return
-	}
-	for _, action := range active.Actions {
-		localAction := action.Action
-		timeout := localAction.Device.Timeout()
-		ctx, cancel := context.WithTimeoutCause(ctx, timeout, OpTimeout)
-		opts := devices.OperationArgs{
-			Writer: s.opWriter,
-			Logger: s.logger,
-			Args:   action.Action.Args,
-		}
-		err := localAction.Action.Op(ctx, opts)
-		cancel()
-		if err != nil {
-			s.logger.Warn("failed", "op", localAction.Name, "due", due, "err", err)
-		} else {
-			s.logger.Info("ok", "op", localAction.Name, "due", due)
-		}
-	}
-}
-
-func (s *Scheduler) runSingleOp(ctx context.Context, due time.Time, action schedule.Action[Daily]) error {
+func (s *Scheduler) runSingleOp(ctx context.Context, now, due time.Time, action schedule.Action[Action]) error {
 	op := action.Action
 	timeout := op.Device.Timeout()
 	ctx, cancel := context.WithTimeoutCause(ctx, timeout, OpTimeout)
@@ -65,33 +42,37 @@ func (s *Scheduler) runSingleOp(ctx context.Context, due time.Time, action sched
 		err = ctx.Err()
 	}
 	if err != nil {
-		s.logger.Warn("failed", "op", op.Name, "due", due, "err", err)
+		s.logger.Warn("failed", "op", op.Name, "now", now, "due", due, "err", err)
 	} else {
-		s.logger.Info("ok", "op", op.Name, "due", due)
+		s.logger.Info("ok", "op", op.Name, "now", now, "due", due)
 	}
 	return nil
 }
 
-func (s *Scheduler) RunDay(ctx context.Context, yp datetime.YearAndPlace, active schedule.Active[Daily]) error {
+func (s *Scheduler) RunDay(ctx context.Context, yp datetime.YearAndPlace, active schedule.Active[Action]) error {
 	cd := active.Date.CalendarDate(yp.Year)
-	orderDailyOperationsDynamic(active.Actions, cd, s.place)
-	for _, action := range active.Actions {
+	for action := range Actions(active.Actions).Next(cd, s.place) {
 		dueAt := datetime.Time(yp, active.Date, action.Due)
 		now := s.timeSource.NowIn(s.place)
-		if now.Before(dueAt) {
-			delay := dueAt.Sub(now)
+		delay := dueAt.Sub(now)
+		if delay > 0 {
 			_, _, toStandardTime := datetime.DSTTransition(yp, now, active.Date, action.Due)
 			if toStandardTime {
 				// avoid an overly long delay when transitioning from DST to standard time.
 				delay -= time.Hour
+				//fmt.Printf("% 8v: adjusting delay: %v -- %v\n", action.Name, now, dueAt)
 			}
+			//fmt.Printf("% 8v: delaying: %v: %v -- %v\n", action.Name, delay, now, dueAt)
+			fmt.Printf("% 8v: delay %v: now: %v, due: %v\n", action.Name, delay, now, dueAt)
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
 			case <-time.After(delay):
 			}
 		}
-		if err := s.runSingleOp(ctx, dueAt, action); err != nil {
+		fmt.Printf("% 8v: executing: now: %v, (%v) due: %v\n", action.Name, now, delay, dueAt)
+		fmt.Printf("clock: % 8v: %v\n", action.Name, now)
+		if err := s.runSingleOp(ctx, now, dueAt, action); err != nil {
 			return err
 		}
 	}
@@ -121,11 +102,11 @@ func (s *Scheduler) RunYears(ctx context.Context, yp datetime.YearAndPlace, nYea
 	return nil
 }
 
-func (s *Scheduler) Scheduled(yp datetime.YearAndPlace) iter.Seq[schedule.Active[Daily]] {
+func (s *Scheduler) Scheduled(yp datetime.YearAndPlace) iter.Seq[schedule.Active[Action]] {
 	return s.scheduler.Scheduled(yp)
 }
 
-func actionAndDeviceNames(active schedule.Active[Daily]) (actionNames, deviceNames []string) {
+func actionAndDeviceNames(active schedule.Active[Action]) (actionNames, deviceNames []string) {
 	for _, a := range active.Actions {
 		actionNames = append(actionNames, a.Action.Name)
 		deviceNames = append(deviceNames, a.Action.DeviceName)
@@ -135,8 +116,8 @@ func actionAndDeviceNames(active schedule.Active[Daily]) (actionNames, deviceNam
 
 type Scheduler struct {
 	options
-	schedule  schedule.Annual[Daily]
-	scheduler *schedule.AnnualScheduler[Daily]
+	schedule  schedule.Annual[Action]
+	scheduler *schedule.AnnualScheduler[Action]
 	place     *time.Location
 }
 
@@ -183,7 +164,7 @@ func WithOperationWriter(w io.Writer) Option {
 }
 
 // New creates a new scheduler for the supplied schedule and associated devices.
-func New(sched schedule.Annual[Daily], system devices.System, opts ...Option) (*Scheduler, error) {
+func New(sched schedule.Annual[Action], system devices.System, opts ...Option) (*Scheduler, error) {
 	scheduler := &Scheduler{
 		schedule: sched,
 		place:    system.Location,
