@@ -188,6 +188,12 @@ schedules:
       - action: another
         when: 01:13:00
         repeat: 13m
+      #- action: op1
+   	  #  when: 02:00:01
+      #  repeat: 24h    
+       #- action: op2
+   	  #  when: 02:00:01
+      #  repeat: 12h 
 
   - name: repeating-bounded
     device: device
@@ -205,7 +211,7 @@ schedules:
 
 var supportedDevices = devices.SupportedDevices{
 	"device": func(string, devices.Options) (devices.Device, error) {
-		return &testutil.MockDevice{}, nil
+		return testutil.NewMockDevice("On", "Off", "Another", "op1", "op2", "op3"), nil
 	},
 	"slow_device": func(string, devices.Options) (devices.Device, error) {
 		return &slow_test_device{

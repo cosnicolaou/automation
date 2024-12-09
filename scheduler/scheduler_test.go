@@ -582,31 +582,35 @@ func TestRepeats(t *testing.T) {
 	// Fill out the timesource schedule with the repeats for each
 	// operation for each day.
 	// There are 3 actions for each day of the four days:
-	// 'on', 'off' and 'another' that start at 00:00:01, 01:00:00 and 01:33:00
+	// 'on', 'off' and 'another' that start at 00:00:01, 01:00:00 and 01:13:00
 
-	// add repeats for 'off' operations, per day. Expect 23 on
-	// a normal day, 22 on ST-DST and 24 on ST-DST.
-	times = appendNRepeats(times, times[1], 23, time.Hour)
-	times = appendNRepeats(times, times[4], 22, time.Hour)
-	times = appendNRepeats(times, times[7], 23, time.Hour)
-	times = appendNRepeats(times, times[10], 24, time.Hour)
+	// add repeats for 'off' operations, per day.
+	expectedOff := 23 // once per hour starting at 1am
+	// 23 repeast on a normal day, 22 on ST-DST and 24 on ST-DST.
+	expectedOffPerday := []int{expectedOff, expectedOff - 1, expectedOff, expectedOff + 1}
+	times = appendNRepeats(times, times[1], expectedOffPerday[0], time.Hour)
+	times = appendNRepeats(times, times[4], expectedOffPerday[1], time.Hour)
+	times = appendNRepeats(times, times[7], expectedOffPerday[2], time.Hour)
+	times = appendNRepeats(times, times[10], expectedOffPerday[3], time.Hour)
 
 	// add repeats for 'another' operations, per day. Expect 41 on
 	// a normal day, 40 on ST-DST and 42 on ST-DST.
 	period := time.Minute * 13
-	times = appendNRepeats(times, times[2], 106, period)
-	times = appendNRepeats(times, times[5], 105, period)
-	times = appendNRepeats(times, times[8], 109, period)
-	times = appendNRepeats(times, times[11], 107, period)
+	expectedAnother := ((24*60*60)-((60+14)*60))/(13*60) + 1
+	// 5 repeats between 1am and 2am on 3/10 are lost
+	// 5 repeats between 1am and 2am on 11/3 are gained, but there is one less
+	//   repeat at the end of the day.
+	expectedAnotherPerday := []int{expectedAnother, expectedAnother - 5, expectedAnother, expectedAnother + 5 - 1}
+
+	times = appendNRepeats(times, times[2], expectedAnotherPerday[0], period)
+	times = appendNRepeats(times, times[5], expectedAnotherPerday[1], period)
+	times = appendNRepeats(times, times[8], expectedAnotherPerday[2], period)
+	times = appendNRepeats(times, times[11], expectedAnotherPerday[3], period)
 
 	sort.Slice(times, func(i, j int) bool {
 		return times[i].Before(times[j])
 	})
 
-	fmt.Printf("LEN %v\n", len(times))
-	for i, t := range times {
-		fmt.Printf("% 5v: %v\n", i, t)
-	}
 	runScheduler(ctx, t, scheduler, yp, ts, times)
 
 	logs := logRecorder.Logs(t)
@@ -616,18 +620,15 @@ func TestRepeats(t *testing.T) {
 
 	// Look at operations per day
 	nops := map[datetime.Date]map[string]int{}
-	duetimes := map[datetime.Date]map[string][]time.Time{}
 	nowtimes := map[datetime.Date]map[string][]time.Time{}
 
 	for _, l := range logs {
 		date := datetime.DateFromTime(l.Due)
 		if _, ok := nops[date]; !ok {
 			nops[date] = map[string]int{}
-			duetimes[date] = map[string][]time.Time{}
 			nowtimes[date] = map[string][]time.Time{}
 		}
 		nops[date][l.Op]++
-		duetimes[date][l.Op] = append(duetimes[date][l.Op], l.Due)
 		nowtimes[date][l.Op] = append(nowtimes[date][l.Op], l.Now)
 
 	}
@@ -651,17 +652,15 @@ func TestRepeats(t *testing.T) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 
-	// The number of 'off' operations depends on ST/DST transitions.
-	// The transition from standard to daylight saving has 22 ops, normal days 23
-	// and Daylight saving to standard has 24 ops.
-	if got, want := perdayOff, []int{23, 22, 23, 24}; !slices.Equal(got, want) {
+	if got, want := perdayOff, expectedOffPerday; !slices.Equal(got, want) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 
-	fmt.Printf("<><<<<<< %v\n", anotherDay)
+	if got, want := anotherDay, expectedAnotherPerday; !slices.Equal(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
 
-	// The nowtimes will always be an hour apart, but the duetimes will
-	// include a 0 difference and a 2 hour difference during ST/DST transitions.
+	// The intervals should always be the same.
 	for _, day := range days {
 		prevNow := nowtimes[day]["off"][0]
 		for _, cur := range nowtimes[day]["off"][1:] {
@@ -670,53 +669,13 @@ func TestRepeats(t *testing.T) {
 			}
 			prevNow = cur
 		}
-
-		prevDue := duetimes[day]["off"][0]
-		for i, cur := range duetimes[day]["off"][1:] {
-			expected := time.Hour
-			if day.Month() == 11 && day.Day() == 3 {
-				if i == 0 {
-					// first repeat is at 1am, which will be scheduled 2x
-					// with the same Due time.
-					expected = 0
-				}
-				if i == 1 {
-					// second repeat is set for 2am, which moves into ST,
-					// and hence differs by 2 hours from the previous due time
-					// which was 1am in DST.
-					expected = time.Hour * 2
-				}
+		prevAnother := nowtimes[day]["another"][0]
+		for _, cur := range nowtimes[day]["another"][1:] {
+			if got, want := cur.Sub(prevAnother), time.Minute*13; got != want {
+				t.Errorf("%v: %v: got %v, want %v", prevAnother, cur, got, want)
 			}
-			if got, want := cur.Sub(prevDue), expected; got != want {
-				t.Errorf("%v: %v: %v: got %v, want %v", i, prevDue.IsDST(), cur.IsDST(), got, want)
-				t.Errorf("%v: %v: %v: got %v, want %v", i, prevDue, cur, got, want)
-			}
-			prevDue = cur
+			prevAnother = cur
 		}
-
-	}
-
-}
-
-func TestDST2(t *testing.T) {
-	t.Fail()
-
-	start := time.Date(2024, 11, 03, 1, 0, 0, 0, time.Local)
-	n := start
-	for i := 0; i < 60*3; i++ {
-		fmt.Printf("%v\n", n)
-		n = n.Add(time.Minute)
-	}
-
-	start = time.Date(2024, 11, 01, 01, 13, 0, 0, time.Local)
-	for i := 0; i < 1000; i++ {
-		fmt.Printf("%v\n", start)
-		c := start.Add((time.Minute * 13) * time.Duration(i))
-		if c.Day() != 01 {
-			fmt.Printf("%v .. %v\n", i, c)
-			break
-		}
-
 	}
 
 }

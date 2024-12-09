@@ -51,19 +51,14 @@ func (s *Scheduler) runSingleOp(ctx context.Context, now, due time.Time, action 
 
 func (s *Scheduler) RunDay(ctx context.Context, yp datetime.YearAndPlace, active schedule.Active[Action]) error {
 	cd := active.Date.CalendarDate(yp.Year)
-	for action := range Actions(active.Actions).Next(cd, s.place) {
+	for action := range Actions(active.Actions).Daily(cd, s.place) {
 		dueAt := datetime.Time(yp, active.Date, action.Due)
 		now := s.timeSource.NowIn(s.place)
 		delay := dueAt.Sub(now)
 		if delay > 0 {
-			_, _, toStandardTime := datetime.DSTTransition(yp, now, active.Date, action.Due)
-			if toStandardTime {
-				// avoid an overly long delay when transitioning from DST to standard time.
-				delay -= time.Hour
-				//fmt.Printf("% 8v: adjusting delay: %v -- %v\n", action.Name, now, dueAt)
+			if delay > time.Millisecond*10 {
+				fmt.Printf("% 8v: delay %v: now: %v, due: %v\n", action.Name, delay, now, dueAt)
 			}
-			//fmt.Printf("% 8v: delaying: %v: %v -- %v\n", action.Name, delay, now, dueAt)
-			fmt.Printf("% 8v: delay %v: now: %v, due: %v\n", action.Name, delay, now, dueAt)
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
