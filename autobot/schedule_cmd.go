@@ -1,0 +1,93 @@
+// Copyright 2024 Cosmos Nicolaou. All rights reserved.
+// Use of this source code is governed by the Apache-2.0
+// license that can be found in the LICENSE file.
+
+package main
+
+import (
+	"context"
+	"log/slog"
+	"os"
+	"time"
+
+	"cloudeng.io/datetime"
+	"github.com/cosnicolaou/automation/devices"
+	"github.com/cosnicolaou/automation/scheduler"
+)
+
+type ScheduleFlags struct {
+	ConfigFileFlags
+	LogFile     string `subcmd:"log-file,,log file"`
+	StartDate   string `subcmd:"start-date,,start date"`
+	ZIPDatabase string `subcmd:"zip-database,,zip code database"`
+}
+
+type Schedule struct {
+	system    devices.System
+	schedules scheduler.Schedules
+}
+
+func (s *Schedule) setupLogging(fv *ScheduleFlags) (*slog.Logger, func(), error) {
+	if len(fv.LogFile) == 0 {
+		return slog.New(slog.NewJSONHandler(os.Stdout, nil)), func() {}, nil
+	}
+	var err error
+	f, err := newLogfile(fv.LogFile)
+	if err != nil {
+		return nil, func() {}, err
+	}
+	l := slog.New(slog.NewJSONHandler(f, nil))
+	return l, func() { f.Close() }, nil
+}
+
+func (s *Schedule) loadFiles(ctx context.Context, fv *ScheduleFlags, deviceOpts []devices.Option) (context.Context, error) {
+	ctx, sys, err := loadSystem(ctx, &fv.ConfigFileFlags, deviceOpts...)
+	if err != nil {
+		return nil, err
+	}
+	scheds, err := loadSchedules(ctx, &fv.ConfigFileFlags, sys)
+	if err != nil {
+		return nil, err
+	}
+	s.system = sys
+	s.schedules = scheds
+	return ctx, nil
+}
+
+func (s *Schedule) Run(ctx context.Context, flags any, args []string) error {
+	fv := flags.(*ScheduleFlags)
+	var start datetime.CalendarDate
+	if sd := fv.StartDate; sd != "" {
+		if err := start.Parse(sd); err != nil {
+			return err
+		}
+	} else {
+		start = datetime.CalendarDateFromTime(time.Now())
+	}
+
+	zdb, err := loadZIPDatabase(ctx, fv.ZIPDatabase)
+
+	logger, cleanup, err := s.setupLogging(fv)
+	if err != nil {
+		return err
+	}
+	defer cleanup()
+
+	deviceOpts := []devices.Option{
+		devices.WithLogger(logger),
+		devices.WithZIPCodeLookup(zdb),
+	}
+
+	schedulerOpts := []scheduler.Option{
+		scheduler.WithLogger(logger),
+		scheduler.WithOperationWriter(os.Stdout),
+	}
+
+	ctx, err = s.loadFiles(ctx, fv, deviceOpts)
+	if err != nil {
+		return err
+	}
+
+	return scheduler.RunSchedulers(ctx, s.schedules, s.system, start, schedulerOpts...)
+
+}
