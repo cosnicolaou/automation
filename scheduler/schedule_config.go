@@ -100,18 +100,24 @@ type schedulesConfig struct {
 	Schedules []actionScheduleConfig `yaml:"schedules" cmd:"the schedules"`
 }
 
-type Schedules struct {
-	System    devices.System
-	Schedules []schedule.Annual[Action]
+type Annual struct {
+	Name         string
+	Dates        schedule.Dates
+	DailyActions schedule.ActionSpecs[Action]
 }
 
-func (s Schedules) Lookup(name string) schedule.Annual[Action] {
+type Schedules struct {
+	System    devices.System
+	Schedules []Annual
+}
+
+func (s Schedules) Lookup(name string) Annual {
 	for _, sched := range s.Schedules {
 		if sched.Name == name {
 			return sched
 		}
 	}
-	return schedule.Annual[Action]{}
+	return Annual{}
 }
 
 func ParseConfigFile(ctx context.Context, cfgFile string, system devices.System) (Schedules, error) {
@@ -138,30 +144,34 @@ func ParseConfig(ctx context.Context, cfgData []byte, system devices.System) (Sc
 	return pcfg, err
 }
 
-func (cfg schedulesConfig) createActions(sys devices.System, times, scheduleName, deviceName, actionName string, details actionDetailed) (schedule.Actions[Action], error) {
+func (cfg schedulesConfig) createActions(sys devices.System, times, scheduleName, deviceName, actionName string, details actionDetailed) (schedule.ActionSpecs[Action], error) {
 	var actionTimes ActionTimeList
 	if err := actionTimes.Parse(times); err != nil {
 		return nil, fmt.Errorf("failed to parse time of day %q for schedule %q, operation: %q: %v", times, scheduleName, actionName, err)
 	}
-	actions := schedule.Actions[Action]{}
+	actions := schedule.ActionSpecs[Action]{}
 	for _, actionTime := range actionTimes {
 		due, dynDue, delta := actionTime.Literal, actionTime.Dynamic, actionTime.Delta
 		if _, ok := sys.Devices[deviceName]; !ok {
 			return nil, fmt.Errorf("unknown device: %s for schedule %q", deviceName, scheduleName)
 		}
-		actions = append(actions, schedule.Action[Action]{
+		actions = append(actions, schedule.ActionSpec[Action]{
 			Due:  due,
 			Name: actionName,
-			Action: Action{
+			Dynamic: schedule.DynamicTimeOfDaySpec{
+				Due:    dynDue,
+				Offset: delta,
+			},
+			Repeat: schedule.RepeatSpec{
+				Interval: time.Duration(details.Repeat),
+				Repeats:  details.NumRepeats,
+			},
+			T: Action{
 				Action: devices.Action{
 					DeviceName: deviceName,
 					Name:       actionName,
 					Args:       details.Args,
 				},
-				DynamicTimeOfDay: dynDue,
-				DynamicDelta:     delta,
-				Repeat:           time.Duration(details.Repeat),
-				NumRepeats:       details.NumRepeats,
 			}})
 	}
 	return actions, nil
@@ -175,12 +185,13 @@ func (cfg schedulesConfig) createSchedules(sys devices.System) (Schedules, error
 			return Schedules{}, fmt.Errorf("duplicate schedule name: %v", csched.Name)
 		}
 		names[csched.Name] = struct{}{}
-		var annual schedule.Annual[Action]
+		var annual Annual
 		annual.Name = csched.Name
 		dates, err := csched.Dates.parse()
 		if err != nil {
 			return Schedules{}, err
 		}
+
 		annual.Dates = dates
 
 		for name, when := range csched.Actions {
@@ -188,22 +199,21 @@ func (cfg schedulesConfig) createSchedules(sys devices.System) (Schedules, error
 			if err != nil {
 				return Schedules{}, err
 			}
-			annual.Actions = append(annual.Actions, actions...)
+			annual.DailyActions = append(annual.DailyActions, actions...)
 		}
 		for _, details := range csched.ActionsDetailed {
 			actions, err := cfg.createActions(sys, string(details.When), csched.Name, csched.Device, details.Action, details)
 			if err != nil {
 				return Schedules{}, err
 			}
-			annual.Actions = append(annual.Actions, actions...)
+			annual.DailyActions = append(annual.DailyActions, actions...)
 		}
-
-		annual.Actions.Sort()
-		annual.Actions, err = orderActionsStatic(annual.Actions, csched.ActionsDetailed)
+		annual.DailyActions.Sort()
+		annual.DailyActions, err = orderActionsStatic(annual.DailyActions, csched.ActionsDetailed)
 		if err != nil {
 			return Schedules{}, fmt.Errorf("failed to order actions for schedule %q: %v", csched.Name, err)
 		}
-		if len(annual.Actions) == 0 {
+		if len(annual.DailyActions) == 0 {
 			return Schedules{}, fmt.Errorf("no actions defined for schedule %q", csched.Name)
 		}
 		sched.Schedules = append(sched.Schedules, annual)

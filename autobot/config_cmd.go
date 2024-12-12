@@ -11,6 +11,7 @@ import (
 	"os"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/cosnicolaou/automation/devices"
 	"github.com/cosnicolaou/automation/scheduler"
@@ -18,10 +19,13 @@ import (
 )
 
 type ConfigFileFlags struct {
-	KeysFile       string `subcmd:"keys,$HOME/.lutron-keys.yaml,path/URI to a file containing keys"`
-	SystemFile     string `subcmd:"system,$HOME/.lutron-system.yaml,path to a file containing the lutron system configuration"`
-	SystemLocation string `subcmd:"location,,location of the system"`
-	ScheduleFile   string `subcmd:"schedule,$HOME/.lutron-schedule.yaml,path to a file containing the lutron schedule configuration"`
+	KeysFile         string  `subcmd:"keys,$HOME/.autobot-keys.yaml,path/URI to a file containing keys"`
+	SystemFile       string  `subcmd:"system,$HOME/.autobot-system.yaml,path to a file containing the lutron system configuration"`
+	SystemTZLocation string  `subcmd:"tz,,timezone of the system"`
+	ZIPCode          string  `subcmd:"zip,,zip code of the system"`
+	Latitude         float64 `subcmd:"lat,,latitude of the system"`
+	Longitude        float64 `subcmd:"long,,longitude of the system"`
+	ScheduleFile     string  `subcmd:"schedule,$HOME/.lutron-schedule.yaml,path to a file containing the lutron schedule configuration"`
 }
 
 type ConfigFlags struct {
@@ -48,11 +52,22 @@ func (c *Config) Display(ctx context.Context, flags any, args []string) error {
 	if err != nil {
 		return err
 	}
+	var tzloc = time.Local
+	if tz := fv.SystemTZLocation; tz != "" {
+		tzloc, err = time.LoadLocation(tz)
+		if err != nil {
+			return fmt.Errorf("invalid timezone: %q: %v", tz, err)
+		}
+	}
 
 	opts := []devices.Option{
-		devices.WithLogger(slog.New(slog.NewTextHandler(os.Stderr, nil)))}
+		devices.WithLogger(slog.New(slog.NewTextHandler(os.Stderr, nil))),
+		devices.WithLatLong(fv.Latitude, fv.Longitude),
+		devices.WithZIPCode(fv.ZIPCode),
+		devices.WithTimeLocation(tzloc),
+	}
 
-	system, err := devices.ParseSystemConfigFile(ctx, fv.SystemLocation, fv.SystemFile, opts...)
+	system, err := devices.ParseSystemConfigFile(ctx, fv.SystemFile, opts...)
 	if err != nil {
 		return err
 	}
@@ -104,7 +119,7 @@ func (c *Config) Operations(ctx context.Context, flags any, args []string) error
 	opts := []devices.Option{
 		devices.WithLogger(slog.New(slog.NewTextHandler(os.Stderr, nil)))}
 
-	system, err := devices.ParseSystemConfigFile(ctx, "", fv.SystemFile, opts...)
+	system, err := devices.ParseSystemConfigFile(ctx, fv.SystemFile, opts...)
 	if err != nil {
 		return err
 	}

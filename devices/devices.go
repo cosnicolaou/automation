@@ -55,15 +55,49 @@ type Device interface {
 	Timeout() time.Duration
 }
 
+type ZIPCodeLookup interface {
+	Lookup(zip string) (float64, float64, error)
+}
+
 type Option func(*Options)
 
 type Options struct {
-	Logger      *slog.Logger
-	Interactive io.Writer
-	Session     streamconn.Session
-	Devices     SupportedDevices
-	Controllers SupportedControllers
-	Custom      any
+	Logger        *slog.Logger
+	Interactive   io.Writer
+	Session       streamconn.Session
+	Devices       SupportedDevices
+	Controllers   SupportedControllers
+	tz            *time.Location
+	latitude      float64
+	longitude     float64
+	zipCode       string
+	zipCodeLookup ZIPCodeLookup
+	Custom        any
+}
+
+func WithZIPCodeLookup(l ZIPCodeLookup) Option {
+	return func(o *Options) {
+		o.zipCodeLookup = l
+	}
+}
+
+func WithTimeLocation(tz *time.Location) Option {
+	return func(o *Options) {
+		o.tz = tz
+	}
+}
+
+func WithLatLong(lat, long float64) Option {
+	return func(o *Options) {
+		o.latitude = lat
+		o.longitude = long
+	}
+}
+
+func WithZIPCode(zip string) Option {
+	return func(o *Options) {
+		o.zipCode = zip
+	}
 }
 
 func WithLogger(l *slog.Logger) Option {

@@ -12,7 +12,6 @@ import (
 	"os"
 	"strings"
 
-	"cloudeng.io/cmdutil/keystore"
 	"github.com/cosnicolaou/automation/devices"
 )
 
@@ -74,15 +73,12 @@ func (c *Control) setup(ctx context.Context, fv *ControlFlags) (context.Context,
 	opts := []devices.Option{
 		devices.WithLogger(logger),
 	}
-	keys, err := ReadKeysFile(ctx, fv.KeysFile)
+	ctx, sys, err := loadSystem(ctx, &fv.ConfigFileFlags, opts...)
 	if err != nil {
 		return nil, err
 	}
-	c.system, err = devices.ParseSystemConfigFile(ctx, " ", fv.SystemFile, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return keystore.ContextWithAuth(ctx, keys), nil
+	c.system = sys
+	return ctx, nil
 }
 
 func (c *Control) Run(ctx context.Context, flags any, args []string) error {

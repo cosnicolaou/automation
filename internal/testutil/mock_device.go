@@ -28,11 +28,11 @@ type MockDevice struct {
 	operationsHelp map[string]string
 }
 
-func NewMockDevice(ops ...string) *MockDevice {
+func NewMockDevice(operations ...string) *MockDevice {
 	d := &MockDevice{}
 	d.operations = map[string]devices.Operation{}
 	d.operationsHelp = map[string]string{}
-	for _, op := range ops {
+	for _, op := range operations {
 		kop := strings.ToLower(op)
 		nop := cases.Title(language.English).String(op)
 		d.operations[kop] = func(ctx context.Context, opts devices.OperationArgs) error {

@@ -6,9 +6,11 @@ package devices
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"cloudeng.io/cmdutil/cmdyaml"
+	"cloudeng.io/datetime"
 	"gopkg.in/yaml.v3"
 )
 
@@ -69,28 +71,43 @@ func locationFromValue(value string) (*time.Location, error) {
 	return location, nil
 }
 
-type LocationConfig struct {
+type TimeZone struct {
 	*time.Location
 }
 
-func (lc *LocationConfig) UnmarshalYAML(node *yaml.Node) error {
+func (tz *TimeZone) UnmarshalYAML(node *yaml.Node) error {
+	fmt.Printf("node: %q\n", node.Value)
 	l, err := locationFromValue(node.Value)
 	if err != nil {
+		fmt.Printf(">>>>")
 		return err
 	}
-	lc.Location = l
+	fmt.Printf("l: %v\n", l)
+	tz.Location = l
 	return nil
 }
 
+type LocationConfig struct {
+	TZ        *TimeZone `yaml:"time_zone" cmd:"the timezone for the location in time.Location format"`
+	ZIPCode   string    `yaml:"zip_code" cmd:"the zip/postal code for the location"`
+	Latitude  float64   `yaml:"latitude" cmd:"the latitude for the location"`
+	Longitude float64   `yaml:"longitude" cmd:"the longitude for the location"`
+}
+
+type Location struct {
+	datetime.Place
+	ZIPCode string
+}
+
 type SystemConfig struct {
-	Location    LocationConfig     `yaml:"location" cmd:"the location for which the schedule is being created in time.Location format"`
+	Location    LocationConfig     `yaml:",inline"`
 	Controllers []ControllerConfig `yaml:"controllers" cmd:"the controllers that are being configured"`
 	Devices     []DeviceConfig     `yaml:"devices" cmd:"the devices that are being configured"`
 }
 
 type System struct {
 	Config      SystemConfig
-	Location    *time.Location
+	Location    Location
 	Controllers map[string]Controller
 	Devices     map[string]Device
 }
@@ -160,36 +177,83 @@ func (s System) DeviceOp(name, op string) (Operation, []string, bool) {
 }
 
 // ParseSystemConfigFile parses the supplied configuration file as per ParseSystemConfig.
-func ParseSystemConfigFile(ctx context.Context, place string, cfgFile string, opts ...Option) (System, error) {
+func ParseSystemConfigFile(ctx context.Context, cfgFile string, opts ...Option) (System, error) {
 	var cfg SystemConfig
 	if err := cmdyaml.ParseConfigFile(ctx, cfgFile, &cfg); err != nil {
 		return System{}, err
 	}
-	return cfg.CreateSystem(place, opts...)
+	return cfg.CreateSystem(opts...)
 }
 
 // ParseSystemConfig parses the supplied configuration data and returns
 // a System using CreateSystem.
-func ParseSystemConfig(ctx context.Context, place string, cfgData []byte, opts ...Option) (System, error) {
+func ParseSystemConfig(ctx context.Context, cfgData []byte, opts ...Option) (System, error) {
 	var cfg SystemConfig
 	if err := yaml.Unmarshal(cfgData, &cfg); err != nil {
 		return System{}, err
 	}
-	return cfg.CreateSystem(place, opts...)
+	return cfg.CreateSystem(opts...)
+}
+
+func buildLocation(cfg LocationConfig, opts []Option) (Location, error) {
+	var o Options
+	for _, opt := range opts {
+		opt(&o)
+	}
+	loc := Location{
+		Place: datetime.Place{
+			Latitude:  cfg.Latitude,
+			Longitude: cfg.Longitude,
+		},
+		ZIPCode: cfg.ZIPCode,
+	}
+	if cfg.TZ != nil {
+		loc.TZ = cfg.TZ.Location
+	}
+	if o.tz != nil {
+		loc.TZ = o.tz
+	}
+	if loc.TZ == nil {
+		tz, err := time.LoadLocation("Local")
+		if err != nil {
+			return loc, err
+		}
+		loc.TZ = tz
+	}
+
+	if o.latitude != 0 {
+		loc.Latitude = o.latitude
+	}
+	if o.longitude != 0 {
+		loc.Longitude = o.longitude
+	}
+	if o.zipCode != "" {
+		loc.ZIPCode = o.zipCode
+	}
+
+	if loc.ZIPCode != "" && loc.Latitude == 0 && loc.Longitude == 0 && o.zipCodeLookup != nil {
+		lat, long, err := o.zipCodeLookup.Lookup(loc.ZIPCode)
+		if err != nil {
+			return loc, err
+		}
+		loc.Latitude = lat
+		loc.Longitude = long
+	}
+	return loc, nil
 }
 
 // CreateSystem creates a system from the supplied configuration.
 // The place argument is used to set the location of the system if
 // the location is not specified in the configuration. Note that if the
-// location: tag is specified in the configuration without a value
+// time_zone: tag is specified in the configuration without a value
 // then the location is set to the current time.Location, ie. timezone of 'Local'
-func (cfg SystemConfig) CreateSystem(place string, opts ...Option) (System, error) {
-	if cfg.Location.Location == nil {
-		var err error
-		cfg.Location.Location, err = locationFromValue(place)
-		if err != nil {
-			return System{}, err
-		}
+// The WithTimeLocation, WithLatLong and WithZIPCode options can be used to
+// override the location specified in the configuration. The WithZIPCodeLookup
+// option must be supplied to enable the lookup of lat/long from a zip code.
+func (cfg SystemConfig) CreateSystem(opts ...Option) (System, error) {
+	loc, err := buildLocation(cfg.Location, opts)
+	if err != nil {
+		return System{}, err
 	}
 	ctrl, dev, err := BuildDevices(cfg.Controllers, cfg.Devices, opts...)
 	if err != nil {
@@ -197,7 +261,7 @@ func (cfg SystemConfig) CreateSystem(place string, opts ...Option) (System, erro
 	}
 	return System{
 		Config:      cfg,
-		Location:    cfg.Location.Location,
+		Location:    loc,
 		Controllers: ctrl,
 		Devices:     dev,
 	}, nil

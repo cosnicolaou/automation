@@ -152,8 +152,8 @@ schedules:
       - summer
       - winter
     actions:
-      on: sunrise-30m
-      off: 5:00
+      on: fake_sunrise-30m
+      off: 15:00
    
   - name: daylight-saving-time
     device: device
@@ -234,7 +234,7 @@ var supportedControllers = devices.SupportedControllers{
 }
 
 func createSystem(t *testing.T) devices.System {
-	sys, err := devices.ParseSystemConfig(context.Background(), "", []byte(devices_config),
+	sys, err := devices.ParseSystemConfig(context.Background(), []byte(devices_config),
 		devices.WithDevices(supportedDevices),
 		devices.WithControllers(supportedControllers))
 	if err != nil {
@@ -264,14 +264,14 @@ func TestParseActions(t *testing.T) {
 	if got, want := simple.Name, "simple"; got != want {
 		t.Fatalf("got %s, want %s", got, want)
 	}
-	if got, want := len(simple.Actions), 2; got != want {
+	if got, want := len(simple.DailyActions), 2; got != want {
 		t.Fatalf("got %d actions, want %d", got, want)
 	}
 
-	if got, want := simple.Actions[0], (schedule.Action[scheduler.Action]{
+	if got, want := simple.DailyActions[0], (schedule.ActionSpec[scheduler.Action]{
 		Name: "on",
 		Due:  datetime.NewTimeOfDay(0, 0, 1),
-		Action: scheduler.Action{
+		T: scheduler.Action{
 			Action: devices.Action{
 				DeviceName: "device",
 				Name:       "on",
@@ -281,10 +281,10 @@ func TestParseActions(t *testing.T) {
 		t.Errorf("got %#v, want %#v", got, want)
 	}
 
-	if got, want := simple.Actions[1], (schedule.Action[scheduler.Action]{
+	if got, want := simple.DailyActions[1], (schedule.ActionSpec[scheduler.Action]{
 		Name: "off",
 		Due:  datetime.NewTimeOfDay(0, 0, 2),
-		Action: scheduler.Action{
+		T: scheduler.Action{
 			Action: devices.Action{
 				DeviceName: "device",
 				Name:       "off",
@@ -295,14 +295,14 @@ func TestParseActions(t *testing.T) {
 	}
 
 	args := scheds.Lookup("simple_args")
-	if got, want := len(args.Actions), 2; got != want {
+	if got, want := len(args.DailyActions), 2; got != want {
 		t.Fatalf("got %d actions, want %d", got, want)
 	}
 
-	if got, want := args.Actions[1], (schedule.Action[scheduler.Action]{
+	if got, want := args.DailyActions[1], (schedule.ActionSpec[scheduler.Action]{
 		Name: "off",
 		Due:  datetime.NewTimeOfDay(0, 0, 2),
-		Action: scheduler.Action{
+		T: scheduler.Action{
 			Action: devices.Action{
 				DeviceName: "device",
 				Name:       "off",
@@ -314,14 +314,14 @@ func TestParseActions(t *testing.T) {
 	}
 
 	multi := scheds.Lookup("multi-time")
-	if got, want := len(multi.Actions), 4; got != want {
+	if got, want := len(multi.DailyActions), 4; got != want {
 		t.Fatalf("got %d actions, want %d", got, want)
 	}
 
-	if got, want := multi.Actions, (schedule.Actions[scheduler.Action]{
+	if got, want := multi.DailyActions, (schedule.ActionSpecs[scheduler.Action]{
 		{Name: "on",
 			Due: datetime.NewTimeOfDay(0, 0, 1),
-			Action: scheduler.Action{
+			T: scheduler.Action{
 				Action: devices.Action{
 					DeviceName: "device",
 					Name:       "on",
@@ -329,7 +329,7 @@ func TestParseActions(t *testing.T) {
 			}},
 		{Name: "off",
 			Due: datetime.NewTimeOfDay(0, 0, 2),
-			Action: scheduler.Action{
+			T: scheduler.Action{
 				Action: devices.Action{
 					DeviceName: "device",
 					Name:       "off",
@@ -337,7 +337,7 @@ func TestParseActions(t *testing.T) {
 			}},
 		{Name: "on",
 			Due: datetime.NewTimeOfDay(0, 1, 0),
-			Action: scheduler.Action{
+			T: scheduler.Action{
 				Action: devices.Action{
 					DeviceName: "device",
 					Name:       "on",
@@ -345,7 +345,7 @@ func TestParseActions(t *testing.T) {
 			}},
 		{Name: "off",
 			Due: datetime.NewTimeOfDay(0, 2, 0),
-			Action: scheduler.Action{
+			T: scheduler.Action{
 				Action: devices.Action{
 					DeviceName: "device",
 					Name:       "off",
@@ -356,18 +356,20 @@ func TestParseActions(t *testing.T) {
 	}
 
 	repeat := scheds.Lookup("repeating")
-	if got, want := len(repeat.Actions), 2; got != want {
+	if got, want := len(repeat.DailyActions), 3; got != want {
 		t.Fatalf("got %d actions, want %d", got, want)
 	}
 
-	if got, want := repeat.Actions[1], (schedule.Action[scheduler.Action]{Name: "off",
+	if got, want := repeat.DailyActions[1], (schedule.ActionSpec[scheduler.Action]{Name: "off",
 		Due: datetime.NewTimeOfDay(1, 0, 0),
-		Action: scheduler.Action{
+		Repeat: schedule.RepeatSpec{
+			Interval: time.Hour,
+		},
+		T: scheduler.Action{
 			Action: devices.Action{
 				DeviceName: "device",
 				Name:       "off",
 			},
-			Repeat: time.Hour,
 		},
 	}); !reflect.DeepEqual(got, want) {
 		t.Errorf("got %+v, want %+v", got, want)
@@ -380,15 +382,14 @@ func scheduledActions(t *testing.T, scheds scheduler.Schedules, sys devices.Syst
 	if err != nil {
 		t.Fatal(err)
 	}
-	yp := datetime.YearAndPlace{
-		Year:  year,
-		Place: sys.Location,
-	}
+	cd := datetime.NewCalendarDate(year, 1, 1)
 	times := []time.Time{}
 	dates := []datetime.Date{}
-	for active := range sr.Scheduled(yp) {
-		times = append(times, datetime.Time(yp, active.Date, active.Actions[0].Due))
-		dates = append(dates, active.Date)
+	for active := range sr.ScheduledYearEnd(cd) {
+		for _, a := range active.Specs {
+			times = append(times, active.Date.Time(a.Due, sys.Location.TZ))
+		}
+		dates = append(dates, active.Date.Date())
 	}
 	return times, dates
 }
@@ -409,23 +410,23 @@ func TestParseSchedules(t *testing.T) {
 
 	// Jan and Feb, *2 for two unique times.
 	scheduled = scheduledTimes(t, scheds, sys, 2024, "months")
-	if got, want := len(scheduled), (31 + 29); got != want {
+	if got, want := len(scheduled), (31+29)*2; got != want {
 		t.Errorf("got %d, want %d", got, want)
 	}
 
 	scheduled = scheduledTimes(t, scheds, sys, 2023, "months")
-	if got, want := len(scheduled), (31 + 28); got != want {
+	if got, want := len(scheduled), (31+28)*2; got != want {
 		t.Errorf("got %d, want %d", got, want)
 	}
 
 	// Jan and Feb with two days missing
 	scheduled = scheduledTimes(t, scheds, sys, 2024, "exlusions")
-	if got, want := len(scheduled), (31 + 29 - 2); got != want {
+	if got, want := len(scheduled), (31+29-2)*2; got != want {
 		t.Errorf("got %d, want %d", got, want)
 	}
 
 	scheduled = scheduledTimes(t, scheds, sys, 2023, "exlusions")
-	if got, want := len(scheduled), (31 + 29 - 3); got != want {
+	if got, want := len(scheduled), (31+29-3)*2; got != want {
 		t.Errorf("got %d, want %d", got, want)
 	}
 
@@ -433,12 +434,12 @@ func TestParseSchedules(t *testing.T) {
 	// 10+28+9+28 days
 
 	scheduled = scheduledTimes(t, scheds, sys, 2024, "ranges")
-	if got, want := len(scheduled), (10 + 29 + 9 + 28); got != want {
+	if got, want := len(scheduled), (10+29+9+28)*3; got != want {
 		t.Errorf("got %d, want %d", got, want)
 	}
 
 	scheduled = scheduledTimes(t, scheds, sys, 2023, "ranges")
-	if got, want := len(scheduled), (10 + 28 + 9 + 28); got != want {
+	if got, want := len(scheduled), (10+28+9+28)*3; got != want {
 		t.Errorf("got %d, want %d", got, want)
 	}
 
@@ -463,8 +464,8 @@ func TestParseOperationOrder(t *testing.T) {
 	} {
 		sched := scheds.Lookup(tc.name)
 		names := []string{}
-		for _, sched := range sched.Actions {
-			names = append(names, sched.Name)
+		for _, a := range sched.DailyActions {
+			names = append(names, a.Name)
 		}
 		if got, want := names, tc.expected; !slices.Equal(got, want) {
 			t.Errorf("%v: got %v, want %v", tc.name, got, want)
@@ -480,6 +481,21 @@ func datesForRange(year int, dr datetime.DateRangeList) []datetime.Date {
 		}
 	}
 	return dates
+}
+
+type fakeSunrise struct {
+}
+
+func (fakeSunrise) Name() string {
+	return "fake-sunrise"
+}
+
+func (fakeSunrise) Evaluate(date datetime.CalendarDate, place datetime.Place) datetime.TimeOfDay {
+	return datetime.NewTimeOfDay(8, 3, 2)
+}
+
+func init() {
+	scheduler.DailyDynamic["fake_sunrise"] = fakeSunrise{}
 }
 
 func TestDynamic(t *testing.T) {
@@ -505,10 +521,13 @@ func TestDynamic(t *testing.T) {
 		t.Errorf("dates: got %v, want %v", got, want)
 	}
 
-	// Dynamic times will be 00:00:00 when returned for each day in the schedule.
-	for _, when := range times {
-		if when.Hour() != 0 || when.Minute() != 0 || when.Second() != 0 {
-			t.Errorf("time hours, mins and seconds %v should be zero", when)
+	for i, when := range times {
+		want := datetime.NewTimeOfDay(8, 3, 2).Add(-time.Minute * 30) // fake_sunrise is at 8:03:02, subtract 30 minutes from that
+		if i%2 == 1 {
+			want = datetime.NewTimeOfDay(15, 0, 0) // 'off' is at 15:00
+		}
+		if got := datetime.TimeOfDayFromTime(when); got != want {
+			t.Errorf("%v: got %v, want %v", i, got, want)
 		}
 	}
 }
@@ -602,11 +621,4 @@ func TestValidation(t *testing.T) {
 		}
 	}
 
-}
-
-func TestMultiAndRepeat(t *testing.T) {
-
-	// impossible repeat values
-	// make sure it stops correctly, even on DST transitions
-	t.Fail()
 }

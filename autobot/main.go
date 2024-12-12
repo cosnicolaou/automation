@@ -33,6 +33,12 @@ commands:
         summary: read commands from a file
         arguments:
           - <filename> - the file to read commands from
+  - name: schedule
+    summary: schedule a series of commands to be executed at specific times
+    commands:
+      - name: run
+        arguments:
+          - <schedule>...
   - name: config
     summary: query/inspect the configuration file
     commands:
@@ -51,6 +57,8 @@ func cli() *subcmd.CommandSetYAML {
 	cmd.Set("config", "display").MustRunner(config.Display, &ConfigFlags{})
 	cmd.Set("config", "operations").MustRunner(config.Operations, &ConfigFlags{})
 
+	schedule := &Schedule{}
+	cmd.Set("schedule", "run").MustRunner(schedule.Run, &ScheduleFlags{})
 	return cmd
 }
 

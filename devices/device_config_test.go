@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"cloudeng.io/datetime"
 	"github.com/cosnicolaou/automation/devices"
 	"github.com/cosnicolaou/automation/internal/testutil"
 	"gopkg.in/yaml.v3"
@@ -55,7 +56,7 @@ var supportedControllers = devices.SupportedControllers{
 
 var supportedDevices = devices.SupportedDevices{
 	"device": func(string, devices.Options) (devices.Device, error) {
-		return &testutil.MockDevice{}, nil
+		return testutil.NewMockDevice("on", "off"), nil
 	},
 }
 
@@ -79,7 +80,7 @@ func compareOperationMaps(got, want map[string][]string) bool {
 func TestParseConfig(t *testing.T) {
 	ctx := context.Background()
 
-	system, err := devices.ParseSystemConfig(ctx, "", []byte(simple_spec))
+	system, err := devices.ParseSystemConfig(ctx, []byte(simple_spec))
 	if err != nil {
 		t.Fatalf("failed to parse system config: %v", err)
 	}
@@ -168,40 +169,98 @@ func TestBuildDevices(t *testing.T) {
 
 }
 
-func TestParseLocation(t *testing.T) {
+func TestParseTZLocation(t *testing.T) {
 	ctx := context.Background()
 	gl := func(l string) *time.Location {
+		if l == "" {
+			return nil
+		}
 		loc, err := time.LoadLocation(l)
 		if err != nil {
 			t.Fatal(err)
 		}
 		return loc
 	}
-	for _, tc := range []struct {
+	for i, tc := range []struct {
 		arg      string
-		file     string
+		cfg      string
 		expected *time.Location
 	}{
 		{"", "", gl("Local")},
-		{"", "location:", gl("Local")},
-		{"", "location: America/New_York", gl("America/New_York")},
+		{"Local", "", gl("Local")},
+		{"UTC", "", gl("UTC")},
+		{"UTC", "time_zone: Local", gl("UTC")},
+		{"", "time_zone:", gl("Local")},
+		{"", "time_zone: America/New_York", gl("America/New_York")},
+		{"UTC", "time_zone: America/New_York", gl("UTC")},
 		{"America/New_York", "", gl("America/New_York")},
+		{"America/Los_Angeles", "time_zone: America/New_York", gl("America/Los_Angeles")},
 	} {
-		spec := tc.file
-		system, err := devices.ParseSystemConfig(ctx, tc.arg, []byte(spec))
+		spec := tc.cfg
+		loc := gl(tc.arg)
+		system, err := devices.ParseSystemConfig(ctx, []byte(spec), devices.WithTimeLocation(loc))
 		if err != nil {
 			t.Fatalf("failed to parse system config: %v", err)
 		}
-		if got, want := system.Location.String(), tc.expected.String(); got != want {
-			t.Errorf("got %q, want %q", got, want)
+		if got, want := system.Location.TZ.String(), tc.expected.String(); got != want {
+			t.Errorf("%v: got %q, want %q", i, got, want)
 		}
+	}
+}
+
+type ziplookup struct{}
+
+func (ziplookup) Lookup(zip string) (float64, float64, error) {
+	if zip == "94102" {
+		return 200, -200, nil
+	}
+	return 100, -100, nil
+}
+
+func TestParsePlaceAndZIP(t *testing.T) {
+	ctx := context.Background()
+	spec := "time_zone:\nlatitude: 37.7749\nlongitude: 122.4194\nzip_code: 94102"
+
+	system, err := devices.ParseSystemConfig(ctx, []byte(spec))
+	if err != nil {
+		t.Fatalf("failed to parse system config: %v", err)
+	}
+	if got, want := system.Location, (devices.Location{ZIPCode: "94102", Place: datetime.Place{TZ: time.Local, Latitude: 37.7749, Longitude: 122.4194}}); !reflect.DeepEqual(got, want) {
+		t.Errorf("got %+v, want %+v", got, want)
+	}
+
+	system, err = devices.ParseSystemConfig(ctx, []byte(spec), devices.WithLatLong(23, 43), devices.WithZIPCode("12345"), devices.WithZIPCodeLookup(ziplookup{}))
+	if err != nil {
+		t.Fatalf("failed to parse system config: %v", err)
+	}
+	if got, want := system.Location, (devices.Location{ZIPCode: "12345", Place: datetime.Place{TZ: time.Local, Latitude: 23, Longitude: 43}}); !reflect.DeepEqual(got, want) {
+		t.Errorf("got %+v, want %+v", got, want)
+	}
+
+	// Test zip code lookup, the zip that is looked up is the result of the
+	// WithZIPCode option if one is given.
+
+	system, err = devices.ParseSystemConfig(ctx, []byte("zip_code: 94102"), devices.WithZIPCode("12345"), devices.WithZIPCodeLookup(ziplookup{}))
+	if err != nil {
+		t.Fatalf("failed to parse system config: %v", err)
+	}
+	if got, want := system.Location, (devices.Location{ZIPCode: "12345", Place: datetime.Place{TZ: time.Local, Latitude: 100, Longitude: -100}}); !reflect.DeepEqual(got, want) {
+		t.Errorf("got %+v, want %+v", got, want)
+	}
+
+	system, err = devices.ParseSystemConfig(ctx, []byte("zip_code: 94102"), devices.WithZIPCodeLookup(ziplookup{}))
+	if err != nil {
+		t.Fatalf("failed to parse system config: %v", err)
+	}
+	if got, want := system.Location, (devices.Location{ZIPCode: "94102", Place: datetime.Place{TZ: time.Local, Latitude: 200, Longitude: -200}}); !reflect.DeepEqual(got, want) {
+		t.Errorf("got %+v, want %+v", got, want)
 	}
 }
 
 func TestOperations(t *testing.T) {
 
 	ctx := context.Background()
-	system, err := devices.ParseSystemConfig(ctx, "", []byte(simple_spec))
+	system, err := devices.ParseSystemConfig(ctx, []byte(simple_spec))
 	if err != nil {
 		t.Fatalf("failed to parse system config: %v", err)
 	}

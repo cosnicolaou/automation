@@ -16,15 +16,16 @@ import (
 
 	"cloudeng.io/datetime"
 	"cloudeng.io/datetime/schedule"
+	"cloudeng.io/sync/errgroup"
 	"github.com/cosnicolaou/automation/devices"
 )
 
-var OpTimeout = errors.New("op-timeout")
+var ErrOpTimeout = errors.New("op-timeout")
 
-func (s *Scheduler) runSingleOp(ctx context.Context, now, due time.Time, action schedule.Action[Action]) error {
-	op := action.Action
+func (s *Scheduler) runSingleOp(ctx context.Context, now, due time.Time, action schedule.Active[Action]) error {
+	op := action.T.Action
 	timeout := op.Device.Timeout()
-	ctx, cancel := context.WithTimeoutCause(ctx, timeout, OpTimeout)
+	ctx, cancel := context.WithTimeoutCause(ctx, timeout, ErrOpTimeout)
 	defer cancel()
 	opts := devices.OperationArgs{
 		Writer: s.opWriter,
@@ -33,7 +34,7 @@ func (s *Scheduler) runSingleOp(ctx context.Context, now, due time.Time, action 
 	}
 	errCh := make(chan error)
 	go func() {
-		errCh <- op.Action.Op(ctx, opts)
+		errCh <- op.Op(ctx, opts)
 	}()
 	var err error
 	select {
@@ -49,71 +50,71 @@ func (s *Scheduler) runSingleOp(ctx context.Context, now, due time.Time, action 
 	return nil
 }
 
-func (s *Scheduler) RunDay(ctx context.Context, yp datetime.YearAndPlace, active schedule.Active[Action]) error {
-	cd := active.Date.CalendarDate(yp.Year)
-	for action := range Actions(active.Actions).Daily(cd, s.place) {
-		dueAt := datetime.Time(yp, active.Date, action.Due)
-		now := s.timeSource.NowIn(s.place)
+func (s *Scheduler) RunDay(ctx context.Context, place datetime.Place, active schedule.Scheduled[Action]) error {
+	for active := range active.Active(place) {
+		dueAt := active.When
+		now := s.timeSource.NowIn(s.place.TZ)
 		delay := dueAt.Sub(now)
 		if delay > 0 {
-			if delay > time.Millisecond*10 {
-				fmt.Printf("% 8v: delay %v: now: %v, due: %v\n", action.Name, delay, now, dueAt)
-			}
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
 			case <-time.After(delay):
 			}
 		}
-		fmt.Printf("% 8v: executing: now: %v, (%v) due: %v\n", action.Name, now, delay, dueAt)
-		fmt.Printf("clock: % 8v: %v\n", action.Name, now)
-		if err := s.runSingleOp(ctx, now, dueAt, action); err != nil {
+		if err := s.runSingleOp(ctx, now, dueAt, active); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (s *Scheduler) RunYear(ctx context.Context, yp datetime.YearAndPlace) error {
-	for active := range s.scheduler.Scheduled(yp) {
-		s.logger.Info("ok", "#actions", len(active.Actions))
-		if len(active.Actions) == 0 {
+// RunYear runs the scheduler from the specified calendar date to the end of that
+// year
+func (s *Scheduler) RunYearEnd(ctx context.Context, cd datetime.CalendarDate) error {
+	yp := datetime.YearPlace{
+		Place: s.place,
+		Year:  cd.Year(),
+	}
+	toYearEnd := datetime.NewDateRange(cd.Date(), datetime.NewDate(12, 31))
+	for active := range s.scheduler.Scheduled(yp, s.schedule.Dates, toYearEnd) {
+		s.logger.Info("ok", "#actions", len(active.Specs))
+		if len(active.Specs) == 0 {
 			continue
 		}
-		if err := s.RunDay(ctx, yp, active); err != nil {
+		if err := s.RunDay(ctx, yp.Place, active); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (s *Scheduler) RunYears(ctx context.Context, yp datetime.YearAndPlace, nYears int) error {
-	for y := 0; y < nYears; y++ {
-		if err := s.RunYear(ctx, yp); err != nil {
-			return err
-		}
-		yp.Year++
+func (s *Scheduler) ScheduledYearEnd(cd datetime.CalendarDate) iter.Seq[schedule.Scheduled[Action]] {
+	yp := datetime.YearPlace{
+		Place: s.place,
+		Year:  cd.Year(),
 	}
-	return nil
+	toYearEnd := datetime.NewDateRange(cd.Date(), datetime.NewDate(12, 31))
+	return s.scheduler.Scheduled(yp, s.schedule.Dates, toYearEnd)
 }
 
-func (s *Scheduler) Scheduled(yp datetime.YearAndPlace) iter.Seq[schedule.Active[Action]] {
-	return s.scheduler.Scheduled(yp)
+func (s *Scheduler) Place() datetime.Place {
+	return s.place
 }
 
-func actionAndDeviceNames(active schedule.Active[Action]) (actionNames, deviceNames []string) {
-	for _, a := range active.Actions {
-		actionNames = append(actionNames, a.Action.Name)
-		deviceNames = append(deviceNames, a.Action.DeviceName)
+func actionAndDeviceNames(active schedule.Scheduled[Action]) (actionNames, deviceNames []string) {
+	for _, a := range active.Specs {
+		actionNames = append(actionNames, a.T.Name)
+		deviceNames = append(deviceNames, a.T.DeviceName)
 	}
 	return actionNames, deviceNames
 }
 
 type Scheduler struct {
 	options
-	schedule  schedule.Annual[Action]
+	schedule  Annual
 	scheduler *schedule.AnnualScheduler[Action]
-	place     *time.Location
+	place     datetime.Place
 }
 
 type Option func(o *options)
@@ -159,10 +160,10 @@ func WithOperationWriter(w io.Writer) Option {
 }
 
 // New creates a new scheduler for the supplied schedule and associated devices.
-func New(sched schedule.Annual[Action], system devices.System, opts ...Option) (*Scheduler, error) {
+func New(sched Annual, system devices.System, opts ...Option) (*Scheduler, error) {
 	scheduler := &Scheduler{
 		schedule: sched,
-		place:    system.Location,
+		place:    system.Location.Place,
 	}
 	for _, opt := range opts {
 		opt(&scheduler.options)
@@ -177,33 +178,46 @@ func New(sched schedule.Annual[Action], system devices.System, opts ...Option) (
 		scheduler.opWriter = os.Stdout
 	}
 
-	for i, a := range sched.Actions {
-		dev := system.Devices[a.Action.DeviceName]
+	for i, a := range sched.DailyActions {
+		dev := system.Devices[a.T.DeviceName]
 		if dev == nil {
-			return nil, fmt.Errorf("unknown device: %s", a.Action.DeviceName)
+			return nil, fmt.Errorf("unknown device: %s", a.T.DeviceName)
 		}
-		op := dev.Operations()[a.Action.Name]
+		op := dev.Operations()[a.T.Name]
 		if op == nil {
-			return nil, fmt.Errorf("unknown operation: %s for device: %v", a.Action.Name, a.Action.DeviceName)
+			return nil, fmt.Errorf("unknown operation: %s for device: %v", a.T.Name, a.T.DeviceName)
 		}
-		sched.Actions[i].Action.Device = dev
-		sched.Actions[i].Action.Action.Op = op
+		sched.DailyActions[i].T.Device = dev
+		sched.DailyActions[i].T.Action.Op = op
 	}
 	scheduler.logger = scheduler.logger.With("mod", "scheduler", "sched", sched.Name)
-	scheduler.scheduler = schedule.NewAnnualScheduler(sched)
+	scheduler.scheduler = schedule.NewAnnualScheduler(sched.DailyActions)
 	return scheduler, nil
 }
 
-type MasterScheduler struct {
-	schedulers []*Scheduler
-}
-
-func CreateMasterScheduler(schedules []Schedules, devices map[string]devices.Device, opts ...Option) (*MasterScheduler, error) {
-	schedulers := make([]*Scheduler, 0, len(schedules))
-	for _, sched := range schedules {
-		_ = sched
-		//schedulers = append(schedulers, NewScheduler(sched, dev, opts...))
+func RunSchedulers(ctx context.Context, schedules Schedules, system devices.System, start datetime.CalendarDate, opts ...Option) error {
+	schedulers := make([]*Scheduler, 0, len(schedules.Schedules))
+	for _, sched := range schedules.Schedules {
+		s, err := New(sched, system, opts...)
+		if err != nil {
+			return fmt.Errorf("failed to create scheduler for %v: %w", sched.Name, err)
+		}
+		schedulers = append(schedulers, s)
 	}
-	ms := &MasterScheduler{schedulers: schedulers}
-	return ms, nil
+	var g errgroup.T
+	for _, s := range schedulers {
+		g.Go(func() error {
+			if err := s.RunYearEnd(ctx, start); err != nil {
+				return err
+			}
+			year := start.Year() + 1
+			for {
+				cd := datetime.NewCalendarDate(year, 1, 1)
+				if err := s.RunYearEnd(ctx, cd); err != nil {
+					return err
+				}
+			}
+		})
+	}
+	return g.Wait()
 }
