@@ -22,6 +22,8 @@ import (
 
 const devices_config = `
 time_zone: Local
+latitude: 1 # dummy values used to avoid having to use a zip code database.
+longitude: 1
 devices:
   - name: device
     type: device
