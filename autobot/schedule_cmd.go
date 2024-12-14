@@ -17,9 +17,9 @@ import (
 
 type ScheduleFlags struct {
 	ConfigFileFlags
-	LogFile     string `subcmd:"log-file,,log file"`
-	StartDate   string `subcmd:"start-date,,start date"`
-	ZIPDatabase string `subcmd:"zip-database,,zip code database"`
+	LogFile   string `subcmd:"log-file,,log file"`
+	StartDate string `subcmd:"start-date,,start date"`
+	DryRun    bool   `subcmd:"dry-run,,dry run"`
 }
 
 type Schedule struct {
@@ -65,8 +65,6 @@ func (s *Schedule) Run(ctx context.Context, flags any, args []string) error {
 		start = datetime.CalendarDateFromTime(time.Now())
 	}
 
-	zdb, err := loadZIPDatabase(ctx, fv.ZIPDatabase)
-
 	logger, cleanup, err := s.setupLogging(fv)
 	if err != nil {
 		return err
@@ -75,18 +73,20 @@ func (s *Schedule) Run(ctx context.Context, flags any, args []string) error {
 
 	deviceOpts := []devices.Option{
 		devices.WithLogger(logger),
-		devices.WithZIPCodeLookup(zdb),
 	}
 
 	schedulerOpts := []scheduler.Option{
 		scheduler.WithLogger(logger),
 		scheduler.WithOperationWriter(os.Stdout),
+		scheduler.WithDryRun(fv.DryRun),
 	}
 
 	ctx, err = s.loadFiles(ctx, fv, deviceOpts)
 	if err != nil {
 		return err
 	}
+
+	logger.Info("starting schedules", "start", start.String(), "tz", s.system.Location.TZ.String(), "zip", s.system.Location.ZIPCode, "latitude", s.system.Location.Latitude, "longitude", s.system.Location.Longitude)
 
 	return scheduler.RunSchedulers(ctx, s.schedules, s.system, start, schedulerOpts...)
 

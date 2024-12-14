@@ -26,6 +26,13 @@ func loadSystem(ctx context.Context, fv *ConfigFileFlags, opts ...devices.Option
 	if err != nil {
 		return nil, devices.System{}, err
 	}
+
+	zdb, err := loadZIPDatabase(ctx, fv.ZIPDatabase)
+	if err != nil {
+		return nil, devices.System{}, err
+	}
+	opts = append(opts, devices.WithZIPCodeLookup(zdb))
+
 	system, err := devices.ParseSystemConfigFile(ctx, fv.SystemFile, opts...)
 	if err != nil {
 		return nil, devices.System{}, err

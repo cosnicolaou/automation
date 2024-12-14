@@ -21,7 +21,7 @@ import (
 )
 
 const devices_config = `
-location: Local
+time_zone: Local
 devices:
   - name: device
     type: device
@@ -73,7 +73,7 @@ schedules:
       - 02/25:02
 
   - name: months
-    for: jan, feb
+    months: jan, feb
     actions:
       on: 08:12
       off: 20:01:13
@@ -81,7 +81,7 @@ schedules:
 
   - name: exlusions
     weekdays: true
-    for: jan,feb
+    months: jan,feb
     exclude_dates: jan-02, feb-02
     actions:
       on: 12:00
@@ -147,7 +147,7 @@ schedules:
 
   - name: dynamic
     device: device
-    for: feb
+    months: feb
     ranges:
       - summer
       - winter
@@ -188,12 +188,6 @@ schedules:
       - action: another
         when: 01:13:00
         repeat: 13m
-      #- action: op1
-   	  #  when: 02:00:01
-      #  repeat: 24h    
-       #- action: op2
-   	  #  when: 02:00:01
-      #  repeat: 12h 
 
   - name: repeating-bounded
     device: device

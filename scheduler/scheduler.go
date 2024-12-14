@@ -25,6 +25,10 @@ var ErrOpTimeout = errors.New("op-timeout")
 func (s *Scheduler) runSingleOp(ctx context.Context, now, due time.Time, action schedule.Active[Action]) error {
 	op := action.T.Action
 	timeout := op.Device.Timeout()
+	if s.dryRun {
+		s.logger.Info("dry-run", "op", action.Name, "args", op.Args, "timeout", timeout.String(), "now", now, "due", due)
+		return nil
+	}
 	ctx, cancel := context.WithTimeoutCause(ctx, timeout, ErrOpTimeout)
 	defer cancel()
 	opts := devices.OperationArgs{
@@ -43,9 +47,9 @@ func (s *Scheduler) runSingleOp(ctx context.Context, now, due time.Time, action 
 		err = ctx.Err()
 	}
 	if err != nil {
-		s.logger.Warn("failed", "op", op.Name, "now", now, "due", due, "err", err)
+		s.logger.Warn("failed", "op", op.Name, "args", op.Args, "now", now, "due", due, "err", err)
 	} else {
-		s.logger.Info("ok", "op", op.Name, "now", now, "due", due)
+		s.logger.Info("ok", "op", op.Name, "args", op.Args, "now", now, "due", due)
 	}
 	return nil
 }
@@ -56,11 +60,16 @@ func (s *Scheduler) RunDay(ctx context.Context, place datetime.Place, active sch
 		now := s.timeSource.NowIn(s.place.TZ)
 		delay := dueAt.Sub(now)
 		if delay > 0 {
+			s.logger.Info("waiting", "op", active.T.Name, "now", now, "due", dueAt, "delay", delay.String())
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
 			case <-time.After(delay):
 			}
+		}
+		if delay < 0 && -delay > time.Minute {
+			s.logger.Info("ignored", "op", active.T.Name, "now", now, "due", dueAt, "delay", delay.String())
+			continue
 		}
 		if err := s.runSingleOp(ctx, now, dueAt, active); err != nil {
 			return err
@@ -69,9 +78,9 @@ func (s *Scheduler) RunDay(ctx context.Context, place datetime.Place, active sch
 	return nil
 }
 
-// RunYear runs the scheduler from the specified calendar date to the end of that
-// year
-func (s *Scheduler) RunYearEnd(ctx context.Context, cd datetime.CalendarDate) error {
+// Run runs the scheduler from the specified calendar date to the last of the sheduled
+// actions for that year.
+func (s *Scheduler) RunYear(ctx context.Context, cd datetime.CalendarDate) error {
 	yp := datetime.YearPlace{
 		Place: s.place,
 		Year:  cd.Year(),
@@ -85,6 +94,23 @@ func (s *Scheduler) RunYearEnd(ctx context.Context, cd datetime.CalendarDate) er
 		if err := s.RunDay(ctx, yp.Place, active); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// RunYear runs the scheduler from the specified calendar date to the end of that
+// year
+func (s *Scheduler) RunYearEnd(ctx context.Context, cd datetime.CalendarDate) error {
+	if err := s.RunYear(ctx, cd); err != nil {
+		return err
+	}
+	yearEnd := time.Date(cd.Year(), 12, 31, 23, 59, 59, int(time.Second)-1, s.place.TZ)
+	delay := yearEnd.Sub(s.timeSource.NowIn(s.place.TZ))
+	s.logger.Info("year-end", "year-end-delay", delay.String())
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-time.After(delay):
 	}
 	return nil
 }
@@ -123,6 +149,7 @@ type options struct {
 	timeSource TimeSource
 	logger     *slog.Logger
 	opWriter   io.Writer
+	dryRun     bool
 }
 
 // TimeSource is an interface that provides the current time in a specific
@@ -156,6 +183,12 @@ func WithLogger(l *slog.Logger) Option {
 func WithOperationWriter(w io.Writer) Option {
 	return func(o *options) {
 		o.opWriter = w
+	}
+}
+
+func WithDryRun(v bool) Option {
+	return func(o *options) {
+		o.dryRun = v
 	}
 }
 
@@ -210,8 +243,8 @@ func RunSchedulers(ctx context.Context, schedules Schedules, system devices.Syst
 			if err := s.RunYearEnd(ctx, start); err != nil {
 				return err
 			}
-			year := start.Year() + 1
 			for {
+				year := start.Year() + 1
 				cd := datetime.NewCalendarDate(year, 1, 1)
 				if err := s.RunYearEnd(ctx, cd); err != nil {
 					return err

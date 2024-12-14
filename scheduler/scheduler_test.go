@@ -112,13 +112,15 @@ func (r *recorder) Lines() []string {
 }
 
 type logEntry struct {
-	Sched      string    `json:"sched"`
-	Msg        string    `json:"msg"`
-	Op         string    `json:"op"`
-	Now        time.Time `json:"now"`
-	Due        time.Time `json:"due"`
-	NumActions int       `json:"#actions"`
-	Error      string    `json:"err"`
+	Sched        string    `json:"sched"`
+	Msg          string    `json:"msg"`
+	Op           string    `json:"op"`
+	Now          time.Time `json:"now"`
+	Due          time.Time `json:"due"`
+	NumActions   int       `json:"#actions"`
+	Error        string    `json:"err"`
+	YearEndDelay string    `json:"year-end-delay"`
+	Delay        string    `json:"delay"`
 }
 
 func (r *recorder) Logs(t *testing.T) []logEntry {
@@ -132,7 +134,7 @@ func (r *recorder) Logs(t *testing.T) []logEntry {
 			t.Errorf("failed to unmarshal: %v: %v", string(l), err)
 			return nil
 		}
-		if e.NumActions != 0 || e.Msg == "late" {
+		if e.NumActions != 0 || e.Msg == "late" || e.Delay != "" {
 			continue
 		}
 		entries = append(entries, e)
@@ -198,6 +200,13 @@ func createScheduler(t *testing.T, sys devices.System, schedule scheduler.Annual
 	return scheduler
 }
 
+func appendYearEndTimesTicks(year int, loc *time.Location, times, ticks []time.Time) ([]time.Time, []time.Time) {
+	last := time.Date(year, 12, 31, 23, 59, 59, int(time.Second)-1, loc)
+	times = append(times, last)
+	ticks = append(ticks, last.Add(-time.Millisecond*10))
+	return times, ticks
+}
+
 func TestScheduler(t *testing.T) {
 	ctx := context.Background()
 
@@ -209,6 +218,7 @@ func TestScheduler(t *testing.T) {
 
 	year := 2021
 	all, times, ticks := allActive(scheduler, year)
+	_, ticks = appendYearEndTimesTicks(year, sys.Location.TZ, times, ticks)
 	runScheduler(ctx, t, scheduler, year, ts, ticks)
 
 	logs := logRecorder.Logs(t)
@@ -222,21 +232,24 @@ func TestScheduler(t *testing.T) {
 		t.Errorf("got %d, want %d", got, want)
 	}
 
-	if got, want := len(logs), days*3; got != want {
+	if got, want := len(logs), (days*3)+1; got != want {
 		t.Errorf("got %d, want %d", got, want)
 	}
 
-	for i := range len(logs) / 3 {
+	for i := 0; i < len(logs)-1; i++ {
+		if got, want := logs[i].Due, times[i]; !got.Equal(want) {
+			t.Errorf("got %v, want %v", got, want)
+		}
+		if logs[i].YearEndDelay != "" {
+			t.Errorf("unexpected year end")
+		}
+	}
+	if logs[len(logs)-1].YearEndDelay == "" {
+		t.Errorf("missing year end delay")
+	}
+
+	for i := range (len(logs) - 1) / 3 {
 		lg1, lg2, lg3 := logs[i*3], logs[i*3+1], logs[i*3+2]
-		if got, want := lg1.Due, times[i*3]; !got.Equal(want) {
-			t.Errorf("%#v: got %v, want %v", lg1, got, want)
-		}
-		if got, want := lg2.Due, times[i*3+1]; !got.Equal(want) {
-			t.Errorf("%#v: got %v, want %v", lg2, got, want)
-		}
-		if got, want := lg3.Due, times[i*3+2]; !got.Equal(want) {
-			t.Errorf("%#v: got %v, want %v", lg3, got, want)
-		}
 		if got, want := lg1.Op, "another"; got != want {
 			t.Errorf("%#v: got %v, want %v", lg1, got, want)
 		}
@@ -304,7 +317,7 @@ func TestScheduleRealTime(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-		errs.Append(scheduler.RunYearEnd(ctx, cd))
+		errs.Append(scheduler.RunYear(ctx, cd))
 		wg.Done()
 	}()
 	wg.Wait()
@@ -376,7 +389,7 @@ func TestTimeout(t *testing.T) {
 			}()
 		}
 
-		if err := scheduler.RunYearEnd(ctx, cd); err != nil {
+		if err := scheduler.RunYear(ctx, cd); err != nil {
 			t.Fatal(err)
 		}
 
@@ -407,12 +420,14 @@ func TestMultiYear(t *testing.T) {
 	scheduler := createScheduler(t, sys, spec.Lookup("multi-year"), opts...)
 
 	all2023, times2023, ticks2023 := allActive(scheduler, 2023)
+	times2023, ticks2023 = appendYearEndTimesTicks(2023, sys.Location.TZ, times2023, ticks2023)
 	all2024, times2024, ticks2024 := allActive(scheduler, 2024)
+	times2024, ticks2024 = appendYearEndTimesTicks(2024, sys.Location.TZ, times2024, ticks2024)
 	times := append(times2023, times2024...)
 	ticks := append(ticks2023, ticks2024...)
 
 	all := append(all2023, all2024...)
-	if len(times) != len(all) {
+	if len(times) != len(all)+2 {
 		t.Fatalf("mismatch: %v %v", len(times), len(all))
 	}
 
@@ -439,7 +454,7 @@ func TestMultiYear(t *testing.T) {
 	}
 
 	for i, l := range logs {
-		if got, want := l.Due, times[i]; !got.Equal(want) {
+		if got, want := l.Due, times[i]; l.YearEndDelay == "" && !got.Equal(want) {
 			t.Errorf("got %v, want %v", got, want)
 		}
 	}
@@ -461,12 +476,13 @@ func TestDST(t *testing.T) {
 	scheduler := createScheduler(t, sys, spec.Lookup("daylight-saving-time"), opts...)
 
 	all, times, ticks := allActive(scheduler, year)
+	times, ticks = appendYearEndTimesTicks(year, sys.Location.TZ, times, ticks)
 	runScheduler(ctx, t, scheduler, year, ts, ticks)
 
 	// Make sure all operations were called despite the DST transitions.
 	opsLines := deviceRecorder.Lines()
 	ndays := 4 + 3
-	if got, want := len(opsLines), ndays*3; got != want {
+	if got, want := len(opsLines), (ndays * 3); got != want {
 		t.Errorf("got %d, want %d", got, want)
 	}
 
@@ -490,7 +506,7 @@ func TestDST(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if got, want := len(logs), ndays*3; got != want {
+	if got, want := len(logs), (ndays*3)+1; got != want {
 		t.Errorf("got %d, want %d", got, want)
 	}
 
@@ -534,6 +550,7 @@ func TestRepeats(t *testing.T) {
 	year := 2024
 	//	ndays := 2 + 2
 	all, _, ticks := allActive(scheduler, year)
+	_, ticks = appendYearEndTimesTicks(year, sys.Location.TZ, nil, ticks)
 
 	runScheduler(ctx, t, scheduler, year, ts, ticks)
 
@@ -547,6 +564,9 @@ func TestRepeats(t *testing.T) {
 	nowtimes := map[datetime.Date]map[string][]time.Time{}
 
 	for i, l := range logs {
+		if l.YearEndDelay != "" {
+			break
+		}
 		date := datetime.DateFromTime(l.Due)
 		if _, ok := nops[date]; !ok {
 			nops[date] = map[string]int{}
@@ -619,5 +639,4 @@ func TestRepeats(t *testing.T) {
 			prevAnother = cur
 		}
 	}
-
 }

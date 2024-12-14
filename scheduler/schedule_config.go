@@ -54,7 +54,7 @@ func (cc constraintsConfig) parse() (datetime.Constraints, error) {
 }
 
 type datesConfig struct {
-	For          monthList         `yaml:"for" cmd:"for the specified months"`
+	Months       monthList         `yaml:"months" cmd:"for the specified months"`
 	MirrorMonths bool              `yaml:"mirror_months" cmd:"include the mirror months, ie. those equidistant from the soltices for the set of 'for' months"`
 	Ranges       []string          `yaml:"ranges" cmd:"for the specified date ranges"`
 	Constraints  constraintsConfig `yaml:",inline" cmd:"constrain the dates"`
@@ -62,7 +62,7 @@ type datesConfig struct {
 
 func (dc *datesConfig) parse() (schedule.Dates, error) {
 	d := schedule.Dates{
-		For:          datetime.MonthList(dc.For),
+		Months:       datetime.MonthList(dc.Months),
 		MirrorMonths: dc.MirrorMonths,
 	}
 	var err error

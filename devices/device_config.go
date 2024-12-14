@@ -76,13 +76,10 @@ type TimeZone struct {
 }
 
 func (tz *TimeZone) UnmarshalYAML(node *yaml.Node) error {
-	fmt.Printf("node: %q\n", node.Value)
 	l, err := locationFromValue(node.Value)
 	if err != nil {
-		fmt.Printf(">>>>")
 		return err
 	}
-	fmt.Printf("l: %v\n", l)
 	tz.Location = l
 	return nil
 }
@@ -238,6 +235,10 @@ func buildLocation(cfg LocationConfig, opts []Option) (Location, error) {
 		}
 		loc.Latitude = lat
 		loc.Longitude = long
+	}
+
+	if loc.Latitude == 0 && loc.Longitude == 0 {
+		return loc, fmt.Errorf("latitude and longitude must be specified either directly or via a zip code")
 	}
 	return loc, nil
 }

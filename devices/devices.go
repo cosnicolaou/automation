@@ -164,18 +164,18 @@ func CreateControllers(config []ControllerConfig, options Options) (map[string]C
 	for _, ctrlcfg := range config {
 		f, ok := availableControllers[ctrlcfg.Type]
 		if !ok {
-			return nil, fmt.Errorf("unsupported controller type: %s", ctrlcfg.Type)
+			return nil, fmt.Errorf("unsupported controller type: %q", ctrlcfg.Type)
 		}
 		if f == nil {
 			return nil, fmt.Errorf("unsupported controller type, nil new function: %s", ctrlcfg.Type)
 		}
 		ctrl, err := f(ctrlcfg.Type, options)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create controller %v: %w", ctrlcfg.Type, err)
+			return nil, fmt.Errorf("failed to create controller %q: %w", ctrlcfg.Type, err)
 		}
 		ctrl.SetConfig(ctrlcfg.ControllerConfigCommon)
 		if err := ctrl.UnmarshalYAML(&ctrlcfg.Config); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal controller %v: %w", ctrlcfg.Type, err)
+			return nil, fmt.Errorf("failed to unmarshal controller %q: %w", ctrlcfg.Type, err)
 		}
 		controllers[ctrlcfg.Name] = ctrl
 	}
@@ -191,14 +191,14 @@ func CreateDevices(config []DeviceConfig, options Options) (map[string]Device, e
 	for _, devcfg := range config {
 		f, ok := availableDevices[devcfg.Type]
 		if !ok {
-			return nil, fmt.Errorf("unsupported device type: %s", devcfg.Type)
+			return nil, fmt.Errorf("device %q, unsupported device type: %q", devcfg.Name, devcfg.Type)
 		}
 		if f == nil {
-			return nil, fmt.Errorf("unsupported device type, nil new function: %s", devcfg.Type)
+			return nil, fmt.Errorf("device %q type, device type: %q, has no compiled in support", devcfg.Name, devcfg.Type)
 		}
 		dev, err := f(devcfg.Type, options)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create device %v: %w", devcfg.Type, err)
+			return nil, fmt.Errorf("device %q type, to create device %v: %w", devcfg.Name, devcfg.Type, err)
 		}
 		dev.SetConfig(devcfg.DeviceConfigCommon)
 		if err := dev.UnmarshalYAML(&devcfg.Config); err != nil {
