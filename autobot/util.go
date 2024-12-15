@@ -27,7 +27,7 @@ func loadSystem(ctx context.Context, fv *ConfigFileFlags, opts ...devices.Option
 		return nil, devices.System{}, err
 	}
 
-	zdb, err := loadZIPDatabase(ctx, fv.ZIPDatabase)
+	zdb, err := loadZIPDatabase(fv.ZIPDatabase)
 	if err != nil {
 		return nil, devices.System{}, err
 	}
@@ -63,29 +63,64 @@ type zipLookup struct {
 }
 
 func (z zipLookup) Lookup(zip string) (float64, float64, error) {
+	zip = strings.ToUpper(zip)
 	parts := strings.FieldsFunc(zip, func(c rune) bool {
 		return !unicode.IsLetter(c) && !unicode.IsNumber(c)
 	})
-	if len(parts) != 2 {
+	admin, code := "", ""
+	switch len(parts) {
+	case 2:
+		admin, code = parts[0], parts[1]
+	case 3:
+		admin, code = parts[0], parts[1]+" "+parts[2]
+	default:
 		return 0, 0, fmt.Errorf("invalid zipcode: %v", zip)
 	}
-	if ll, ok := z.LatLong(parts[0], parts[1]); ok {
+	if ll, ok := z.LatLong(admin, code); ok {
 		return ll.Lat, ll.Long, nil
 	}
 	return 0, 0, fmt.Errorf("unknown zipcode: %v", zip)
 }
 
-func loadZIPDatabase(ctx context.Context, dbname string) (zipLookup, error) {
-	filename := "US.zip"
-	var lfs fs.FS = USZipCodes
-	if dbname != "" {
-		dirname := filepath.Dir(dbname)
-		filename = filepath.Base(dbname)
-		lfs = os.DirFS(dirname)
-	}
+func loadZIPDatabaseDir(db *zipcode.DB, lfs fs.FS) error {
+	return fs.WalkDir(lfs, ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if filepath.Ext(path) == ".zip" {
+			fmt.Printf("loading zip file: %v\n", path)
+			if err := internal.LoadFromZIPArchive(db, lfs, path); err != nil {
+				return fmt.Errorf("failed to load database file: %v, %v\n", path, err)
+			}
+			return nil
+		}
+		fmt.Printf("loading zip file: %v\n", path)
+		data, err := fs.ReadFile(lfs, path)
+		if err != nil {
+			return err
+		}
+		if err := db.Load(data); err != nil {
+			return fmt.Errorf("failed to load database file: %v, %v\n", path, err)
+		}
+		return nil
+	})
+}
+
+func loadZIPDatabase(dbdir string) (zipLookup, error) {
 	db := zipcode.NewDB()
-	if err := internal.LoadFromZIPArchive(db, lfs, filename); err != nil {
-		return zipLookup{}, fmt.Errorf("failed to load embedded US zipcode database: %v\n", err)
+	if len(dbdir) == 0 {
+		var lfs fs.FS = USZipCodes
+		if err := internal.LoadFromZIPArchive(db, lfs, "US.zip"); err != nil {
+			return zipLookup{}, fmt.Errorf("failed to load embedded US zipcode database: %v\n", err)
+		}
+		return zipLookup{DB: db}, nil
+	}
+	lfs := os.DirFS(dbdir)
+	if err := loadZIPDatabaseDir(db, lfs); err != nil {
+		return zipLookup{}, fmt.Errorf("failed to load zipcode database from directory %v: %v\n", dbdir, err)
 	}
 	return zipLookup{DB: db}, nil
 }

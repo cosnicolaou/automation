@@ -538,6 +538,40 @@ func TestDST(t *testing.T) {
 
 }
 
+func operationsByDate(logs []logEntry) (
+	days []datetime.Date,
+	timesByDate map[datetime.Date]map[string][]time.Time,
+	opsByName map[string][]int,
+) {
+	opsByDate := map[datetime.Date]map[string]int{}
+	timesByDate = map[datetime.Date]map[string][]time.Time{}
+	opsByName = map[string][]int{}
+	for _, l := range logs {
+		if l.YearEndDelay != "" {
+			break
+		}
+		date := datetime.DateFromTime(l.Due)
+		if _, ok := opsByDate[date]; !ok {
+			opsByDate[date] = map[string]int{}
+			timesByDate[date] = map[string][]time.Time{}
+		}
+		opsByDate[date][l.Op]++
+		timesByDate[date][l.Op] = append(timesByDate[date][l.Op], l.Now)
+	}
+	for day := range opsByDate {
+		days = append(days, day)
+	}
+	slices.Sort(days)
+
+	for _, day := range days {
+		for op := range opsByDate[day] {
+			opsByName[op] = append(opsByName[op], opsByDate[day][op])
+		}
+	}
+
+	return
+}
+
 func TestRepeats(t *testing.T) {
 	ctx := context.Background()
 
@@ -559,22 +593,10 @@ func TestRepeats(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Look at operations per day
-	nops := map[datetime.Date]map[string]int{}
-	nowtimes := map[datetime.Date]map[string][]time.Time{}
-
 	for i, l := range logs {
 		if l.YearEndDelay != "" {
 			break
 		}
-		date := datetime.DateFromTime(l.Due)
-		if _, ok := nops[date]; !ok {
-			nops[date] = map[string]int{}
-			nowtimes[date] = map[string][]time.Time{}
-		}
-		nops[date][l.Op]++
-		nowtimes[date][l.Op] = append(nowtimes[date][l.Op], l.Now)
-
 		if got, want := l.Due, all[i].when; !got.Equal(want) {
 			t.Errorf("got %v, want %v", got, want)
 		}
@@ -583,19 +605,8 @@ func TestRepeats(t *testing.T) {
 		}
 	}
 
-	days := []datetime.Date{}
-	for day := range nops {
-		days = append(days, day)
-	}
-	slices.Sort(days)
-	perdayOff := []int{}
-	perdayOn := []int{}
-	anotherDay := []int{}
-	for _, day := range days {
-		perdayOn = append(perdayOn, nops[day]["on"])
-		perdayOff = append(perdayOff, nops[day]["off"])
-		anotherDay = append(anotherDay, nops[day]["another"])
-	}
+	// Look at operations per day
+	days, nowtimes, opsPerDay := operationsByDate(logs)
 
 	// add repeats for 'off' operations, per day.
 	expectedOff := 23 // once per hour starting at 1am
@@ -610,15 +621,15 @@ func TestRepeats(t *testing.T) {
 	expectedAnotherPerday := []int{expectedAnother, expectedAnother - 5, expectedAnother, expectedAnother + 5 - 1}
 
 	// One 'on' operation per day
-	if got, want := perdayOn, []int{1, 1, 1, 1}; !slices.Equal(got, want) {
+	if got, want := opsPerDay["on"], []int{1, 1, 1, 1}; !slices.Equal(got, want) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 
-	if got, want := perdayOff, expectedOffPerday; !slices.Equal(got, want) {
+	if got, want := opsPerDay["off"], expectedOffPerday; !slices.Equal(got, want) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 
-	if got, want := anotherDay, expectedAnotherPerday; !slices.Equal(got, want) {
+	if got, want := opsPerDay["another"], expectedAnotherPerday; !slices.Equal(got, want) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 
@@ -637,6 +648,63 @@ func TestRepeats(t *testing.T) {
 				t.Errorf("%v: %v: got %v, want %v", prevAnother, cur, got, want)
 			}
 			prevAnother = cur
+		}
+	}
+}
+
+func TestRepeatsBounded(t *testing.T) {
+	ctx := context.Background()
+
+	ts := &timesource{ch: make(chan time.Time, 1)}
+	_, logRecorder, opts := newRecordersAndLogger(ts)
+	sys, spec := setupSchedules(t)
+
+	scheduler := createScheduler(t, sys, spec.Lookup("repeating-bounded"), opts...)
+
+	year := 2024
+	//	ndays := 2 + 2
+	all, _, ticks := allActive(scheduler, year)
+	_, ticks = appendYearEndTimesTicks(year, sys.Location.TZ, nil, ticks)
+	runScheduler(ctx, t, scheduler, year, ts, ticks)
+
+	logs := logRecorder.Logs(t)
+	if err := containsError(logs); err != nil {
+		t.Fatal(err)
+	}
+
+	for i, l := range logs {
+		if l.YearEndDelay != "" {
+			break
+		}
+		if got, want := l.Due, all[i].when; !got.Equal(want) {
+			t.Errorf("got %v, want %v", got, want)
+		}
+		if got, want := l.Now, ticks[i]; !got.Equal(want) {
+			t.Errorf("got %v, want %v", got, want)
+		}
+	}
+
+	// Look at operations per day
+	days, nowtimes, opsPerDay := operationsByDate(logs)
+
+	// One 'on' operation per day
+	if got, want := opsPerDay["on"], []int{1, 1, 1, 1}; !slices.Equal(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+
+	// Five 'off' operations per day, since num_repeats is set to 4.
+	if got, want := opsPerDay["off"], []int{5, 5, 5, 5}; !slices.Equal(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+
+	// The intervals should always be the same.
+	for _, day := range days {
+		prevNow := nowtimes[day]["off"][0]
+		for _, cur := range nowtimes[day]["off"][1:] {
+			if got, want := cur.Sub(prevNow), time.Minute*30; got != want {
+				t.Errorf("%v: %v: got %v, want %v", prevNow, cur, got, want)
+			}
+			prevNow = cur
 		}
 	}
 }

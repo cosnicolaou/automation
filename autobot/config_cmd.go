@@ -23,7 +23,7 @@ type ConfigFileFlags struct {
 	SystemFile       string  `subcmd:"system,$HOME/.autobot-system.yaml,path to a file containing the lutron system configuration"`
 	SystemTZLocation string  `subcmd:"tz,,timezone of the system"`
 	ZIPCode          string  `subcmd:"zip,,zip code of the system"`
-	ZIPDatabase      string  `subcmd:"zip-database,,zip code database"`
+	ZIPDatabase      string  `subcmd:"zip-db-dir,,directory containing zip code database files from geonames.org"`
 	Latitude         float64 `subcmd:"lat,,latitude of the system"`
 	Longitude        float64 `subcmd:"long,,longitude of the system"`
 	ScheduleFile     string  `subcmd:"schedule,$HOME/.lutron-schedule.yaml,path to a file containing the lutron schedule configuration"`

@@ -78,14 +78,21 @@ func (dc *datesConfig) parse() (schedule.Dates, error) {
 	return d, nil
 }
 
+type precondition struct {
+	Device string   `yaml:"device" cmd:"name of the device that the pre-condition applies to"`
+	Op     string   `yaml:"op" cmd:"name of the pre-condition in device.op format"`
+	Args   []string `yaml:"args,flow" cmd:"arguments to be passed to the pre-condition"`
+}
+
 type actionDetailed struct {
-	When       timeOfDay      `yaml:"when" cmd:"time of day when the action is to be taken"`
-	Action     string         `yaml:"action" cmd:"action to be taken"`
-	Args       []string       `yaml:"args,flow" cmd:"argument to be passed to the action"`
-	Before     string         `yaml:"before" cmd:"action that must be taken before this one if it is scheduled for the same time"`
-	After      string         `yaml:"after" cmd:"action that must be taken after this one if it is scheduled for the same time"`
-	Repeat     repeatDuration `yaml:"repeat" cmd:"repeat the action every specified duration, starting at 'when'"`
-	NumRepeats int            `yaml:"num_repeats" cmd:"number of times to repeat"`
+	When         timeOfDay      `yaml:"when" cmd:"time of day when the action is to be taken"`
+	Action       string         `yaml:"action" cmd:"action to be taken"`
+	Args         []string       `yaml:"args,flow" cmd:"argument to be passed to the action"`
+	Precondition precondition   `yaml:"precondition" cmd:"precondition that must be satisfied before the action is taken"`
+	Before       string         `yaml:"before" cmd:"action that must be taken before this one if it is scheduled for the same time"`
+	After        string         `yaml:"after" cmd:"action that must be taken after this one if it is scheduled for the same time"`
+	Repeat       repeatDuration `yaml:"repeat" cmd:"repeat the action every specified duration, starting at 'when'"`
+	NumRepeats   int            `yaml:"num_repeats" cmd:"number of times to repeat"`
 }
 
 type actionScheduleConfig struct {
@@ -152,9 +159,22 @@ func (cfg schedulesConfig) createActions(sys devices.System, times, scheduleName
 	actions := schedule.ActionSpecs[Action]{}
 	for _, actionTime := range actionTimes {
 		due, dynDue, delta := actionTime.Literal, actionTime.Dynamic, actionTime.Delta
-		if _, ok := sys.Devices[deviceName]; !ok {
+		if _, _, ok := sys.DeviceConfigs(deviceName); !ok {
 			return nil, fmt.Errorf("unknown device: %s for schedule %q", deviceName, scheduleName)
 		}
+		if _, _, ok := sys.DeviceOp(deviceName, actionName); !ok {
+			return nil, fmt.Errorf("unknown operation: %q for device: %q for schedule %q", actionName, deviceName, scheduleName)
+		}
+
+		var condition devices.Condition
+		if details.Precondition.Op != "" {
+			c, _, ok := sys.DeviceCondition(details.Precondition.Device, details.Precondition.Op)
+			if !ok {
+				return nil, fmt.Errorf("unknown precondition: %q for device: %q for schedule %q", details.Precondition.Op, deviceName, scheduleName)
+			}
+			condition = c
+		}
+
 		actions = append(actions, schedule.ActionSpec[Action]{
 			Due:  due,
 			Name: actionName,
@@ -172,7 +192,11 @@ func (cfg schedulesConfig) createActions(sys devices.System, times, scheduleName
 					Name:       actionName,
 					Args:       details.Args,
 				},
-			}})
+				Precondition: Precondition{
+					ConditionName: details.Precondition.Op,
+					Condition:     condition,
+					Args:          details.Precondition.Args,
+				}}})
 	}
 	return actions, nil
 }

@@ -21,9 +21,16 @@ func (t *timeOfDay) UnmarshalYAML(node *yaml.Node) error {
 	return atl.Parse(node.Value)
 }
 
+type Precondition struct {
+	ConditionName string
+	Condition     devices.Condition
+	Args          []string
+}
+
 // Action represents a single action to be taken on any given day.
 type Action struct {
 	devices.Action
+	Precondition Precondition
 }
 
 // orderActionsStatic orders the actions in the supplied slice of

@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"time"
 
+	"cloudeng.io/datetime"
 	"github.com/cosnicolaou/automation/net/streamconn"
 	"gopkg.in/yaml.v3"
 )
@@ -25,6 +26,8 @@ type Action struct {
 }
 
 type OperationArgs struct {
+	Due    time.Time
+	Place  datetime.Place
 	Writer io.Writer
 	Logger *slog.Logger
 	Args   []string
@@ -40,7 +43,12 @@ type Controller interface {
 	Implementation() any
 }
 
+// Operation represents a single operation that can be performed on a device.
 type Operation func(ctx context.Context, opts OperationArgs) error
+
+// Condition represents a condition that can be evaluated to determine if an
+// operation should be performed.
+type Condition func(ctx context.Context, opts OperationArgs) (bool, error)
 
 type Device interface {
 	SetConfig(DeviceConfigCommon)
@@ -52,6 +60,8 @@ type Device interface {
 	ControlledBy() Controller
 	Operations() map[string]Operation
 	OperationsHelp() map[string]string
+	Conditions() map[string]Condition
+	ConditionsHelp() map[string]string
 	Timeout() time.Duration
 }
 
@@ -134,7 +144,7 @@ type SupportedControllers map[string]func(typ string, opts Options) (Controller,
 
 type SupportedDevices map[string]func(typ string, opts Options) (Device, error)
 
-func BuildDevices(controllerCfg []ControllerConfig, deviceCfg []DeviceConfig, opts ...Option) (map[string]Controller, map[string]Device, error) {
+func CreateSystem(controllerCfg []ControllerConfig, deviceCfg []DeviceConfig, opts ...Option) (map[string]Controller, map[string]Device, error) {
 	var options Options
 	for _, opt := range opts {
 		opt(&options)

@@ -26,6 +26,8 @@ type MockDevice struct {
 	Detail         DeviceDetail `yaml:",inline"`
 	operations     map[string]devices.Operation
 	operationsHelp map[string]string
+	conditions     map[string]devices.Condition
+	conditionsHelp map[string]string
 }
 
 func NewMockDevice(operations ...string) *MockDevice {
@@ -36,11 +38,20 @@ func NewMockDevice(operations ...string) *MockDevice {
 		kop := strings.ToLower(op)
 		nop := cases.Title(language.English).String(op)
 		d.operations[kop] = func(ctx context.Context, opts devices.OperationArgs) error {
-			return d.generic(ctx, nop, opts)
+			return d.genericOp(ctx, nop, opts)
 		}
 		d.operationsHelp[kop] = fmt.Sprintf("%s operation", nop)
 	}
+	d.conditions = map[string]devices.Condition{}
+	d.conditionsHelp = map[string]string{}
 	return d
+}
+
+func (d *MockDevice) AddCondition(name string, outcome bool) {
+	d.conditions[name] = func(ctx context.Context, opts devices.OperationArgs) (bool, error) {
+		return outcome, nil
+	}
+	d.conditionsHelp[name] = fmt.Sprintf("%s condition: outcome %v", name, outcome)
 }
 
 func (d *MockDevice) SetConfig(cfg devices.DeviceConfigCommon) {
@@ -83,24 +94,19 @@ func (d *MockDevice) OperationsHelp() map[string]string {
 	return d.operationsHelp
 }
 
+func (d *MockDevice) Conditions() map[string]devices.Condition {
+	return d.conditions
+}
+
+func (d *MockDevice) ConditionsHelp() map[string]string {
+	return d.conditionsHelp
+}
+
 func (d *MockDevice) Timeout() time.Duration {
 	return time.Second
 }
 
-/*
-func (d *MockDevice) On(ctx context.Context, opts devices.OperationArgs) error {
-	return d.generic(ctx, "On", opts)
-}
-
-func (d *MockDevice) Off(ctx context.Context, opts devices.OperationArgs) error {
-	return d.generic(ctx, "Off", opts)
-}
-
-func (d *MockDevice) Another(ctx context.Context, opts devices.OperationArgs) error {
-	return d.generic(ctx, "Another", opts)
-}*/
-
-func (d *MockDevice) generic(_ context.Context, opName string, opts devices.OperationArgs) error {
+func (d *MockDevice) genericOp(_ context.Context, opName string, opts devices.OperationArgs) error {
 	fmt.Fprintf(opts.Writer, "device[%s].%s: [%d] %v\n", d.Name, opName, len(opts.Args), strings.Join(opts.Args, "--"))
 	return nil
 }

@@ -21,16 +21,34 @@ import (
 )
 
 const devices_config = `
+common_ops: &common_ops
+  operations:
+    a:
+    b:
+    c:
+    d:
+    on:
+    off:
+    another:
+  conditions:
+    weather:
+
 time_zone: Local
-latitude: 1 # dummy values used to avoid having to use a zip code database.
-longitude: 1
 devices:
   - name: device
     type: device
+    <<: *common_ops
+
   - name: slow
     type: slow_device
+    <<: *common_ops
+
   - name: hanging
     type: hanging_device
+    <<: *common_ops
+
+  - name: device
+    type: device
 `
 
 const schedule_config = `
@@ -197,17 +215,33 @@ schedules:
        - 03/09:03/10
        - 11/02:11/03
     actions:
-      on: 00:00:01
+      on: 00:01:30
     actions_detailed:
       - action: off
         when: 01:0:00
         repeat: 30m
         num_repeats: 4
+
+  - name: precondition
+    device: device
+    months: jan
+    actions:
+      on: 00:01:30
+    actions_detailed:
+      - action: off
+        when: 01:0:00
+        repeat: 30m
+        precondition:
+          device: device
+          op: weather
+          args: ["sunny"]
 `
 
 var supportedDevices = devices.SupportedDevices{
 	"device": func(string, devices.Options) (devices.Device, error) {
-		return testutil.NewMockDevice("On", "Off", "Another", "op1", "op2", "op3"), nil
+		md := testutil.NewMockDevice("On", "Off", "Another", "a", "b", "c", "d")
+		md.AddCondition("weather", true)
+		return md, nil
 	},
 	"slow_device": func(string, devices.Options) (devices.Device, error) {
 		return &slow_test_device{
@@ -252,7 +286,7 @@ func TestParseActions(t *testing.T) {
 	sys := createSystem(t)
 	scheds := createSchedules(t, sys)
 
-	if got, want := len(scheds.Schedules), 20; got != want {
+	if got, want := len(scheds.Schedules), 21; got != want {
 		t.Fatalf("got %d schedules, want %d", got, want)
 	}
 
@@ -370,6 +404,30 @@ func TestParseActions(t *testing.T) {
 	}); !reflect.DeepEqual(got, want) {
 		t.Errorf("got %+v, want %+v", got, want)
 	}
+
+	precondition := scheds.Lookup("precondition")
+	if got, want := len(precondition.DailyActions), 2; got != want {
+		t.Fatalf("got %d actions, want %d", got, want)
+	}
+
+	withoutFunc := scheduler.Precondition{
+		ConditionName: "weather",
+		Args:          []string{"sunny"},
+	}
+
+	if got := precondition.DailyActions[1].T.Precondition.Condition; got != nil {
+		if ok, err := got(context.Background(), devices.OperationArgs{}); !ok || err != nil {
+			t.Errorf("expected precondition to be true and without error: %v", err)
+		}
+	}
+
+	if got, want := precondition.DailyActions[1].T.Precondition.ConditionName, withoutFunc.ConditionName; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+	if got, want := precondition.DailyActions[1].T.Precondition.Args, withoutFunc.Args; !reflect.DeepEqual(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+
 }
 
 func scheduledActions(t *testing.T, scheds scheduler.Schedules, sys devices.System, year int, name string) ([]time.Time, []datetime.Date) {

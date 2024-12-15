@@ -6,7 +6,6 @@ package devices
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"cloudeng.io/cmdutil/cmdyaml"
@@ -46,6 +45,7 @@ type DeviceConfigCommon struct {
 	Type       string              `yaml:"type"`
 	Controller string              `yaml:"controller"`
 	Operations map[string][]string `yaml:"operations"`
+	Conditions map[string][]string `yaml:"conditions"`
 }
 
 type DeviceConfig struct {
@@ -159,13 +159,28 @@ func (s System) ControllerOp(name, op string) (Operation, []string, bool) {
 }
 
 // DeviceOp returns the operation function (and any configured parameters)
-// for the specified operation on the named controller. The operation must be
-// 'configured', ie. listed in the operations: list for the controller to be
+// for the specified operation on the named device. The operation must be
+// 'configured', ie. listed in the operations: list for the device to be
 // returned.
 func (s System) DeviceOp(name, op string) (Operation, []string, bool) {
 	if cfg, dev, ok := s.DeviceConfigs(name); ok {
 		if fn, ok := dev.Operations()[op]; ok {
 			if pars, ok := cfg.Operations[op]; ok {
+				return fn, pars, true
+			}
+		}
+	}
+	return nil, nil, false
+}
+
+// DeviceCondition returns the condition function (and any configured parameters)
+// for the specified operation on the named controller. The condition must be
+// 'configured', ie. listed in the conditions: list for the device to be
+// returned.
+func (s System) DeviceCondition(name, op string) (Condition, []string, bool) {
+	if cfg, dev, ok := s.DeviceConfigs(name); ok {
+		if fn, ok := dev.Conditions()[op]; ok {
+			if pars, ok := cfg.Conditions[op]; ok {
 				return fn, pars, true
 			}
 		}
@@ -236,10 +251,6 @@ func buildLocation(cfg LocationConfig, opts []Option) (Location, error) {
 		loc.Latitude = lat
 		loc.Longitude = long
 	}
-
-	if loc.Latitude == 0 && loc.Longitude == 0 {
-		return loc, fmt.Errorf("latitude and longitude must be specified either directly or via a zip code")
-	}
 	return loc, nil
 }
 
@@ -256,7 +267,7 @@ func (cfg SystemConfig) CreateSystem(opts ...Option) (System, error) {
 	if err != nil {
 		return System{}, err
 	}
-	ctrl, dev, err := BuildDevices(cfg.Controllers, cfg.Devices, opts...)
+	ctrl, dev, err := CreateSystem(cfg.Controllers, cfg.Devices, opts...)
 	if err != nil {
 		return System{}, err
 	}

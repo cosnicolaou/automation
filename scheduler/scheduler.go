@@ -22,6 +22,27 @@ import (
 
 var ErrOpTimeout = errors.New("op-timeout")
 
+func (s *Scheduler) invokeOp(ctx context.Context, action Action, opts devices.OperationArgs) error {
+	if pre := action.Precondition; pre.Condition != nil {
+		preOpts := devices.OperationArgs{
+			Due:    opts.Due,
+			Place:  opts.Place,
+			Writer: opts.Writer,
+			Logger: s.logger,
+			Args:   pre.Args,
+		}
+		ok, err := pre.Condition(ctx, preOpts)
+		if err != nil {
+			return fmt.Errorf("failed to evaluate precondition: %v: %v", pre.ConditionName, err)
+		}
+		s.logger.Info("precondition", "op", action.Name, "passed", ok)
+		if !ok {
+			return nil
+		}
+	}
+	return action.Op(ctx, opts)
+}
+
 func (s *Scheduler) runSingleOp(ctx context.Context, now, due time.Time, action schedule.Active[Action]) error {
 	op := action.T.Action
 	timeout := op.Device.Timeout()
@@ -32,13 +53,15 @@ func (s *Scheduler) runSingleOp(ctx context.Context, now, due time.Time, action 
 	ctx, cancel := context.WithTimeoutCause(ctx, timeout, ErrOpTimeout)
 	defer cancel()
 	opts := devices.OperationArgs{
+		Due:    due,
+		Place:  s.place,
 		Writer: s.opWriter,
 		Logger: s.logger,
 		Args:   op.Args,
 	}
 	errCh := make(chan error)
 	go func() {
-		errCh <- op.Op(ctx, opts)
+		errCh <- s.invokeOp(ctx, action.T, opts)
 	}()
 	var err error
 	select {

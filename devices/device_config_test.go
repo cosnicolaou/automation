@@ -40,7 +40,10 @@ const devices_spec = `
     type: device
     operations:
       off: [off, command]
+    conditions:
+      weather: [clear]
     detail: my-device-e
+
 `
 
 const simple_spec = `controllers:
@@ -137,7 +140,7 @@ func TestBuildDevices(t *testing.T) {
 		t.Fatalf("failed to unmarshal devices: %v", err)
 	}
 
-	controllers, devices, err := devices.BuildDevices(ctrls, devs)
+	controllers, devices, err := devices.CreateSystem(ctrls, devs)
 
 	if err != nil {
 		t.Fatalf("failed to build devices: %v", err)

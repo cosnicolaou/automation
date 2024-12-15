@@ -6,6 +6,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
 	"time"
@@ -84,6 +85,10 @@ func (s *Schedule) Run(ctx context.Context, flags any, args []string) error {
 	ctx, err = s.loadFiles(ctx, fv, deviceOpts)
 	if err != nil {
 		return err
+	}
+
+	if s.system.Location.Latitude == 0 && s.system.Location.Longitude == 0 {
+		return fmt.Errorf("latitude and longitude must be specified either directly or via a zip code")
 	}
 
 	logger.Info("starting schedules", "start", start.String(), "tz", s.system.Location.TZ.String(), "zip", s.system.Location.ZIPCode, "latitude", s.system.Location.Latitude, "longitude", s.system.Location.Longitude)
