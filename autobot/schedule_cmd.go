@@ -13,6 +13,7 @@ import (
 
 	"cloudeng.io/datetime"
 	"github.com/cosnicolaou/automation/devices"
+	"github.com/cosnicolaou/automation/internal"
 	"github.com/cosnicolaou/automation/scheduler"
 )
 
@@ -76,7 +77,7 @@ func (s *Schedule) Run(ctx context.Context, flags any, args []string) error {
 		devices.WithLogger(logger),
 	}
 
-	sr := scheduler.NewStatusRecorder()
+	sr := internal.NewStatusRecorder()
 	schedulerOpts := []scheduler.Option{
 		scheduler.WithLogger(logger),
 		scheduler.WithOperationWriter(os.Stdout),

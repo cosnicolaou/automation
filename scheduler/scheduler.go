@@ -97,7 +97,7 @@ func (s *Scheduler) newStatusRecord(delay time.Duration, a schedule.Active[Actio
 func (s *Scheduler) newPending(delay time.Duration, a schedule.Active[Action]) (*StatusRecord, list.DoubleID[*StatusRecord]) {
 	if sr := s.statusRecorder; sr != nil {
 		rec := s.newStatusRecord(delay, a)
-		return rec, sr.Pending(rec)
+		return rec, sr.pending(rec)
 	}
 	var eid list.DoubleID[*StatusRecord]
 	return nil, eid
@@ -105,8 +105,7 @@ func (s *Scheduler) newPending(delay time.Duration, a schedule.Active[Action]) (
 
 func (s *Scheduler) completed(rec *StatusRecord, precondition bool, err error, id list.DoubleID[*StatusRecord]) {
 	if sr := s.statusRecorder; sr != nil {
-		rec.SetOutcome(precondition, err)
-		sr.Completed(rec, id)
+		sr.completed(precondition, err, rec, id)
 	}
 }
 
