@@ -14,6 +14,7 @@ import (
 	"os"
 	"time"
 
+	"cloudeng.io/algo/container/list"
 	"cloudeng.io/datetime"
 	"cloudeng.io/datetime/schedule"
 	"cloudeng.io/sync/errgroup"
@@ -22,7 +23,7 @@ import (
 
 var ErrOpTimeout = errors.New("op-timeout")
 
-func (s *Scheduler) invokeOp(ctx context.Context, action Action, opts devices.OperationArgs) error {
+func (s *Scheduler) invokeOp(ctx context.Context, action Action, opts devices.OperationArgs) (bool, error) {
 	if pre := action.Precondition; pre.Condition != nil {
 		preOpts := devices.OperationArgs{
 			Due:    opts.Due,
@@ -33,17 +34,17 @@ func (s *Scheduler) invokeOp(ctx context.Context, action Action, opts devices.Op
 		}
 		ok, err := pre.Condition(ctx, preOpts)
 		if err != nil {
-			return fmt.Errorf("failed to evaluate precondition: %v: %v", pre.ConditionName, err)
+			return false, fmt.Errorf("failed to evaluate precondition: %v: %v", pre.ConditionName, err)
 		}
 		s.logger.Info("precondition", "op", action.Name, "passed", ok)
 		if !ok {
-			return nil
+			return true, nil
 		}
 	}
-	return action.Op(ctx, opts)
+	return false, action.Op(ctx, opts)
 }
 
-func (s *Scheduler) runSingleOp(ctx context.Context, now, due time.Time, action schedule.Active[Action]) error {
+func (s *Scheduler) runSingleOp(ctx context.Context, now, due time.Time, action schedule.Active[Action], rec *StatusRecord, recID list.DoubleID[*StatusRecord]) error {
 	op := action.T.Action
 	timeout := op.Device.Timeout()
 	if s.dryRun {
@@ -61,7 +62,9 @@ func (s *Scheduler) runSingleOp(ctx context.Context, now, due time.Time, action 
 	}
 	errCh := make(chan error)
 	go func() {
-		errCh <- s.invokeOp(ctx, action.T, opts)
+		pcr, err := s.invokeOp(ctx, action.T, opts)
+		s.completed(rec, pcr, err, recID)
+		errCh <- err
 	}()
 	var err error
 	select {
@@ -72,9 +75,39 @@ func (s *Scheduler) runSingleOp(ctx context.Context, now, due time.Time, action 
 	if err != nil {
 		s.logger.Warn("failed", "op", op.Name, "args", op.Args, "now", now, "due", due, "err", err)
 	} else {
-		s.logger.Info("ok", "op", op.Name, "args", op.Args, "now", now, "due", due)
+		s.logger.Info("executed", "op", op.Name, "args", op.Args, "now", now, "due", due)
 	}
 	return nil
+}
+
+func (s *Scheduler) newStatusRecord(delay time.Duration, a schedule.Active[Action]) *StatusRecord {
+	rec := &StatusRecord{
+		Schedule: s.schedule.Name,
+		When:     a.When,
+		Delay:    delay,
+		Device:   a.T.DeviceName,
+		Op:       a.T.Name,
+	}
+	if pc := a.T.Precondition; pc.Condition != nil {
+		rec.PreCondition = pc.ConditionName
+	}
+	return rec
+}
+
+func (s *Scheduler) newPending(delay time.Duration, a schedule.Active[Action]) (*StatusRecord, list.DoubleID[*StatusRecord]) {
+	if sr := s.statusRecorder; sr != nil {
+		rec := s.newStatusRecord(delay, a)
+		return rec, sr.Pending(rec)
+	}
+	var eid list.DoubleID[*StatusRecord]
+	return nil, eid
+}
+
+func (s *Scheduler) completed(rec *StatusRecord, precondition bool, err error, id list.DoubleID[*StatusRecord]) {
+	if sr := s.statusRecorder; sr != nil {
+		rec.SetOutcome(precondition, err)
+		sr.Completed(rec, id)
+	}
 }
 
 func (s *Scheduler) RunDay(ctx context.Context, place datetime.Place, active schedule.Scheduled[Action]) error {
@@ -82,8 +115,9 @@ func (s *Scheduler) RunDay(ctx context.Context, place datetime.Place, active sch
 		dueAt := active.When
 		now := s.timeSource.NowIn(s.place.TZ)
 		delay := dueAt.Sub(now)
+		rec, recID := s.newPending(delay, active)
 		if delay > 0 {
-			s.logger.Info("waiting", "op", active.T.Name, "now", now, "due", dueAt, "delay", delay.String())
+			s.logger.Info("scheduled", "op", active.T.Name, "now", now, "due", dueAt, "delay", delay.String())
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
@@ -94,7 +128,7 @@ func (s *Scheduler) RunDay(ctx context.Context, place datetime.Place, active sch
 			s.logger.Info("ignored", "op", active.T.Name, "now", now, "due", dueAt, "delay", delay.String())
 			continue
 		}
-		if err := s.runSingleOp(ctx, now, dueAt, active); err != nil {
+		if err := s.runSingleOp(ctx, now, dueAt, active, rec, recID); err != nil {
 			return err
 		}
 	}
@@ -169,10 +203,11 @@ type Scheduler struct {
 type Option func(o *options)
 
 type options struct {
-	timeSource TimeSource
-	logger     *slog.Logger
-	opWriter   io.Writer
-	dryRun     bool
+	timeSource     TimeSource
+	logger         *slog.Logger
+	opWriter       io.Writer
+	dryRun         bool
+	statusRecorder *StatusRecorder
 }
 
 // TimeSource is an interface that provides the current time in a specific
@@ -212,6 +247,12 @@ func WithOperationWriter(w io.Writer) Option {
 func WithDryRun(v bool) Option {
 	return func(o *options) {
 		o.dryRun = v
+	}
+}
+
+func WithStatusRecorder(sr *StatusRecorder) Option {
+	return func(o *options) {
+		o.statusRecorder = sr
 	}
 }
 

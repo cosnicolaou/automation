@@ -11,9 +11,7 @@ import (
 	"os"
 
 	"cloudeng.io/cmdutil"
-	"cloudeng.io/cmdutil/cmdyaml"
 	"cloudeng.io/cmdutil/subcmd"
-	"cloudeng.io/macos/keychainfs"
 	"github.com/cosnicolaou/automation/devices"
 	"github.com/cosnicolaou/lutron/homeworks"
 	"github.com/cosnicolaou/pentair/screenlogic"
@@ -60,10 +58,6 @@ func cli() *subcmd.CommandSetYAML {
 	schedule := &Schedule{}
 	cmd.Set("schedule", "run").MustRunner(schedule.Run, &ScheduleFlags{})
 	return cmd
-}
-
-var URIHandlers = map[string]cmdyaml.URLHandler{
-	"keychain": keychainfs.NewSecureNoteFSFromURL,
 }
 
 func init() {

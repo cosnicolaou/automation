@@ -76,10 +76,12 @@ func (s *Schedule) Run(ctx context.Context, flags any, args []string) error {
 		devices.WithLogger(logger),
 	}
 
+	sr := scheduler.NewStatusRecorder()
 	schedulerOpts := []scheduler.Option{
 		scheduler.WithLogger(logger),
 		scheduler.WithOperationWriter(os.Stdout),
 		scheduler.WithDryRun(fv.DryRun),
+		scheduler.WithStatusRecorder(sr),
 	}
 
 	ctx, err = s.loadFiles(ctx, fv, deviceOpts)
