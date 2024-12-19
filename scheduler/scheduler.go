@@ -12,13 +12,14 @@ import (
 	"iter"
 	"log/slog"
 	"os"
+	"sync/atomic"
 	"time"
 
-	"cloudeng.io/algo/container/list"
 	"cloudeng.io/datetime"
 	"cloudeng.io/datetime/schedule"
 	"cloudeng.io/sync/errgroup"
 	"github.com/cosnicolaou/automation/devices"
+	"github.com/cosnicolaou/automation/internal"
 )
 
 var ErrOpTimeout = errors.New("op-timeout")
@@ -34,7 +35,7 @@ func (s *Scheduler) invokeOp(ctx context.Context, action Action, opts devices.Op
 		}
 		ok, err := pre.Condition(ctx, preOpts)
 		if err != nil {
-			return false, fmt.Errorf("failed to evaluate precondition: %v: %v", pre.ConditionName, err)
+			return false, fmt.Errorf("failed to evaluate precondition: %v: %v", pre.Name, err)
 		}
 		s.logger.Info("precondition", "op", action.Name, "passed", ok)
 		if !ok {
@@ -44,13 +45,10 @@ func (s *Scheduler) invokeOp(ctx context.Context, action Action, opts devices.Op
 	return false, action.Op(ctx, opts)
 }
 
-func (s *Scheduler) runSingleOp(ctx context.Context, now, due time.Time, action schedule.Active[Action], rec *StatusRecord, recID list.DoubleID[*StatusRecord]) error {
+func (s *Scheduler) runSingleOp(ctx context.Context, due time.Time, action schedule.Active[Action]) (aborted bool, err error) {
 	op := action.T.Action
 	timeout := op.Device.Timeout()
-	if s.dryRun {
-		s.logger.Info("dry-run", "op", action.Name, "args", op.Args, "timeout", timeout.String(), "now", now, "due", due)
-		return nil
-	}
+
 	ctx, cancel := context.WithTimeoutCause(ctx, timeout, ErrOpTimeout)
 	defer cancel()
 	opts := devices.OperationArgs{
@@ -61,80 +59,116 @@ func (s *Scheduler) runSingleOp(ctx context.Context, now, due time.Time, action 
 		Args:   op.Args,
 	}
 	errCh := make(chan error)
+	var preconditionAbort bool
 	go func() {
-		pcr, err := s.invokeOp(ctx, action.T, opts)
-		s.completed(rec, pcr, err, recID)
+		var err error
+		preconditionAbort, err = s.invokeOp(ctx, action.T, opts)
 		errCh <- err
 	}()
-	var err error
 	select {
 	case err = <-errCh:
+		close(errCh)
 	case <-ctx.Done():
 		err = ctx.Err()
 	}
-	if err != nil {
-		s.logger.Warn("failed", "op", op.Name, "args", op.Args, "now", now, "due", due, "err", err)
-	} else {
-		s.logger.Info("executed", "op", op.Name, "args", op.Args, "now", now, "due", due)
-	}
-	return nil
+	return preconditionAbort, err
 }
 
-func (s *Scheduler) newStatusRecord(delay time.Duration, a schedule.Active[Action]) *StatusRecord {
-	rec := &StatusRecord{
+var invocationID int64
+
+func nextInvocationID() int64 {
+	return atomic.AddInt64(&invocationID, 1)
+}
+
+func (s *Scheduler) newStatusRecord(delay time.Duration, a schedule.Active[Action]) *internal.StatusRecord {
+	rec := &internal.StatusRecord{
 		Schedule: s.schedule.Name,
-		When:     a.When,
+		Due:      a.When,
 		Delay:    delay,
 		Device:   a.T.DeviceName,
 		Op:       a.T.Name,
 	}
 	if pc := a.T.Precondition; pc.Condition != nil {
-		rec.PreCondition = pc.ConditionName
+		rec.PreCondition = pc.Name
 	}
 	return rec
 }
 
-func (s *Scheduler) newPending(delay time.Duration, a schedule.Active[Action]) (*StatusRecord, list.DoubleID[*StatusRecord]) {
+func (s *Scheduler) newPending(id int64, delay time.Duration, a schedule.Active[Action]) *internal.StatusRecord {
 	if sr := s.statusRecorder; sr != nil {
 		rec := s.newStatusRecord(delay, a)
-		return rec, sr.pending(rec)
+		rec.ID = id
+		return sr.NewPending(rec)
 	}
-	var eid list.DoubleID[*StatusRecord]
-	return nil, eid
+	return nil
 }
 
-func (s *Scheduler) completed(rec *StatusRecord, precondition bool, err error, id list.DoubleID[*StatusRecord]) {
+func (s *Scheduler) completed(rec *internal.StatusRecord, precondition bool, err error) {
 	if sr := s.statusRecorder; sr != nil {
-		sr.completed(precondition, err, rec, id)
+		sr.PendingDone(rec, precondition, err)
 	}
+}
+
+func (s *Scheduler) msgStart(delay time.Duration) (bool, string) {
+	msg := "pending"
+	overdue := delay < 0 && -delay > time.Minute
+	if overdue {
+		msg = "too-late"
+	}
+	return overdue, msg
 }
 
 func (s *Scheduler) RunDay(ctx context.Context, place datetime.Place, active schedule.Scheduled[Action]) error {
 	for active := range active.Active(place) {
+		id := nextInvocationID()
 		dueAt := active.When
-		now := s.timeSource.NowIn(s.place.TZ)
+		now := s.timeSource.NowIn(dueAt.Location())
 		delay := dueAt.Sub(now)
-		rec, recID := s.newPending(delay, active)
+		nowStr := now.Format(time.RFC3339)
+		dueAtStr := dueAt.Format(time.RFC3339)
+		delayStr := delay.String()
+
+		overdue, msg := s.msgStart(delay)
+		s.logger.Info(msg,
+			"dry-run", s.dryRun, "id", id,
+			"device", active.T.DeviceName, "op", active.T.Name,
+			"args", active.T.Args,
+			"pre", active.T.Precondition.Name,
+			"now", nowStr, "due", dueAtStr, "delay", delayStr)
+		if overdue {
+			continue
+		}
+		rec := s.newPending(id, delay, active)
 		if delay > 0 {
-			s.logger.Info("scheduled", "op", active.T.Name, "now", now, "due", dueAt, "delay", delay.String())
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
 			case <-time.After(delay):
 			}
 		}
-		if delay < 0 && -delay > time.Minute {
-			s.logger.Info("ignored", "op", active.T.Name, "now", now, "due", dueAt, "delay", delay.String())
-			continue
+		var aborted bool
+		var err error
+		if !s.dryRun {
+			aborted, err = s.runSingleOp(ctx, dueAt, active)
 		}
-		if err := s.runSingleOp(ctx, now, dueAt, active, rec, recID); err != nil {
-			return err
+		msg = "completed"
+		if err != nil {
+			msg = "failed"
 		}
+		nowStr = time.Now().In(dueAt.Location()).Format(time.RFC3339)
+		s.logger.Info(msg,
+			"dry-run", s.dryRun, "id", id,
+			"device", active.T.DeviceName, "op", active.T.Name,
+			"pre", active.T.Precondition.Name,
+			"pre-abort", aborted,
+			"err", err,
+			"now", nowStr, "due", dueAtStr, "delay", delayStr)
+		s.completed(rec, aborted, err)
 	}
 	return nil
 }
 
-// Run runs the scheduler from the specified calendar date to the last of the sheduled
+// Run runs the scheduler from the specified calendar date to the last of the scheduled
 // actions for that year.
 func (s *Scheduler) RunYear(ctx context.Context, cd datetime.CalendarDate) error {
 	yp := datetime.YearPlace{
@@ -206,7 +240,7 @@ type options struct {
 	logger         *slog.Logger
 	opWriter       io.Writer
 	dryRun         bool
-	statusRecorder *StatusRecorder
+	statusRecorder *internal.StatusRecorder
 }
 
 // TimeSource is an interface that provides the current time in a specific
@@ -249,7 +283,7 @@ func WithDryRun(v bool) Option {
 	}
 }
 
-func WithStatusRecorder(sr *StatusRecorder) Option {
+func WithStatusRecorder(sr *internal.StatusRecorder) Option {
 	return func(o *options) {
 		o.statusRecorder = sr
 	}

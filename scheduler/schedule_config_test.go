@@ -411,8 +411,8 @@ func TestParseActions(t *testing.T) {
 	}
 
 	withoutFunc := scheduler.Precondition{
-		ConditionName: "weather",
-		Args:          []string{"sunny"},
+		Name: "weather",
+		Args: []string{"sunny"},
 	}
 
 	if got := precondition.DailyActions[1].T.Precondition.Condition; got != nil {
@@ -421,7 +421,7 @@ func TestParseActions(t *testing.T) {
 		}
 	}
 
-	if got, want := precondition.DailyActions[1].T.Precondition.ConditionName, withoutFunc.ConditionName; got != want {
+	if got, want := precondition.DailyActions[1].T.Precondition.Name, withoutFunc.Name; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
 	if got, want := precondition.DailyActions[1].T.Precondition.Args, withoutFunc.Args; !reflect.DeepEqual(got, want) {

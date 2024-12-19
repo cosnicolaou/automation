@@ -22,9 +22,9 @@ func (t *timeOfDay) UnmarshalYAML(node *yaml.Node) error {
 }
 
 type Precondition struct {
-	ConditionName string
-	Condition     devices.Condition
-	Args          []string
+	Name      string
+	Condition devices.Condition
+	Args      []string
 }
 
 // Action represents a single action to be taken on any given day.

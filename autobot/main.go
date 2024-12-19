@@ -42,6 +42,12 @@ commands:
     commands:
       - name: display
       - name: operations
+  - name: logs
+    summary: query/inspect the log files
+    commands:
+      - name: status
+        arguments:
+          - <log-files>+
 `
 
 func cli() *subcmd.CommandSetYAML {
@@ -57,6 +63,9 @@ func cli() *subcmd.CommandSetYAML {
 
 	schedule := &Schedule{}
 	cmd.Set("schedule", "run").MustRunner(schedule.Run, &ScheduleFlags{})
+
+	log := &Log{}
+	cmd.Set("logs", "status").MustRunner(log.Status, &LogStatusFlags{})
 	return cmd
 }
 

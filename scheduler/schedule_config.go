@@ -193,9 +193,9 @@ func (cfg schedulesConfig) createActions(sys devices.System, times, scheduleName
 					Args:       details.Args,
 				},
 				Precondition: Precondition{
-					ConditionName: details.Precondition.Op,
-					Condition:     condition,
-					Args:          details.Precondition.Args,
+					Name:      details.Precondition.Op,
+					Condition: condition,
+					Args:      details.Precondition.Args,
 				}}})
 	}
 	return actions, nil
