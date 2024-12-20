@@ -35,6 +35,13 @@ commands:
     summary: schedule a series of commands to be executed at specific times
     commands:
       - name: run
+        summary: run the scheduler
+        arguments:
+          - <schedule>...
+      - name: simulate
+        summary: |
+          run the scheduler using simulated time so that it skips from
+          scheduled time to scheduled time with minimal delay
         arguments:
           - <schedule>...
   - name: config
@@ -47,7 +54,8 @@ commands:
     commands:
       - name: status
         arguments:
-          - <log-files>+
+          - <log-files>
+          - <log-files>...
 `
 
 func cli() *subcmd.CommandSetYAML {
@@ -63,6 +71,7 @@ func cli() *subcmd.CommandSetYAML {
 
 	schedule := &Schedule{}
 	cmd.Set("schedule", "run").MustRunner(schedule.Run, &ScheduleFlags{})
+	cmd.Set("schedule", "simulate").MustRunner(schedule.Simulate, &SimulateFlags{})
 
 	log := &Log{}
 	cmd.Set("logs", "status").MustRunner(log.Status, &LogStatusFlags{})

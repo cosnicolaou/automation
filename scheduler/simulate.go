@@ -5,43 +5,114 @@
 package scheduler
 
 import (
+	"context"
+	"fmt"
+	"sync"
 	"time"
 
 	"cloudeng.io/datetime"
 	"cloudeng.io/datetime/schedule"
+	"cloudeng.io/sync/errgroup"
 	"github.com/cosnicolaou/automation/devices"
 )
 
-func yearEndTimes(scheduler schedule.AnnualScheduler[Action], year int, place datetime.Place, bound datetime.DateRange) []time.Time {
+func ticksToYearEnd(scheduler *schedule.AnnualScheduler[Action], year int, place datetime.Place, dates schedule.Dates, bound datetime.DateRange, delay time.Duration) []time.Time {
 	times := []time.Time{}
 	yp := datetime.YearPlace{
 		Place: place,
 		Year:  year,
 	}
-	for active := range s.scheduler.Scheduled(yp, s.schedule.Dates, bound) {
-		for action := range active.Active(s.place) {
-			times = append(times, action.When)
+	for active := range scheduler.Scheduled(yp, dates, bound) {
+		for action := range active.Active(place) {
+			times = append(times, action.When.Add(-delay))
 		}
 	}
+	last := time.Date(year, 12, 31, 23, 59, 59, int(time.Second)-1, place.TZ)
+	times = append(times, last.Add(-delay))
 	return nil
 }
 
-func (s *Scheduler) allTimes(bound datetime.CalendarDateRange) []time.Time {
+func ticksForAllYears(scheduler *schedule.AnnualScheduler[Action], place datetime.Place, dates schedule.Dates, period datetime.CalendarDateRange, delay time.Duration) []time.Time {
 	times := []time.Time{}
-	yearStart := bound.From().Date()
-	for year := bound.From().Year(); year <= bound.To().Year(); year++ {
-		nd := datetime.NewDateRange(yearStart, datetime.NewDate(12, 31))
-		times = append(times, s.yearEndTimes(year, nd)...)
+	yearStart := period.From().Date()
+	for year := period.From().Year(); year <= period.To().Year(); year++ {
+		thisYear := datetime.NewDateRange(yearStart, datetime.NewDate(12, 31))
+		times = append(times, ticksToYearEnd(scheduler, year, place, dates, thisYear, delay)...)
 		yearStart = datetime.NewDate(1, 1)
 	}
 	return times
 }
 
-func Simulate(schedules Schedules, system devices.System, bound datetime.CalendarDateRange) error {
-	times := []time.Time{}
-	for _, s := range schedules.Schedules {
-		scheduler := schedule.NewAnnualScheduler(s.DailyActions)
-		times = append(times, scheduler.allTimes(bound)...)
+type timesource struct {
+	ch    chan time.Time
+	ticks []time.Time
+}
+
+func (t *timesource) NowIn(loc *time.Location) time.Time {
+	n := <-t.ch
+	return n.In(loc)
+}
+
+func (t *timesource) run(ctx context.Context) {
+	for _, tick := range t.ticks {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+		t.ch <- tick
 	}
-	return nil
+}
+
+// RunSimulation runs the specified schedules against the specified system for the
+// specified period using a similated time.
+func RunSimulation(ctx context.Context, schedules Schedules, system devices.System, period datetime.CalendarDateRange, opts ...Option) error {
+	var o options
+	for _, opt := range opts {
+		opt(&o)
+	}
+	delay := o.simulatedDelay
+	if delay == 0 {
+		delay = time.Millisecond * 10
+	}
+	timeSources := make([]timesource, len(schedules.Schedules))
+	for i, s := range schedules.Schedules {
+		scheduler := schedule.NewAnnualScheduler(s.DailyActions)
+		ticks := ticksForAllYears(scheduler, system.Location.Place, s.Dates, period, delay)
+		timeSources[i] = timesource{ch: make(chan time.Time), ticks: ticks}
+	}
+	schedulers := make([]*Scheduler, len(schedules.Schedules))
+	for i, sched := range schedules.Schedules {
+		s, err := New(sched, system, opts...)
+		if err != nil {
+			return fmt.Errorf("failed to create scheduler for %v: %w", sched.Name, err)
+		}
+		schedulers[i] = s
+	}
+
+	var g errgroup.T
+	var wg sync.WaitGroup
+	wg.Add(len(schedulers) * 2)
+	for i, s := range schedulers {
+		g.Go(func() error {
+			defer wg.Done()
+			if err := s.RunYearEnd(ctx, period.From()); err != nil {
+				return err
+			}
+			for year := period.From().Year() + 1; year <= period.To().Year(); year++ {
+				cd := datetime.NewCalendarDate(year, 1, 1)
+				if err := s.RunYearEnd(ctx, cd); err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+		g.Go(func() error {
+			timeSources[i].run(ctx)
+			wg.Done()
+			return nil
+		})
+	}
+	wg.Wait()
+	return g.Wait()
 }

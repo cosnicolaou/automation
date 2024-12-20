@@ -189,7 +189,7 @@ func (s *Scheduler) RunYear(ctx context.Context, cd datetime.CalendarDate) error
 }
 
 // RunYear runs the scheduler from the specified calendar date to the end of that
-// year
+// year.
 func (s *Scheduler) RunYearEnd(ctx context.Context, cd datetime.CalendarDate) error {
 	if err := s.RunYear(ctx, cd); err != nil {
 		return err
@@ -241,6 +241,7 @@ type options struct {
 	opWriter       io.Writer
 	dryRun         bool
 	statusRecorder *internal.StatusRecorder
+	simulatedDelay time.Duration
 }
 
 // TimeSource is an interface that provides the current time in a specific
@@ -289,6 +290,12 @@ func WithStatusRecorder(sr *internal.StatusRecorder) Option {
 	}
 }
 
+func WithSimulationDelay(d time.Duration) Option {
+	return func(o *options) {
+		o.simulatedDelay = d
+	}
+}
+
 // New creates a new scheduler for the supplied schedule and associated devices.
 func New(sched Annual, system devices.System, opts ...Option) (*Scheduler, error) {
 	scheduler := &Scheduler{
@@ -325,14 +332,20 @@ func New(sched Annual, system devices.System, opts ...Option) (*Scheduler, error
 	return scheduler, nil
 }
 
+// RunSchedulers runs the supplied schedules against the supplied system starting
+// at the specified date until the context is canceled. Note that the WithTimeSource
+// option should not be used with this function as it will be used by all of
+// the schedulers created which is likely not what is intended. Note that the
+// Simulate function can be used to run multiple schedules using simulated
+// time appropriate for each schedule.
 func RunSchedulers(ctx context.Context, schedules Schedules, system devices.System, start datetime.CalendarDate, opts ...Option) error {
-	schedulers := make([]*Scheduler, 0, len(schedules.Schedules))
-	for _, sched := range schedules.Schedules {
+	schedulers := make([]*Scheduler, len(schedules.Schedules))
+	for i, sched := range schedules.Schedules {
 		s, err := New(sched, system, opts...)
 		if err != nil {
 			return fmt.Errorf("failed to create scheduler for %v: %w", sched.Name, err)
 		}
-		schedulers = append(schedulers, s)
+		schedulers[i] = s
 	}
 	var g errgroup.T
 	for _, s := range schedulers {
@@ -340,12 +353,13 @@ func RunSchedulers(ctx context.Context, schedules Schedules, system devices.Syst
 			if err := s.RunYearEnd(ctx, start); err != nil {
 				return err
 			}
+			year := start.Year() + 1
 			for {
-				year := start.Year() + 1
 				cd := datetime.NewCalendarDate(year, 1, 1)
 				if err := s.RunYearEnd(ctx, cd); err != nil {
 					return err
 				}
+				year++
 			}
 		})
 	}
