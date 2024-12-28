@@ -24,18 +24,18 @@ import (
 func loadSystem(ctx context.Context, fv *ConfigFileFlags, opts ...devices.Option) (context.Context, devices.System, error) {
 	keys, err := ReadKeysFile(ctx, fv.KeysFile)
 	if err != nil {
-		return nil, devices.System{}, err
+		return nil, devices.System{}, fmt.Errorf("failed to read keys file: %q: %w", fv.KeysFile, err)
 	}
 
 	zdb, err := loadZIPDatabase(fv.ZIPDatabase)
 	if err != nil {
-		return nil, devices.System{}, err
+		return nil, devices.System{}, fmt.Errorf("failed to load zip database: %q: %w", fv.ZIPDatabase, err)
 	}
 	opts = append(opts, devices.WithZIPCodeLookup(zdb))
 
 	system, err := devices.ParseSystemConfigFile(ctx, fv.SystemFile, opts...)
 	if err != nil {
-		return nil, devices.System{}, err
+		return nil, devices.System{}, fmt.Errorf("failed to parse system config file: %q: %w", fv.SystemFile, err)
 	}
 	return keystore.ContextWithAuth(ctx, keys), system, nil
 }

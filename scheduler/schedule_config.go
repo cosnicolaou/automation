@@ -80,7 +80,7 @@ func (dc *datesConfig) parse() (schedule.Dates, error) {
 
 type precondition struct {
 	Device string   `yaml:"device" cmd:"name of the device that the pre-condition applies to"`
-	Op     string   `yaml:"op" cmd:"name of the pre-condition in device.op format"`
+	Op     string   `yaml:"op" cmd:"name of the pre-condition in device.op format, use \"!op\" for negation"`
 	Args   []string `yaml:"args,flow" cmd:"arguments to be passed to the pre-condition"`
 }
 

@@ -179,8 +179,19 @@ func (s System) DeviceOp(name, op string) (Operation, []string, bool) {
 // returned.
 func (s System) DeviceCondition(name, op string) (Condition, []string, bool) {
 	if cfg, dev, ok := s.DeviceConfigs(name); ok {
+		negation := false
+		if op[0] == '!' {
+			op = op[1:]
+			negation = true
+		}
 		if fn, ok := dev.Conditions()[op]; ok {
 			if pars, ok := cfg.Conditions[op]; ok {
+				if negation {
+					return func(ctx context.Context, opts OperationArgs) (bool, error) {
+						ok, err := fn(ctx, opts)
+						return !ok, err
+					}, pars, true
+				}
 				return fn, pars, true
 			}
 		}

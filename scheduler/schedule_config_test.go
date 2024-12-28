@@ -235,6 +235,13 @@ schedules:
           device: device
           op: weather
           args: ["sunny"]
+      - action: another
+        when: 01:0:00
+        repeat: 30m
+        precondition:
+          device: device
+          op: "!weather"  # this should evaluate to 'not weather sunny'
+          args: ["sunny"]
 `
 
 var supportedDevices = devices.SupportedDevices{
@@ -406,7 +413,7 @@ func TestParseActions(t *testing.T) {
 	}
 
 	precondition := scheds.Lookup("precondition")
-	if got, want := len(precondition.DailyActions), 2; got != want {
+	if got, want := len(precondition.DailyActions), 3; got != want {
 		t.Fatalf("got %d actions, want %d", got, want)
 	}
 
@@ -415,16 +422,30 @@ func TestParseActions(t *testing.T) {
 		Args: []string{"sunny"},
 	}
 
+	// negation.
 	if got := precondition.DailyActions[1].T.Precondition.Condition; got != nil {
+		if ok, err := got(context.Background(), devices.OperationArgs{}); ok || err != nil {
+			t.Errorf("expected precondition to be true and without error: %v", err)
+		}
+	}
+
+	if got, want := precondition.DailyActions[1].T.Precondition.Name, "!"+withoutFunc.Name; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+	if got, want := precondition.DailyActions[1].T.Precondition.Args, withoutFunc.Args; !reflect.DeepEqual(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+
+	if got := precondition.DailyActions[2].T.Precondition.Condition; got != nil {
 		if ok, err := got(context.Background(), devices.OperationArgs{}); !ok || err != nil {
 			t.Errorf("expected precondition to be true and without error: %v", err)
 		}
 	}
 
-	if got, want := precondition.DailyActions[1].T.Precondition.Name, withoutFunc.Name; got != want {
+	if got, want := precondition.DailyActions[2].T.Precondition.Name, withoutFunc.Name; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
-	if got, want := precondition.DailyActions[1].T.Precondition.Args, withoutFunc.Args; !reflect.DeepEqual(got, want) {
+	if got, want := precondition.DailyActions[2].T.Precondition.Args, withoutFunc.Args; !reflect.DeepEqual(got, want) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 

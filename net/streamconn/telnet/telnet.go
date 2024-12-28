@@ -30,14 +30,26 @@ func Dial(ctx context.Context, addr string, timeout time.Duration, logger *slog.
 	return &telnetConn{conn: conn, timeout: timeout, logger: logger}, nil
 }
 
-func (tc *telnetConn) Send(ctx context.Context, buf []byte) (int, error) {
+func (tc *telnetConn) send(ctx context.Context, buf []byte, sensitive bool) (int, error) {
 	if err := tc.conn.SetWriteDeadline(time.Now().Add(tc.timeout)); err != nil {
 		tc.logger.Log(ctx, slog.LevelWarn, "send failed to set read deadline", "err", err)
 		return -1, err
 	}
 	n, err := tc.conn.Write(buf)
-	tc.logger.Log(ctx, slog.LevelInfo, "sent", "text", string(buf), "err", err)
+	if sensitive {
+		tc.logger.Log(ctx, slog.LevelInfo, "sent", "text", "***", "err", err)
+	} else {
+		tc.logger.Log(ctx, slog.LevelInfo, "sent", "text", string(buf), "err", err)
+	}
 	return n, err
+}
+
+func (tc *telnetConn) Send(ctx context.Context, buf []byte) (int, error) {
+	return tc.send(ctx, buf, false)
+}
+
+func (tc *telnetConn) SendSensitive(ctx context.Context, buf []byte) (int, error) {
+	return tc.send(ctx, buf, true)
 }
 
 func (tc *telnetConn) ReadUntil(ctx context.Context, expected []string) ([]byte, error) {

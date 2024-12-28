@@ -13,12 +13,18 @@ import (
 
 type Transport interface {
 	Send(ctx context.Context, buf []byte) (int, error)
+	// SendSensitive avoids logging the contents of the buffer, use
+	// it for login exchanges, credentials etc.
+	SendSensitive(ctx context.Context, buf []byte) (int, error)
 	ReadUntil(ctx context.Context, expected []string) ([]byte, error)
 	Close(ctx context.Context) error
 }
 
 type Session interface {
 	Send(ctx context.Context, buf []byte)
+	// SendSensitive avoids logging the contents of the buffer, use
+	// it for login exchanges, credentials etc.
+	SendSensitive(ctx context.Context, buf []byte)
 	ReadUntil(ctx context.Context, expected ...string) []byte
 	Close(ctx context.Context) error
 	Err() error
@@ -49,6 +55,16 @@ func (s *session) Send(ctx context.Context, buf []byte) {
 	}
 	s.idle.Reset()
 	_, s.err = s.conn.Send(ctx, buf)
+}
+
+func (s *session) SendSensitive(ctx context.Context, buf []byte) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.err != nil {
+		return
+	}
+	s.idle.Reset()
+	_, s.err = s.conn.SendSensitive(ctx, buf)
 }
 
 func (s *session) ReadUntil(ctx context.Context, expected ...string) []byte {
@@ -89,6 +105,9 @@ func (s *errorSession) Err() error {
 }
 
 func (s *errorSession) Send(ctx context.Context, buf []byte) {
+}
+
+func (s *errorSession) SendSensitive(ctx context.Context, buf []byte) {
 }
 
 func (s *errorSession) ReadUntil(ctx context.Context, expected ...string) []byte {

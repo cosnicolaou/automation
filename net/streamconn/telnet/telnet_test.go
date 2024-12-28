@@ -53,7 +53,7 @@ func TestClient(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	idle := netutil.NewIdleTimer(10 * time.Minute)
+	idle, _ := netutil.NewIdleTimer(10 * time.Minute)
 	s := streamconn.NewSession(transport, idle)
 	s.Send(ctx, []byte("hello\r\n"))
 	s.Send(ctx, []byte("world\r\n"))

@@ -93,3 +93,52 @@ func (m *IdleManager[T, F]) Stop(ctx context.Context, timeout time.Duration) err
 	}
 	return err
 }
+
+// OnDemandConnection wraps an IdleManager to reuse or recreate a connection
+// as required.
+type OnDemandConnection[T any, F Managed[T]] struct {
+	mu              sync.Mutex
+	managed         F
+	idleManager     *IdleManager[T, F]
+	keepAlive       time.Duration
+	newErrorSession func(error) T
+}
+
+func NewOnDemandConnection[T any, F Managed[T]](managed F, newErrorSession func(error) T) *OnDemandConnection[T, F] {
+	return &OnDemandConnection[T, F]{
+		managed:         managed,
+		newErrorSession: newErrorSession,
+	}
+}
+
+func (sm *OnDemandConnection[T, F]) SetKeepAlive(keepAlive time.Duration) {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	sm.keepAlive = keepAlive
+}
+
+func (sm *OnDemandConnection[T, F]) Connection(ctx context.Context) T {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	if sm.idleManager == nil {
+		im, err := NewIdleTimer(sm.keepAlive)
+		if err != nil {
+			return sm.newErrorSession(err)
+		}
+		sm.idleManager = NewIdleManager(ctx, sm.managed, im)
+	}
+	sess, err := sm.idleManager.Connection(ctx)
+	if err != nil {
+		return sm.newErrorSession(err)
+	}
+	return sess
+}
+
+func (sm *OnDemandConnection[T, F]) Close(ctx context.Context) error {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	if sm.idleManager == nil {
+		return nil
+	}
+	return sm.idleManager.Stop(ctx, time.Minute)
+}

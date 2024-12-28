@@ -12,6 +12,7 @@ import (
 
 	"cloudeng.io/cmdutil"
 	"cloudeng.io/cmdutil/subcmd"
+	"gitcom.com/cosnicolaou/elk/elkm1"
 	"github.com/cosnicolaou/automation/devices"
 	"github.com/cosnicolaou/lutron/homeworks"
 	"github.com/cosnicolaou/pentair/screenlogic"
@@ -26,6 +27,10 @@ commands:
       - name: run
         arguments:
           - <name.op> - name of the device or controller and the operation to perform
+          - <parameters>...
+      - name: test
+        arguments:
+          - <name.condition> - name of the device and the condition to test
           - <parameters>...
       - name: script
         summary: read commands from a file
@@ -63,6 +68,7 @@ func cli() *subcmd.CommandSetYAML {
 
 	control := &Control{}
 	cmd.Set("control", "run").MustRunner(control.Run, &ControlFlags{})
+	cmd.Set("control", "test").MustRunner(control.Test, &ControlFlags{})
 	cmd.Set("control", "script").MustRunner(control.RunScript, &ControlScriptFlags{})
 
 	config := &Config{}
@@ -83,11 +89,15 @@ func init() {
 		maps.All(homeworks.SupportedControllers()))
 	maps.Insert(devices.AvailableControllers,
 		maps.All(screenlogic.SupportedControllers()))
+	maps.Insert(devices.AvailableControllers,
+		maps.All(elkm1.SupportedControllers()))
 
 	maps.Insert(devices.AvailableDevices,
 		maps.All(homeworks.SupportedDevices()))
 	maps.Insert(devices.AvailableDevices,
 		maps.All(screenlogic.SupportedDevices()))
+	maps.Insert(devices.AvailableDevices,
+		maps.All(elkm1.SupportedDevices()))
 }
 
 var interrupt = errors.New("interrupt")

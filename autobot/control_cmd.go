@@ -52,6 +52,7 @@ func (c *Control) runOp(ctx context.Context, system devices.System, nameAndOp st
 		}
 		return nil
 	}
+
 	if fn, pars, ok := system.DeviceOp(name, op); ok {
 		if len(args) == 0 {
 			args = pars
@@ -65,7 +66,37 @@ func (c *Control) runOp(ctx context.Context, system devices.System, nameAndOp st
 		}
 		return nil
 	}
+
 	return fmt.Errorf("unknown or not configured operation: %v, %v", name, op)
+}
+
+func (c *Control) runCondition(ctx context.Context, system devices.System, nameAndOp string, args []string) (bool, error) {
+	parts := strings.Split(nameAndOp, ".")
+	if len(parts) != 2 {
+		return false, fmt.Errorf("invalid condition: %v, should be name.condition", nameAndOp)
+	}
+	name, op := parts[0], parts[1]
+	_, cok := system.Controllers[name]
+	_, dok := system.Devices[name]
+	if !cok && !dok {
+		return false, fmt.Errorf("unknown controller or device: %v", name)
+	}
+	if fn, pars, ok := system.DeviceCondition(name, op); ok {
+		if len(args) == 0 {
+			args = pars
+		}
+		opts := devices.OperationArgs{
+			Writer: os.Stdout,
+			Args:   args,
+		}
+		result, err := fn(ctx, opts)
+		if err != nil {
+			return false, fmt.Errorf("failed to run condition: %v: %v", op, err)
+		}
+		return result, nil
+	}
+
+	return false, fmt.Errorf("unknown or not configured condition: %v, %v", name, op)
 }
 
 func (c *Control) setup(ctx context.Context, fv *ControlFlags) (context.Context, error) {
@@ -91,6 +122,21 @@ func (c *Control) Run(ctx context.Context, flags any, args []string) error {
 	if err := c.runOp(ctx, c.system, cmd, parameters); err != nil {
 		return err
 	}
+	return nil
+}
+
+func (c *Control) Test(ctx context.Context, flags any, args []string) error {
+	ctx, err := c.setup(ctx, flags.(*ControlFlags))
+	if err != nil {
+		return err
+	}
+	cmd := args[0]
+	parameters := args[1:]
+	result, err := c.runCondition(ctx, c.system, cmd, parameters)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("%v(%v): %v\n", cmd, strings.Join(parameters, ", "), result)
 	return nil
 }
 

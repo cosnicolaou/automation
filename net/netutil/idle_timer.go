@@ -6,6 +6,7 @@ package netutil
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 )
@@ -23,12 +24,15 @@ type IdleTimer struct {
 // NewIdleTimer creates a new IdleTimer with the specified idle time,
 // call Reset to restart the timer. The timer can reused by calling
 // Wait again, typically in a goroutine.
-func NewIdleTimer(d time.Duration) *IdleTimer {
+func NewIdleTimer(d time.Duration) (*IdleTimer, error) {
+	if d <= 0 {
+		return nil, fmt.Errorf("idle time must be greater than 0")
+	}
 	return &IdleTimer{
 		idleTime:  d,
 		stopCh:    make(chan struct{}),
 		stoppedCh: make(chan struct{}),
-	}
+	}, nil
 }
 
 // Reset resets the idle timer.
