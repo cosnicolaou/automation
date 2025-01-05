@@ -21,10 +21,6 @@ type Managed[T any] interface {
 
 	// Disconnect is called when the idle timer has expired.
 	Disconnect(context.Context, T) error
-
-	// Nil returns a nil value of the connection type and is used to allow
-	// the connection to be reset to a nil value when the idle timer expires.
-	Nil() T
 }
 
 // IdleManagerManager manages an instance of Managed using the supplied idle timer.
@@ -57,7 +53,8 @@ func (m *IdleManager[T, F]) Connection(ctx context.Context) (T, error) {
 	}
 	conn, err := m.connector.Connect(ctx, m.idle)
 	if err != nil {
-		return m.connector.Nil(), err
+		var empty T
+		return empty, err
 	}
 	m.conn = conn
 	m.connected = true
@@ -67,8 +64,9 @@ func (m *IdleManager[T, F]) Connection(ctx context.Context) (T, error) {
 
 func (m *IdleManager[T, F]) closeUnderlyingUnlocked(ctx context.Context) error {
 	if m.connected {
+		var empty T
 		conn := m.conn
-		m.conn = m.connector.Nil()
+		m.conn = empty
 		m.connected = false
 		return m.connector.Disconnect(ctx, conn)
 	}
@@ -121,11 +119,7 @@ func (sm *OnDemandConnection[T, F]) Connection(ctx context.Context) T {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 	if sm.idleManager == nil {
-		im, err := NewIdleTimer(sm.keepAlive)
-		if err != nil {
-			return sm.newErrorSession(err)
-		}
-		sm.idleManager = NewIdleManager(ctx, sm.managed, im)
+		sm.idleManager = NewIdleManager(ctx, sm.managed, NewIdleTimer(sm.keepAlive))
 	}
 	sess, err := sm.idleManager.Connection(ctx)
 	if err != nil {

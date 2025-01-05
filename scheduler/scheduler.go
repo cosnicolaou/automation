@@ -12,7 +12,6 @@ import (
 	"iter"
 	"log/slog"
 	"os"
-	"sync/atomic"
 	"time"
 
 	"cloudeng.io/datetime"
@@ -74,11 +73,13 @@ func (s *Scheduler) runSingleOp(ctx context.Context, due time.Time, action sched
 	return preconditionAbort, err
 }
 
+/*
 var invocationID int64
 
 func nextInvocationID() int64 {
 	return atomic.AddInt64(&invocationID, 1)
 }
+*/
 
 func (s *Scheduler) newStatusRecord(delay time.Duration, a schedule.Active[Action]) *internal.StatusRecord {
 	rec := &internal.StatusRecord{
@@ -109,32 +110,29 @@ func (s *Scheduler) completed(rec *internal.StatusRecord, precondition bool, err
 	}
 }
 
-func (s *Scheduler) msgStart(delay time.Duration) (bool, string) {
-	msg := "pending"
-	overdue := delay < 0 && -delay > time.Minute
-	if overdue {
-		msg = "too-late"
-	}
-	return overdue, msg
-}
-
 func (s *Scheduler) RunDay(ctx context.Context, place datetime.Place, active schedule.Scheduled[Action]) error {
 	for active := range active.Active(place) {
-		id := nextInvocationID()
 		dueAt := active.When
-		now := s.timeSource.NowIn(dueAt.Location())
-		delay := dueAt.Sub(now)
-		nowStr := now.Format(time.RFC3339)
 		dueAtStr := dueAt.Format(time.RFC3339)
+		started := s.timeSource.NowIn(dueAt.Location())
+		startedStr := started.Format(time.RFC3339Nano)
+		delay := dueAt.Sub(started)
 		delayStr := delay.String()
 
-		overdue, msg := s.msgStart(delay)
-		s.logger.Info(msg,
-			"dry-run", s.dryRun, "id", id,
-			"device", active.T.DeviceName, "op", active.T.Name,
-			"args", active.T.Args,
-			"pre", active.T.Precondition.Name,
-			"now", nowStr, "due", dueAtStr, "delay", delayStr)
+		overdue := delay < 0 && -delay > time.Minute
+		id := internal.WritePendingLog(
+			s.logger,
+			overdue,
+			s.dryRun,
+			active.T.DeviceName,
+			active.T.Name,
+			active.T.Args,
+			active.T.Precondition.Name,
+			active.T.Precondition.Args,
+			startedStr,
+			dueAtStr,
+			delayStr,
+		)
 		if overdue {
 			continue
 		}
@@ -151,18 +149,20 @@ func (s *Scheduler) RunDay(ctx context.Context, place datetime.Place, active sch
 		if !s.dryRun {
 			aborted, err = s.runSingleOp(ctx, dueAt, active)
 		}
-		msg = "completed"
-		if err != nil {
-			msg = "failed"
-		}
-		nowStr = time.Now().In(dueAt.Location()).Format(time.RFC3339)
-		s.logger.Info(msg,
-			"dry-run", s.dryRun, "id", id,
-			"device", active.T.DeviceName, "op", active.T.Name,
-			"pre", active.T.Precondition.Name,
-			"pre-abort", aborted,
-			"err", err,
-			"now", nowStr, "due", dueAtStr, "delay", delayStr)
+		internal.WriteCompletionLog(
+			s.logger,
+			id,
+			err,
+			s.dryRun,
+			active.T.DeviceName,
+			active.T.Name,
+			active.T.Precondition.Name,
+			!aborted,
+			startedStr,
+			time.Now().In(dueAt.Location()).Format(time.RFC3339Nano),
+			dueAtStr,
+			delayStr,
+		)
 		s.completed(rec, aborted, err)
 	}
 	return nil
@@ -177,7 +177,7 @@ func (s *Scheduler) RunYear(ctx context.Context, cd datetime.CalendarDate) error
 	}
 	toYearEnd := datetime.NewDateRange(cd.Date(), datetime.NewDate(12, 31))
 	for active := range s.scheduler.Scheduled(yp, s.schedule.Dates, toYearEnd) {
-		s.logger.Info("ok", "#actions", len(active.Specs))
+		internal.WriteNewDayLog(s.logger, active.Date, len(active.Specs))
 		if len(active.Specs) == 0 {
 			continue
 		}
@@ -194,9 +194,11 @@ func (s *Scheduler) RunYearEnd(ctx context.Context, cd datetime.CalendarDate) er
 	if err := s.RunYear(ctx, cd); err != nil {
 		return err
 	}
-	yearEnd := time.Date(cd.Year(), 12, 31, 23, 59, 59, int(time.Second)-1, s.place.TZ)
-	delay := yearEnd.Sub(s.timeSource.NowIn(s.place.TZ))
-	s.logger.Info("year-end", "year-end-delay", delay.String())
+	year := cd.Year()
+	yearEnd := time.Date(year, 12, 31, 23, 59, 59, int(time.Second)-1, s.place.TZ)
+	now := s.timeSource.NowIn(s.place.TZ)
+	delay := yearEnd.Sub(now)
+	internal.WriteYearEndLog(s.logger, year, delay)
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
@@ -266,12 +268,16 @@ func WithTimeSource(ts TimeSource) Option {
 	}
 }
 
+// WithLogger sets the logger to be used by the scheduler and is also
+// passed to all device operations/conditions.
 func WithLogger(l *slog.Logger) Option {
 	return func(o *options) {
 		o.logger = l
 	}
 }
 
+// WithOperationWriter sets the output writer that operations can use
+// for interactive output.
 func WithOperationWriter(w io.Writer) Option {
 	return func(o *options) {
 		o.opWriter = w
@@ -327,7 +333,7 @@ func New(sched Annual, system devices.System, opts ...Option) (*Scheduler, error
 		sched.DailyActions[i].T.Device = dev
 		sched.DailyActions[i].T.Action.Op = op
 	}
-	scheduler.logger = scheduler.logger.With("mod", "scheduler", "sched", sched.Name)
+	scheduler.logger = scheduler.logger.With("mod", "scheduler", "schedule", sched.Name)
 	scheduler.scheduler = schedule.NewAnnualScheduler(sched.DailyActions)
 	return scheduler, nil
 }

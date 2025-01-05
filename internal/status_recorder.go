@@ -5,6 +5,7 @@
 package internal
 
 import (
+	"fmt"
 	"iter"
 	"sync"
 	"time"
@@ -29,13 +30,15 @@ func NewStatusRecorder() *StatusRecorder {
 }
 
 type StatusRecord struct {
-	Schedule     string
-	Device       string
-	ID           int64 // Unique identifier for this invocation
-	Op           string
-	Due          time.Time
-	Delay        time.Duration
-	PreCondition string // Name of the precondition, if any
+	Schedule         string
+	Device           string
+	ID               int64 // Unique identifier for this invocation
+	Op               string
+	OpArgs           []string
+	Due              time.Time
+	Delay            time.Duration
+	PreCondition     string // Name of the precondition, if any
+	PreConditionArgs []string
 
 	// The following fields are filled in by the status recorder.
 	Pending            time.Time // Time the operation was added to the pending list, set by NewPending
@@ -46,7 +49,13 @@ type StatusRecord struct {
 	listID list.DoubleID[*StatusRecord]
 }
 
-// Need a flush/reset option
+func (sr *StatusRecord) Aborted() bool {
+	return sr.PreCondition != "" && !sr.PreConditionResult
+}
+
+func (sr *StatusRecord) Name() string {
+	return fmt.Sprintf("%v:%v.%v", sr.Schedule, sr.Device, sr.Op)
+}
 
 func (s *StatusRecorder) PendingDone(sr *StatusRecord, precondition bool, err error) {
 	if sr == nil {
@@ -94,4 +103,10 @@ func (s *StatusRecorder) Pending() iter.Seq[*StatusRecord] {
 			}
 		}
 	}
+}
+
+func (s *StatusRecorder) ResetCompleted() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.done = s.done[:0]
 }

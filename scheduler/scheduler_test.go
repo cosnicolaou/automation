@@ -112,15 +112,17 @@ func (r *recorder) Lines() []string {
 }
 
 type logEntry struct {
-	Sched        string    `json:"sched"`
+	line         string
 	Msg          string    `json:"msg"`
 	Op           string    `json:"op"`
 	Now          time.Time `json:"now"`
+	Started      time.Time `json:"started"`
 	Due          time.Time `json:"due"`
 	NumActions   int       `json:"#actions"`
 	Error        string    `json:"err"`
 	YearEndDelay string    `json:"year-end-delay"`
 	Delay        string    `json:"delay"`
+	Date         string    `json:"date"`
 }
 
 func (r *recorder) Logs(t *testing.T) []logEntry {
@@ -134,7 +136,8 @@ func (r *recorder) Logs(t *testing.T) []logEntry {
 			t.Errorf("failed to unmarshal: %v: %v", string(l), err)
 			return nil
 		}
-		if e.NumActions != 0 || e.Msg == "late" || e.Delay != "" {
+		e.line = string(l)
+		if e.Msg != "completed" && e.Msg != "year-end" && e.Msg != "failed" {
 			continue
 		}
 		entries = append(entries, e)
@@ -332,10 +335,10 @@ func TestScheduleRealTime(t *testing.T) {
 	lines := deviceRecorder.Lines()
 
 	if got, want := len(logs), len(all); got != want {
-		t.Errorf("got %d, want %d", got, want)
+		t.Fatalf("got %d, want %d", got, want)
 	}
 	if got, want := len(lines), len(all); got != want {
-		t.Errorf("got %d, want %d", got, want)
+		t.Fatalf("got %d, want %d", got, want)
 	}
 	for i := range all {
 		if got, want := logs[i].Due, all[i].when; !got.Equal(want) {
@@ -556,7 +559,7 @@ func operationsByDate(logs []logEntry) (
 			timesByDate[date] = map[string][]time.Time{}
 		}
 		opsByDate[date][l.Op]++
-		timesByDate[date][l.Op] = append(timesByDate[date][l.Op], l.Now)
+		timesByDate[date][l.Op] = append(timesByDate[date][l.Op], l.Started)
 	}
 	for day := range opsByDate {
 		days = append(days, day)
@@ -600,13 +603,13 @@ func TestRepeats(t *testing.T) {
 		if got, want := l.Due, all[i].when; !got.Equal(want) {
 			t.Errorf("got %v, want %v", got, want)
 		}
-		if got, want := l.Now, ticks[i]; !got.Equal(want) {
+		if got, want := l.Started, ticks[i]; !got.Equal(want) {
 			t.Errorf("got %v, want %v", got, want)
 		}
 	}
 
 	// Look at operations per day
-	days, nowtimes, opsPerDay := operationsByDate(logs)
+	days, startedTimes, opsPerDay := operationsByDate(logs)
 
 	// add repeats for 'off' operations, per day.
 	expectedOff := 23 // once per hour starting at 1am
@@ -635,15 +638,15 @@ func TestRepeats(t *testing.T) {
 
 	// The intervals should always be the same.
 	for _, day := range days {
-		prevNow := nowtimes[day]["off"][0]
-		for _, cur := range nowtimes[day]["off"][1:] {
+		prevNow := startedTimes[day]["off"][0]
+		for _, cur := range startedTimes[day]["off"][1:] {
 			if got, want := cur.Sub(prevNow), time.Hour; got != want {
 				t.Errorf("%v: %v: got %v, want %v", prevNow, cur, got, want)
 			}
 			prevNow = cur
 		}
-		prevAnother := nowtimes[day]["another"][0]
-		for _, cur := range nowtimes[day]["another"][1:] {
+		prevAnother := startedTimes[day]["another"][0]
+		for _, cur := range startedTimes[day]["another"][1:] {
 			if got, want := cur.Sub(prevAnother), time.Minute*13; got != want {
 				t.Errorf("%v: %v: got %v, want %v", prevAnother, cur, got, want)
 			}
@@ -679,13 +682,13 @@ func TestRepeatsBounded(t *testing.T) {
 		if got, want := l.Due, all[i].when; !got.Equal(want) {
 			t.Errorf("got %v, want %v", got, want)
 		}
-		if got, want := l.Now, ticks[i]; !got.Equal(want) {
+		if got, want := l.Started, ticks[i]; !got.Equal(want) {
 			t.Errorf("got %v, want %v", got, want)
 		}
 	}
 
 	// Look at operations per day
-	days, nowtimes, opsPerDay := operationsByDate(logs)
+	days, startedTimes, opsPerDay := operationsByDate(logs)
 
 	// One 'on' operation per day
 	if got, want := opsPerDay["on"], []int{1, 1, 1, 1}; !slices.Equal(got, want) {
@@ -699,8 +702,8 @@ func TestRepeatsBounded(t *testing.T) {
 
 	// The intervals should always be the same.
 	for _, day := range days {
-		prevNow := nowtimes[day]["off"][0]
-		for _, cur := range nowtimes[day]["off"][1:] {
+		prevNow := startedTimes[day]["off"][0]
+		for _, cur := range startedTimes[day]["off"][1:] {
 			if got, want := cur.Sub(prevNow), time.Minute*30; got != want {
 				t.Errorf("%v: %v: got %v, want %v", prevNow, cur, got, want)
 			}

@@ -15,12 +15,18 @@ import (
 
 type session struct {
 	mu  sync.Mutex
+	err error
 	msg string
 }
 
 type sessionMgr struct {
 	eventCh chan string
 	timeCh  chan time.Time
+}
+
+func (sm *sessionMgr) Connect(ctx context.Context, reset netutil.IdleReset) (*session, error) {
+	sm.eventCh <- "connect"
+	return &session{}, nil
 }
 
 func (sm *sessionMgr) Disconnect(_ context.Context, s *session) error {
@@ -31,14 +37,6 @@ func (sm *sessionMgr) Disconnect(_ context.Context, s *session) error {
 	if sm.timeCh != nil {
 		sm.timeCh <- time.Now()
 	}
-	return nil
-}
-
-func (sm *sessionMgr) Connect(ctx context.Context, reset netutil.IdleReset) (*session, error) {
-	sm.eventCh <- "connect"
-	return &session{}, nil
-}
-func (sm *sessionMgr) Nil() *session {
 	return nil
 }
 
@@ -61,6 +59,7 @@ func TestIdleManager(t *testing.T) {
 	if got, want := <-eventCh, "disconnect"; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
+	mc.Stop(ctx, time.Second)
 }
 
 func TestIdleManagerReset(t *testing.T) {
@@ -107,5 +106,51 @@ func TestIdleManagerReset(t *testing.T) {
 	stopped := <-timeCh
 	if stopped.Sub(start) < time.Duration(numResets)*resetDelay {
 		t.Errorf("expected at least %v, got %v", time.Duration(numResets)*resetDelay, stopped.Sub(start))
+	}
+}
+
+func TestOnDemand(t *testing.T) {
+	ctx := context.Background()
+	eventCh := make(chan string, 1000)
+	timeCh := make(chan time.Time, 1000)
+
+	sm := &sessionMgr{eventCh: eventCh, timeCh: timeCh}
+	odm := netutil.NewOnDemandConnection(sm,
+		func(err error) *session { return &session{err: err} })
+	odm.SetKeepAlive(time.Millisecond)
+	s := odm.Connection(ctx)
+	time.Sleep(5 * time.Millisecond)
+	if got, want := <-eventCh, "connect"; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+	if got, want := <-eventCh, "disconnect"; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+	if got, want := s.msg, "disconnected"; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+
+	eventCh = make(chan string, 1000)
+	timeCh = make(chan time.Time, 1000)
+
+	sm = &sessionMgr{eventCh: eventCh, timeCh: timeCh}
+	odm = netutil.NewOnDemandConnection(sm,
+		func(err error) *session { return &session{err: err} })
+	odm.SetKeepAlive(time.Minute * 10)
+	s1 := odm.Connection(ctx)
+	time.Sleep(5 * time.Millisecond)
+	s2 := odm.Connection(ctx)
+	if got, want := s1, s2; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+	if got, want := <-eventCh, "connect"; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+	if got, want := len(eventCh), 0; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+	odm.Close(ctx)
+	if got, want := <-eventCh, "disconnect"; got != want {
+		t.Errorf("got %v, want %v", got, want)
 	}
 }

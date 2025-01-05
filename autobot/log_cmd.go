@@ -5,10 +5,7 @@
 package main
 
 import (
-	"bufio"
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -26,96 +23,22 @@ type LogFlags struct {
 type LogStatusFlags struct {
 	LogFlags
 	StreamingSummary bool `subcmd:"streaming-summary,true,print a summary of the status of each log entry as it is completed"`
+	DailySummary     bool `subcmd:"daily-summary,true,print a summary of the status at the end of each day"`
 }
 
-type Log struct{}
-
-type logEntry struct {
-	Msg          string   `json:"msg"`
-	Mod          string   `json:"mod"`
-	DryRun       bool     `json:"dry-run"`
-	Schedule     string   `json:"sched"`
-	Device       string   `json:"device"`
-	ID           int64    `json:"id"`
-	Op           string   `json:"op"`
-	Args         []string `json:"args"`
-	PreCond      string   `json:"pre"`
-	PreCondAbort bool     `json:"pre-abort"`
-
-	NowStr   string `json:"now"`
-	DueStr   string `json:"due"`
-	DelayStr string `json:"delay"`
-	ErrStr   string `json:"err"`
-	Now      time.Time
-	Due      time.Time
-	Delay    time.Duration
-	Err      error
+type Log struct {
+	out io.Writer
 }
 
-func parseLogLine(line string) (logEntry, error) {
-	var le logEntry
-	if err := json.Unmarshal([]byte(line), &le); err != nil {
-		return le, err
-	}
-	var err error
-	if len(le.DelayStr) != 0 {
-		le.Delay, err = time.ParseDuration(le.DelayStr)
-		if err != nil {
-			fmt.Printf("failed to parse duration: %v: %v: %v\n", le.DelayStr, err, line)
-		}
-	}
-	if len(le.NowStr) != 0 {
-		le.Now, err = time.Parse(time.RFC3339, le.NowStr)
-		if err != nil {
-			fmt.Printf("failed to parse time: %v: %v: %v\n", le.NowStr, err, line)
-		}
-	}
-	if len(le.DueStr) != 0 {
-		le.Due, err = time.Parse(time.RFC3339, le.DueStr)
-		if err != nil {
-			fmt.Printf("failed to parse time: %v: %v: %v\n", le.DueStr, err, line)
-		}
-	}
-	if le.ErrStr != "" {
-		le.Err = errors.New(le.ErrStr)
-	}
-	return le, nil
-}
+type logEntryHandler func(internal.LogEntry) error
 
-func (le logEntry) statusRecord() *internal.StatusRecord {
-	sr := &internal.StatusRecord{
-		ID:                 le.ID,
-		Schedule:           le.Schedule,
-		Device:             le.Device,
-		Op:                 le.Op,
-		PreCondition:       le.PreCond,
-		PreConditionResult: le.PreCondAbort,
-		Due:                le.Due,
-		Delay:              le.Delay,
-	}
-
-	return sr
-}
-
-type logEntryHandler func(logEntry) error
-
-func (l *Log) processLog(filename string, fv *LogStatusFlags, lh logEntryHandler) error {
-	fi, err := os.OpenFile(filename, os.O_RDONLY, 0)
-	if err != nil {
-		return err
-	}
-	sc := bufio.NewScanner(fi)
-	filterDevice, filterSchedule := len(fv.Device) > 0, len(fv.Schedule) > 0
-	for sc.Scan() {
-		line := sc.Text()
-		le, err := parseLogLine(line)
-		if err != nil {
-			return err
-		}
-		if filterDevice && le.Device != fv.Device {
+func (l *Log) processLog(rd io.Reader, fv *LogStatusFlags, lh logEntryHandler) error {
+	sc := internal.NewLogScanner(rd)
+	for le := range sc.Entries() {
+		if len(fv.Device) > 0 && le.Device != fv.Device {
 			continue
 		}
-		if filterSchedule && le.Schedule != fv.Schedule {
+		if len(fv.Schedule) > 0 && le.Schedule != fv.Schedule {
 			continue
 		}
 		if err := lh(le); err != nil {
@@ -131,12 +54,22 @@ func (l *Log) Status(_ context.Context, flags any, args []string) error {
 		StatusRecorder:   internal.NewStatusRecorder(),
 		pending:          make(map[int64]*internal.StatusRecord),
 		streamingSummary: fv.StreamingSummary,
+		dailySummary:     fv.DailySummary,
+		out:              l.out,
 	}
-	for _, arg := range args {
-		if err := l.processLog(arg, fv, srh.process); err != nil {
+	rd := os.Stdin
+	if len(args) == 1 {
+		fi, err := os.OpenFile(args[0], os.O_RDONLY, 0)
+		if err != nil {
 			return err
 		}
+		defer fi.Close()
+		rd = fi
 	}
+	if err := l.processLog(rd, fv, srh.process); err != nil {
+		return err
+	}
+	srh.print(l.out)
 	return nil
 }
 
@@ -144,58 +77,70 @@ type statusRecoder struct {
 	*internal.StatusRecorder
 	pending          map[int64]*internal.StatusRecord
 	streamingSummary bool
-}
-
-func fmtOp(rec *internal.StatusRecord) string {
-	return fmt.Sprintf("%v:%v.%v", rec.Schedule, rec.Device, rec.Op)
+	dailySummary     bool
+	out              io.Writer
 }
 
 func (sr *statusRecoder) print(out io.Writer) {
-	fmt.Fprint(out, "Completed:\n")
+	banner := false
 	for rec := range sr.Completed() {
+		if !banner {
+			fmt.Fprint(out, "Completed:\n")
+			banner = true
+		}
 		var o strings.Builder
-		fmt.Fprintf(&o, "% 70v: at %v, pending at: %v, due at: %v, delay: %v", fmtOp(rec), rec.Completed, rec.Pending.Truncate(time.Minute), rec.Due, rec.Delay)
+		fmt.Fprintf(&o, "% 70v: completed: %v, pending since: %v, due at: %v, delay: %v", rec.Name(), rec.Completed, rec.Pending.Truncate(time.Minute), rec.Due, rec.Delay)
 		if rec.PreCondition != "" {
-			if !rec.PreConditionResult {
-				o.WriteString(fmt.Sprintf("(aborted due to %v)", rec.PreCondition))
+			pa := strings.Join(rec.PreConditionArgs, " ")
+			if rec.Aborted() {
+				o.WriteString(fmt.Sprintf(" (aborted due to %v %v)", rec.PreCondition, pa))
 			} else {
-				o.WriteString(fmt.Sprintf("(completed after %v)", rec.PreCondition))
+				o.WriteString(fmt.Sprintf(" (completed after %v %v)", rec.PreCondition, pa))
 			}
 		}
 		o.WriteRune('\n')
 		out.Write([]byte(o.String()))
 	}
-	fmt.Fprint(out, "Pending:\n")
+	banner = false
 	for rec := range sr.Pending() {
-		fmt.Fprintf(out, "% 70v: due: %v, in %v\n", fmtOp(rec), rec.Due, rec.Delay.Round(time.Second))
+		if !banner {
+			fmt.Fprint(out, "Pending:\n")
+			banner = true
+		}
+		fmt.Fprintf(out, "% 70v: pending: due: %v, in %v\n", rec.Name(), rec.Due, rec.Delay.Round(time.Second))
 	}
 }
 
-func (sr *statusRecoder) process(le logEntry) error {
+func (sr *statusRecoder) process(le internal.LogEntry) error {
 	if le.Mod != "scheduler" {
 		return nil
 	}
+	printSummary := sr.streamingSummary
 	switch le.Msg {
-	case "pending":
-		rec := le.statusRecord()
+	case internal.LogPending:
+		rec := le.StatusRecord()
 		rec.Pending = le.Now
 		rec = sr.NewPending(rec)
 		sr.pending[le.ID] = rec
 		return nil
-	case "completed", "failed":
-	case "starting schedules", "year-end", "ok", "too-late":
+	case internal.LogCompleted, internal.LogFailed:
+		pending, ok := sr.pending[le.ID]
+		if !ok {
+			return nil
+		}
+		sr.PendingDone(pending, le.PreCondResult, le.Err)
+	case internal.LogNewDay, internal.LogYearEnd:
+		if sr.dailySummary {
+			printSummary = true
+		}
+	case internal.LogTooLate:
+		fmt.Fprintf(sr.out, "% 70v: too late: due at: %v, delay: %v", le.Name(), le.Due, le.Delay)
+	default: // ignore all other messages.
 		return nil
-	default:
-		return fmt.Errorf("unknown message: %q", le.Msg)
 	}
-	pending, ok := sr.pending[le.ID]
-	if !ok {
-		return nil
+	if printSummary {
+		sr.print(sr.out)
+		sr.ResetCompleted()
 	}
-	if sr.streamingSummary {
-		sr.print(os.Stdout)
-	}
-	sr.PendingDone(pending, le.PreCondAbort, le.Err)
-	sr.print(os.Stdout)
 	return nil
 }

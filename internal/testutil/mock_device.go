@@ -28,6 +28,8 @@ type MockDevice struct {
 	operationsHelp map[string]string
 	conditions     map[string]devices.Condition
 	conditionsHelp map[string]string
+	useLogger      bool
+	useWriter      bool
 }
 
 func NewMockDevice(operations ...string) *MockDevice {
@@ -45,6 +47,11 @@ func NewMockDevice(operations ...string) *MockDevice {
 	d.conditions = map[string]devices.Condition{}
 	d.conditionsHelp = map[string]string{}
 	return d
+}
+
+func (d *MockDevice) SetOutput(logger bool, writer bool) {
+	d.useLogger = logger
+	d.useWriter = writer
 }
 
 func (d *MockDevice) AddCondition(name string, outcome bool) {
@@ -107,6 +114,11 @@ func (d *MockDevice) Timeout() time.Duration {
 }
 
 func (d *MockDevice) genericOp(_ context.Context, opName string, opts devices.OperationArgs) error {
-	fmt.Fprintf(opts.Writer, "device[%s].%s: [%d] %v\n", d.Name, opName, len(opts.Args), strings.Join(opts.Args, "--"))
+	if d.useWriter {
+		fmt.Fprintf(opts.Writer, "device[%s].%s: [%d] %v\n", d.Name, opName, len(opts.Args), strings.Join(opts.Args, "--"))
+	}
+	if d.useLogger {
+		opts.Logger.Info("device", "name", d.Name, "op", opName)
+	}
 	return nil
 }

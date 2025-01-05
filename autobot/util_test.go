@@ -5,6 +5,7 @@
 package main
 
 import (
+	"path/filepath"
 	"testing"
 )
 
@@ -13,7 +14,7 @@ func TestZIP(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to load ZIP database: %v", err)
 	}
-	withuk, err := loadZIPDatabase("./testdata")
+	withuk, err := loadZIPDatabase(filepath.Join("testdata", "zipdb"))
 	if err != nil {
 		t.Fatalf("failed to load ZIP database: %v", err)
 	}

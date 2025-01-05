@@ -23,7 +23,7 @@ func TestParseAnnualDynamic(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	scheds, err := scheduler.ParseConfig(ctx, []byte(schedule_config), sys)
+	scheds, err := scheduler.ParseConfig(ctx, []byte(scheduleConfigSample), sys)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -27,7 +27,7 @@ type ScheduleFlags struct {
 type SimulateFlags struct {
 	ConfigFileFlags
 	LogFile   string        `subcmd:"log-file,,log file"`
-	DateRange string        `subcmd:"date-range,,date range in <year>/<month>/<day>:<year>/<month>/<day> format"`
+	DateRange string        `subcmd:"date-range,,date range in <month>/<day>/<year>:<year>/<month>/<day> format"`
 	Delay     time.Duration `subcmd:"delay,10ms,delay between each simulated time step and the scheduled time"`
 }
 

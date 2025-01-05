@@ -7,12 +7,13 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"slices"
 	"strings"
-	"time"
 
+	"cloudeng.io/datetime/schedule"
 	"github.com/cosnicolaou/automation/devices"
 	"github.com/cosnicolaou/automation/scheduler"
 	"gopkg.in/yaml.v3"
@@ -34,6 +35,7 @@ type ConfigFlags struct {
 }
 
 type Config struct {
+	out io.Writer
 }
 
 func marshalYAML(indent string, v any) string {
@@ -46,49 +48,63 @@ func marshalYAML(indent string, v any) string {
 	return strings.Join(indented, "\n")
 }
 
+func indentBlock(indent, block string) string {
+	lines := strings.Split(block, "\n")
+	indented := make([]string, 0, len(lines))
+	for i, line := range lines {
+		if len(line) == 0 && i == len(lines)-1 {
+			continue
+		}
+		indented = append(indented, indent+line)
+	}
+	return strings.Join(indented, "\n")
+}
+
+func formatAction(a schedule.ActionSpec[scheduler.Action]) string {
+	var out strings.Builder
+	fmt.Fprintf(&out, "%v %v", a.Name, a.Due)
+	if a.Repeat.Interval > 0 {
+		fmt.Fprintf(&out, " every: %v", a.Repeat.Interval)
+		if a.Repeat.Repeats > 0 {
+			fmt.Fprintf(&out, ", at most %v times", a.Repeat.Repeats)
+		}
+	}
+	if a.T.Precondition.Condition != nil {
+		fmt.Fprintf(&out, " if %v %v", a.T.Precondition.Name, a.T.Precondition.Args)
+	}
+	return out.String()
+}
+
 func (c *Config) Display(ctx context.Context, flags any, args []string) error {
 	fv := flags.(*ConfigFlags)
 
+	ctx, system, err := loadSystem(ctx, &fv.ConfigFileFlags)
+	if err != nil {
+		return err
+	}
+
+	// Reread the keys file in order to enumerate all the keys.
 	keys, err := ReadKeysFile(ctx, fv.KeysFile)
 	if err != nil {
-		return err
-	}
-	var tzloc = time.Local
-	if tz := fv.SystemTZLocation; tz != "" {
-		tzloc, err = time.LoadLocation(tz)
-		if err != nil {
-			return fmt.Errorf("invalid timezone: %q: %v", tz, err)
-		}
+		return fmt.Errorf("failed to read keys file: %q: %w", fv.KeysFile, err)
 	}
 
-	opts := []devices.Option{
-		devices.WithLogger(slog.New(slog.NewTextHandler(os.Stderr, nil))),
-		devices.WithLatLong(fv.Latitude, fv.Longitude),
-		devices.WithZIPCode(fv.ZIPCode),
-		devices.WithTimeLocation(tzloc),
-	}
-
-	system, err := devices.ParseSystemConfigFile(ctx, fv.SystemFile, opts...)
-	if err != nil {
-		return err
-	}
-
-	fmt.Printf("Keys:\n")
+	fmt.Fprintf(c.out, "Keys:\n")
 	for _, key := range keys {
-		fmt.Printf("  %v\n", key)
+		fmt.Fprintf(c.out, "  %v\n", key)
 	}
 
-	fmt.Printf("\nLocation: %v\n\n", system.Location)
+	fmt.Fprintf(c.out, "\nLocation: %v\n\n", system.Location)
 
 	for _, controller := range system.Controllers {
-		fmt.Printf("Controller:\n%v\n", marshalYAML("  ", controller.Config()))
-		fmt.Printf("%v\n", marshalYAML("  ", controller.CustomConfig()))
+		fmt.Fprintf(c.out, "Controller:\n%v\n", marshalYAML("  ", controller.Config()))
+		fmt.Fprintf(c.out, "%v\n", marshalYAML("  ", controller.CustomConfig()))
 	}
 
 	for _, device := range system.Devices {
-		fmt.Printf("Device: %v\n", marshalYAML("  ", device.Config()))
-		fmt.Printf("Device Controlled By: %v\n", device.ControlledByName())
-		fmt.Printf("Device Custom Config:\n%v\n", marshalYAML("  ", device.CustomConfig()))
+		fmt.Fprintf(c.out, "Device:\n%v\n", marshalYAML("  ", device.Config()))
+		fmt.Fprintf(c.out, "Device Controlled By: %v\n", device.ControlledByName())
+		fmt.Fprintf(c.out, "Device Custom Config:\n%v\n", marshalYAML("  ", device.CustomConfig()))
 	}
 
 	if fv.ScheduleFile != "" {
@@ -96,12 +112,14 @@ func (c *Config) Display(ctx context.Context, flags any, args []string) error {
 		if err != nil {
 			return err
 		}
-		fmt.Printf("Schedules:\n")
+		fmt.Fprintf(c.out, "Schedules:\n")
 		for _, sched := range schedules.Schedules {
-			fmt.Printf("  %v\n", sched)
+			fmt.Fprintf(c.out, "%s\n", indentBlock("  ", sched.Dates.String()))
+			for _, a := range sched.DailyActions {
+				fmt.Fprintf(c.out, "    %s\n", formatAction(a))
+			}
 		}
 	}
-
 	return nil
 }
 
@@ -128,31 +146,41 @@ func (c *Config) Operations(ctx context.Context, flags any, args []string) error
 	for _, cfg := range system.Config.Controllers {
 		available := system.Controllers[cfg.Name].Operations()
 		sorted := opNames(available)
-		fmt.Printf("Controller: %v\n", cfg.Name)
+		fmt.Fprintf(c.out, "Controller: %v\n", cfg.Name)
 		for _, op := range sorted {
 			_, configured := cfg.Operations[op]
 			if !configured {
-				fmt.Printf("  %v: but not configured\n", op)
+				fmt.Fprintf(c.out, "  %v: but not configured\n", op)
 				continue
 			}
 			h := system.Controllers[cfg.Name].OperationsHelp()[op]
-			fmt.Printf("  %v:  %v\n", op, h)
-
+			fmt.Fprintf(c.out, "  %v:  %v\n", op, h)
 		}
 	}
 
 	for _, cfg := range system.Config.Devices {
-		available := system.Devices[cfg.Name].Operations()
-		sorted := opNames(available)
-		fmt.Printf("Device: %v\n", cfg.Name)
+		availableOps := system.Devices[cfg.Name].Operations()
+		sorted := opNames(availableOps)
+		fmt.Fprintf(c.out, "Device: %v\n", cfg.Name)
 		for _, op := range sorted {
 			_, configured := cfg.Operations[op]
 			if !configured {
-				fmt.Printf("  %v: but not configured\n", op)
+				fmt.Fprintf(c.out, "  %v: but not configured\n", op)
 				continue
 			}
 			h := system.Devices[cfg.Name].OperationsHelp()[op]
-			fmt.Printf("  %v:  %v\n", op, h)
+			fmt.Fprintf(c.out, "  %v:  %v\n", op, h)
+		}
+		availableConditions := system.Devices[cfg.Name].Conditions()
+		sorted = opNames(availableConditions)
+		for _, op := range sorted {
+			_, configured := cfg.Conditions[op]
+			if !configured {
+				fmt.Fprintf(c.out, "  %v: but not configured\n", op)
+				continue
+			}
+			h := system.Devices[cfg.Name].ConditionsHelp()[op]
+			fmt.Fprintf(c.out, "  %v:  %v\n", op, h)
 		}
 	}
 	return nil

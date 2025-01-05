@@ -29,7 +29,7 @@ func ticksToYearEnd(scheduler *schedule.AnnualScheduler[Action], year int, place
 	}
 	last := time.Date(year, 12, 31, 23, 59, 59, int(time.Second)-1, place.TZ)
 	times = append(times, last.Add(-delay))
-	return nil
+	return times
 }
 
 func ticksForAllYears(scheduler *schedule.AnnualScheduler[Action], place datetime.Place, dates schedule.Dates, period datetime.CalendarDateRange, delay time.Duration) []time.Time {
@@ -48,12 +48,12 @@ type timesource struct {
 	ticks []time.Time
 }
 
-func (t *timesource) NowIn(loc *time.Location) time.Time {
+func (t timesource) NowIn(loc *time.Location) time.Time {
 	n := <-t.ch
 	return n.In(loc)
 }
 
-func (t *timesource) run(ctx context.Context) {
+func (t timesource) run(ctx context.Context) {
 	for _, tick := range t.ticks {
 		select {
 		case <-ctx.Done():
@@ -83,7 +83,9 @@ func RunSimulation(ctx context.Context, schedules Schedules, system devices.Syst
 	}
 	schedulers := make([]*Scheduler, len(schedules.Schedules))
 	for i, sched := range schedules.Schedules {
-		s, err := New(sched, system, opts...)
+		psopts := opts
+		psopts = append(psopts, WithTimeSource(timeSources[i]))
+		s, err := New(sched, system, psopts...)
 		if err != nil {
 			return fmt.Errorf("failed to create scheduler for %v: %w", sched.Name, err)
 		}

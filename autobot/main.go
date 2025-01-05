@@ -59,7 +59,6 @@ commands:
     commands:
       - name: status
         arguments:
-          - <log-files>
           - <log-files>...
 `
 
@@ -71,7 +70,7 @@ func cli() *subcmd.CommandSetYAML {
 	cmd.Set("control", "test").MustRunner(control.Test, &ControlFlags{})
 	cmd.Set("control", "script").MustRunner(control.RunScript, &ControlScriptFlags{})
 
-	config := &Config{}
+	config := &Config{out: os.Stdout}
 	cmd.Set("config", "display").MustRunner(config.Display, &ConfigFlags{})
 	cmd.Set("config", "operations").MustRunner(config.Operations, &ConfigFlags{})
 
@@ -79,7 +78,7 @@ func cli() *subcmd.CommandSetYAML {
 	cmd.Set("schedule", "run").MustRunner(schedule.Run, &ScheduleFlags{})
 	cmd.Set("schedule", "simulate").MustRunner(schedule.Simulate, &SimulateFlags{})
 
-	log := &Log{}
+	log := &Log{out: os.Stdout}
 	cmd.Set("logs", "status").MustRunner(log.Status, &LogStatusFlags{})
 	return cmd
 }

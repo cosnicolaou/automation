@@ -1,0 +1,25 @@
+common_ops: &common_ops
+  operations:
+    on:
+    off:
+    another:
+  conditions:
+    weather:
+
+time_zone: Local
+zip_code: CA 94024
+
+controllers:
+  - name: controller
+    type: mock-controller
+
+devices:
+  - name: device
+    type: mock-device
+    controller: controller
+    <<: *common_ops
+
+  - name: other-device
+    type: mock-device
+    controller: controller
+    <<: *common_ops

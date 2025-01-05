@@ -51,7 +51,7 @@ devices:
     type: device
 `
 
-const schedule_config = `
+const scheduleConfigSample = `
 shared:
   abc: &abc
     device: device
@@ -248,6 +248,7 @@ var supportedDevices = devices.SupportedDevices{
 	"device": func(string, devices.Options) (devices.Device, error) {
 		md := testutil.NewMockDevice("On", "Off", "Another", "a", "b", "c", "d")
 		md.AddCondition("weather", true)
+		md.SetOutput(false, true)
 		return md, nil
 	},
 	"slow_device": func(string, devices.Options) (devices.Device, error) {
@@ -282,7 +283,7 @@ func createSystem(t *testing.T) devices.System {
 
 func createSchedules(t *testing.T, sys devices.System) scheduler.Schedules {
 	ctx := context.Background()
-	scheds, err := scheduler.ParseConfig(ctx, []byte(schedule_config), sys)
+	scheds, err := scheduler.ParseConfig(ctx, []byte(scheduleConfigSample), sys)
 	if err != nil {
 		t.Fatal(err)
 	}
