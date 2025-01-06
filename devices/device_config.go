@@ -41,11 +41,11 @@ func (lp *ControllerConfig) UnmarshalYAML(node *yaml.Node) error {
 }
 
 type DeviceConfigCommon struct {
-	Name       string              `yaml:"name"`
-	Type       string              `yaml:"type"`
-	Controller string              `yaml:"controller"`
-	Operations map[string][]string `yaml:"operations"`
-	Conditions map[string][]string `yaml:"conditions"`
+	Name           string              `yaml:"name"`
+	Type           string              `yaml:"type"`
+	ControllerName string              `yaml:"controller"`
+	Operations     map[string][]string `yaml:"operations"`
+	Conditions     map[string][]string `yaml:"conditions"`
 }
 
 type DeviceConfig struct {

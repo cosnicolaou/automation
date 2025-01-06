@@ -218,3 +218,73 @@ func CreateDevices(config []DeviceConfig, options Options) (map[string]Device, e
 	}
 	return devices, nil
 }
+
+// ControllerBase represents a base implementation of a Controller parametized
+// by a custom configuration type. Controllers can be created by embedding this
+// type with the desired custom configuration type and overriding methods
+// as needed and providing the Implementation method.
+type ControllerBase[ConfigT any] struct {
+	ControllerConfigCommon
+	ControllerConfigCustom ConfigT
+}
+
+func (cb *ControllerBase[ConfigT]) SetConfig(c ControllerConfigCommon) {
+	cb.ControllerConfigCommon = c
+}
+
+func (cb *ControllerBase[ConfigT]) Config() ControllerConfigCommon {
+	return cb.ControllerConfigCommon
+}
+
+func (cb *ControllerBase[ConfigT]) CustomConfig() any {
+	return cb.CustomConfig
+}
+
+func (cb *ControllerBase[ConfigT]) UnmarshalYAML(node *yaml.Node) error {
+	return node.Decode(&cb.ControllerConfigCustom)
+}
+
+func (cb *ControllerBase[ConfigT]) Operations() map[string]Operation {
+	return map[string]Operation{}
+}
+
+func (cb *ControllerBase[ConfigT]) OperationsHelp() map[string]string {
+	return map[string]string{}
+}
+
+// DeviceBase represents a base implementation of a Device parametized by a
+// custom configuration type. Devices can be created by embedding this type with
+// the desired custom configuration type and overriding methods as needed and
+// providing the SetController, ControlledBy, Operations, and OperationsHelp methods.
+type DeviceBase[ConfigT any] struct {
+	DeviceConfigCommon
+	DeviceConfigCustom ConfigT
+}
+
+func (db *DeviceBase[ConfigT]) SetConfig(c DeviceConfigCommon) {
+	db.DeviceConfigCommon = c
+}
+
+func (db *DeviceBase[ConfigT]) Config() DeviceConfigCommon {
+	return db.DeviceConfigCommon
+}
+
+func (db *DeviceBase[ConfigT]) CustomConfig() ConfigT {
+	return db.DeviceConfigCustom
+}
+
+func (db *DeviceBase[ConfigT]) UnmarshalYAML(node *yaml.Node) error {
+	return node.Decode(&db.DeviceConfigCustom)
+}
+
+func (db *DeviceBase[ConfigT]) ControlledByName() string {
+	return db.ControllerName
+}
+
+func (db *DeviceBase[ConfigT]) Conditions() map[string]Condition {
+	return map[string]Condition{}
+}
+
+func (db *DeviceBase[ConfigT]) ConditionsHelp() map[string]string {
+	return map[string]string{}
+}
