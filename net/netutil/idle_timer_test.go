@@ -30,9 +30,8 @@ func TestIdleWait(t *testing.T) {
 		wg.Add(1)
 		startTimes[i] = time.Now()
 		go func() {
-			timer.Wait(ctx, func(ctx context.Context) error {
+			timer.Wait(ctx, func(context.Context) {
 				ticks <- time.Now()
-				return nil
 			})
 			wg.Done()
 		}()
@@ -101,9 +100,8 @@ func TestIdleReset(t *testing.T) {
 	wg.Add(1)
 	start := time.Now()
 	go func() {
-		timer.Wait(ctx, func(ctx context.Context) error {
+		timer.Wait(ctx, func(context.Context) {
 			ticks <- time.Now()
-			return nil
 		})
 		wg.Done()
 	}()
@@ -129,11 +127,10 @@ func TestIdleStopWait(t *testing.T) {
 	wg.Add(1)
 
 	go func() {
-		timer.Wait(ctx, func(ctx context.Context) error {
+		timer.Wait(ctx, func(context.Context) {
 			<-readyCh
 			waitCh <- mytime
 			close(waitCh)
-			return nil
 		})
 		wg.Done()
 	}()
@@ -152,7 +149,7 @@ func TestIdleStopWait(t *testing.T) {
 
 }
 
-func TestIdleStopWaitCancel(t *testing.T) {
+func TestIdleStopWaitCancel(*testing.T) {
 	ctx := context.Background()
 	timer := netutil.NewIdleTimer(time.Hour)
 	var wg sync.WaitGroup
@@ -161,9 +158,7 @@ func TestIdleStopWaitCancel(t *testing.T) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	go func() {
-		timer.Wait(ctx, func(ctx context.Context) error {
-			return nil
-		})
+		timer.Wait(ctx, func(context.Context) {})
 		wg.Done()
 	}()
 
@@ -177,15 +172,14 @@ func TestIdleStopWaitHang(t *testing.T) {
 	timer := netutil.NewIdleTimer(time.Millisecond)
 	readyCh := make(chan struct{})
 	go func() {
-		timer.Wait(ctx, func(ctx context.Context) error {
+		timer.Wait(ctx, func(context.Context) {
 			// The callback will hang.
 			close(readyCh)
 			select {
 			case <-ctx.Done():
-				return ctx.Err()
+				return
 			case <-time.After(time.Hour):
 			}
-			return nil
 		})
 	}()
 	<-readyCh

@@ -11,15 +11,12 @@ import (
 	"time"
 
 	"cloudeng.io/algo/container/list"
-	"cloudeng.io/datetime"
 )
 
 type StatusRecorder struct {
 	mu      sync.Mutex
-	counter int64
 	done    []*StatusRecord
 	waiting *list.Double[*StatusRecord]
-	date    datetime.CalendarDate
 }
 
 func NewStatusRecorder() *StatusRecorder {

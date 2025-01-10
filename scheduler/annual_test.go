@@ -16,7 +16,7 @@ import (
 
 func TestParseAnnualDynamic(t *testing.T) {
 	ctx := context.Background()
-	sys, err := devices.ParseSystemConfig(ctx, []byte(devices_config),
+	sys, err := devices.ParseSystemConfig(ctx, []byte(devicesConfig),
 		devices.WithDevices(supportedDevices),
 		devices.WithControllers(supportedControllers))
 	if err != nil {

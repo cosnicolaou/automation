@@ -20,7 +20,7 @@ import (
 	"github.com/cosnicolaou/automation/scheduler"
 )
 
-const devices_config = `
+const devicesConfig = `
 common_ops: &common_ops
   operations:
     a:
@@ -252,13 +252,13 @@ var supportedDevices = devices.SupportedDevices{
 		return md, nil
 	},
 	"slow_device": func(string, devices.Options) (devices.Device, error) {
-		return &slow_test_device{
+		return &slowDevice{
 			timeout: time.Millisecond * 10,
 			delay:   time.Minute,
 		}, nil
 	},
 	"hanging_device": func(string, devices.Options) (devices.Device, error) {
-		return &slow_test_device{
+		return &slowDevice{
 			timeout: time.Hour,
 			delay:   time.Hour,
 		}, nil
@@ -272,7 +272,7 @@ var supportedControllers = devices.SupportedControllers{
 }
 
 func createSystem(t *testing.T) devices.System {
-	sys, err := devices.ParseSystemConfig(context.Background(), []byte(devices_config),
+	sys, err := devices.ParseSystemConfig(context.Background(), []byte(devicesConfig),
 		devices.WithDevices(supportedDevices),
 		devices.WithControllers(supportedControllers))
 	if err != nil {
@@ -290,7 +290,7 @@ func createSchedules(t *testing.T, sys devices.System) scheduler.Schedules {
 	return scheds
 }
 
-func TestParseActions(t *testing.T) {
+func TestParseActionsBasic(t *testing.T) {
 	sys := createSystem(t)
 	scheds := createSchedules(t, sys)
 
@@ -350,6 +350,12 @@ func TestParseActions(t *testing.T) {
 	}); !reflect.DeepEqual(got, want) {
 		t.Errorf("got %#v, want %#v", got, want)
 	}
+
+}
+
+func TestParseActionsMulti(t *testing.T) {
+	sys := createSystem(t)
+	scheds := createSchedules(t, sys)
 
 	multi := scheds.Lookup("multi-time")
 	if got, want := len(multi.DailyActions), 4; got != want {
@@ -412,6 +418,11 @@ func TestParseActions(t *testing.T) {
 	}); !reflect.DeepEqual(got, want) {
 		t.Errorf("got %+v, want %+v", got, want)
 	}
+}
+
+func TestParseActionsPreCond(t *testing.T) {
+	sys := createSystem(t)
+	scheds := createSchedules(t, sys)
 
 	precondition := scheds.Lookup("precondition")
 	if got, want := len(precondition.DailyActions), 3; got != want {
@@ -566,7 +577,7 @@ func (fakeSunrise) Name() string {
 	return "fake-sunrise"
 }
 
-func (fakeSunrise) Evaluate(date datetime.CalendarDate, place datetime.Place) datetime.TimeOfDay {
+func (fakeSunrise) Evaluate(datetime.CalendarDate, datetime.Place) datetime.TimeOfDay {
 	return datetime.NewTimeOfDay(8, 3, 2)
 }
 
@@ -614,14 +625,14 @@ schedules:
   - name: simple
     device: device
     actions:`
-	bad_times = `
+	badTimes = `
 schedules:
   - name: simple
     device: device
     actions:
        on: 00:xx:01
 `
-	bad_op = `
+	badOp = `
 schedules:
   - name: simple
     device: device
@@ -631,7 +642,7 @@ schedules:
         when: 00:00:02
         before: foo
 `
-	diff_time = `
+	diffTime = `
 schedules:
   - name: simple
     device: device
@@ -642,7 +653,7 @@ schedules:
         when: 00:00:02
         before: on
 `
-	both_before_and_after = `
+	bothBeforeAndAfter = `
 schedules:
   - name: simple
     device: device
@@ -654,7 +665,7 @@ schedules:
         before: on
         after: on
 `
-	refer_to_self = `
+	referToSelf = `
 schedules:
   - name: simple
     device: device
@@ -666,7 +677,7 @@ schedules:
         before: off
 `
 
-	repeat_zero = `
+	repeatZero = `
 schedules:
   - name: simple
     device: device
@@ -684,12 +695,12 @@ func TestValidation(t *testing.T) {
 		err string
 	}{
 		{empty, "no actions defined"},
-		{bad_times, "invalid time"},
-		{bad_op, "foo not found"},
-		{diff_time, "not scheduled for the same time"},
-		{both_before_and_after, "cannot have both before and after"},
-		{refer_to_self, "cannot be before or after itself"},
-		{repeat_zero, "repeat duration must be greater than zero"},
+		{badTimes, "invalid time"},
+		{badOp, "foo not found"},
+		{diffTime, "not scheduled for the same time"},
+		{bothBeforeAndAfter, "cannot have both before and after"},
+		{referToSelf, "cannot be before or after itself"},
+		{repeatZero, "repeat duration must be greater than zero"},
 	} {
 		_, err := scheduler.ParseConfig(ctx, []byte(tc.cfg), sys)
 		if err == nil || !strings.Contains(err.Error(), tc.err) {

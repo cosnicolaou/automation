@@ -139,7 +139,7 @@ func ParseConfigFile(ctx context.Context, cfgFile string, system devices.System)
 	return pcfg, nil
 }
 
-func ParseConfig(ctx context.Context, cfgData []byte, system devices.System) (Schedules, error) {
+func ParseConfig(_ context.Context, cfgData []byte, system devices.System) (Schedules, error) {
 	var cfg schedulesConfig
 	if err := yaml.Unmarshal(cfgData, &cfg); err != nil {
 		return Schedules{}, err

@@ -28,7 +28,7 @@ func runServer(t *testing.T, handler telnetserver.Handler, wg *sync.WaitGroup) n
 		Handler: handler,
 	}
 	go func() {
-		server.Serve(listener)
+		_ = server.Serve(listener)
 		wg.Done()
 	}()
 	return listener

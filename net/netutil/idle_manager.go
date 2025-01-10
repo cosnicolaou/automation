@@ -35,7 +35,7 @@ type IdleManager[T any, F Managed[T]] struct {
 	conn      T
 }
 
-func NewIdleManager[T any, F Managed[T]](ctx context.Context, managed F, idle *IdleTimer) *IdleManager[T, F] {
+func NewIdleManager[T any, F Managed[T]](managed F, idle *IdleTimer) *IdleManager[T, F] {
 	m := &IdleManager[T, F]{
 		connector: managed,
 		idle:      idle,
@@ -73,10 +73,10 @@ func (m *IdleManager[T, F]) closeUnderlyingUnlocked(ctx context.Context) error {
 	return nil
 }
 
-func (m *IdleManager[T, F]) expired(ctx context.Context) error {
+func (m *IdleManager[T, F]) expired(ctx context.Context) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	return m.closeUnderlyingUnlocked(ctx)
+	_ = m.closeUnderlyingUnlocked(ctx)
 }
 
 // Stop closes the connection and stops the idle timer.
@@ -119,7 +119,7 @@ func (sm *OnDemandConnection[T, F]) Connection(ctx context.Context) T {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 	if sm.idleManager == nil {
-		sm.idleManager = NewIdleManager(ctx, sm.managed, NewIdleTimer(sm.keepAlive))
+		sm.idleManager = NewIdleManager(sm.managed, NewIdleTimer(sm.keepAlive))
 	}
 	sess, err := sm.idleManager.Connection(ctx)
 	if err != nil {

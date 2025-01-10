@@ -31,6 +31,8 @@ func newLogfile(name string) (io.WriteCloser, error) {
 	if err := renameIfExisting(name); err != nil {
 		return nil, err
 	}
-	os.MkdirAll(filepath.Dir(name), 0700)
+	if err := os.MkdirAll(filepath.Dir(name), 0700); err != nil {
+		return nil, err
+	}
 	return os.OpenFile(name, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 }

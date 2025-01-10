@@ -99,15 +99,15 @@ func init() {
 		maps.All(elkm1.SupportedDevices()))
 }
 
-var interrupt = errors.New("interrupt")
+var errInterrupt = errors.New("interrupt")
 
 func main() {
 	ctx := context.Background()
 	ctx, cancel := context.WithCancelCause(ctx)
-	cmdutil.HandleSignals(func() { cancel(interrupt) }, os.Interrupt)
+	cmdutil.HandleSignals(func() { cancel(errInterrupt) }, os.Interrupt)
 	err := cli().Dispatch(ctx)
-	if context.Cause(ctx) == interrupt {
-		cmdutil.Exit("%v", interrupt)
+	if context.Cause(ctx) == errInterrupt {
+		cmdutil.Exit("%v", errInterrupt)
 	}
 	if err != nil {
 		cmdutil.Exit("%v", err)

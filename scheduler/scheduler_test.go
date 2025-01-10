@@ -24,23 +24,24 @@ import (
 	"golang.org/x/text/language"
 )
 
-type slow_test_device struct {
+type slowDevice struct {
 	testutil.MockDevice
 	timeout time.Duration
 	delay   time.Duration
 }
 
-func (st *slow_test_device) Operations() map[string]devices.Operation {
+func (st *slowDevice) Operations() map[string]devices.Operation {
 	return map[string]devices.Operation{
 		"on": st.On,
 	}
 }
 
-func (st *slow_test_device) Timeout() time.Duration {
-	return st.timeout
+func (st *slowDevice) SetConfig(cfg devices.DeviceConfigCommon) {
+	st.MockDevice.SetConfig(cfg)
+	st.DeviceConfigCommon.Timeout = st.timeout
 }
 
-func (st *slow_test_device) On(context.Context, devices.OperationArgs) error {
+func (st *slowDevice) On(context.Context, devices.OperationArgs) error {
 	time.Sleep(st.delay)
 	return nil
 }
@@ -77,7 +78,6 @@ func allActive(s *scheduler.Scheduler, year int) (actions []testAction, activeTi
 			// to test for DST handling, since time.Add does not handle
 			// DST changes and as such is not the same as calling time.Now()
 			// 10 milliseconds before the scheduled time.
-			//dt := subMilliseconds(yp, active.Date.Date(), active.When)
 			timeSourceTicks = append(timeSourceTicks, active.When.Add(-time.Millisecond*10))
 			activeTimes = append(activeTimes, active.When)
 			actions = append(actions, testAction{
@@ -228,6 +228,7 @@ func TestScheduler(t *testing.T) {
 	if err := containsError(logs); err != nil {
 		t.Fatal(err)
 	}
+
 	// 01/22:2, 11/22:12/28 translates to:
 	// 10+28+9+28 days
 	days := 10 + 28 + 9 + 28
@@ -246,22 +247,13 @@ func TestScheduler(t *testing.T) {
 		if logs[i].YearEndDelay != "" {
 			t.Errorf("unexpected year end")
 		}
+		op := []string{"another", "on", "off"}[i%3]
+		if got, want := logs[i].Op, op; got != want {
+			t.Errorf("got %v, want %v", got, want)
+		}
 	}
 	if logs[len(logs)-1].YearEndDelay == "" {
 		t.Errorf("missing year end delay")
-	}
-
-	for i := range (len(logs) - 1) / 3 {
-		lg1, lg2, lg3 := logs[i*3], logs[i*3+1], logs[i*3+2]
-		if got, want := lg1.Op, "another"; got != want {
-			t.Errorf("%#v: got %v, want %v", lg1, got, want)
-		}
-		if got, want := lg2.Op, "on"; got != want {
-			t.Errorf("%#v: got %v, want %v", lg2, got, want)
-		}
-		if got, want := lg3.Op, "off"; got != want {
-			t.Errorf("%#v: got %v, want %v", lg3, got, want)
-		}
 	}
 
 	lines := deviceRecorder.Lines()
@@ -426,10 +418,10 @@ func TestMultiYear(t *testing.T) {
 	times2023, ticks2023 = appendYearEndTimesTicks(2023, sys.Location.TZ, times2023, ticks2023)
 	all2024, times2024, ticks2024 := allActive(scheduler, 2024)
 	times2024, ticks2024 = appendYearEndTimesTicks(2024, sys.Location.TZ, times2024, ticks2024)
-	times := append(times2023, times2024...)
-	ticks := append(ticks2023, ticks2024...)
+	times := append(append([]time.Time(nil), times2023...), times2024...)
+	ticks := append(append([]time.Time(nil), ticks2023...), ticks2024...)
 
-	all := append(all2023, all2024...)
+	all := append(append([]testAction(nil), all2023...), all2024...)
 	if len(times) != len(all)+2 {
 		t.Fatalf("mismatch: %v %v", len(times), len(all))
 	}
@@ -613,7 +605,7 @@ func TestRepeats(t *testing.T) {
 
 	// add repeats for 'off' operations, per day.
 	expectedOff := 23 // once per hour starting at 1am
-	// 23 repeast on a normal day, 22 on ST-DST and 24 on ST-DST.
+	// 23 repeats on a normal day, 22 on ST-DST and 24 on ST-DST.
 	expectedOffPerday := []int{expectedOff, expectedOff - 1, expectedOff, expectedOff + 1}
 
 	expectedAnother := ((24*60*60)-((60+14)*60))/(13*60) + 1

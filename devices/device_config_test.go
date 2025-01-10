@@ -18,7 +18,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const controllers_spec = `
+const controllersSpec = `
   - name: c
     type: controller
     operations:
@@ -26,8 +26,18 @@ const controllers_spec = `
       disable: [off, command]
     detail: my-location
     key_id: my-key
+
+  - name: ct
+    type: controller
+    timeout: 5m
+    retries: 1
+    operations:
+      enable: [on, command, quoted with space]
+      disable: [off, command]
+    detail: my-location
+    key_id: my-key
 `
-const devices_spec = `
+const devicesSpec = `
   - name: d
     controller: c
     type: device
@@ -38,6 +48,8 @@ const devices_spec = `
   - name: e
     controller: c
     type: device
+    timeout: 5m
+    retries: 3
     operations:
       off: [off, command]
     conditions:
@@ -46,10 +58,10 @@ const devices_spec = `
 
 `
 
-const simple_spec = `controllers:
-` + controllers_spec + `
+const simpleSpec = `controllers:
+` + controllersSpec + `
 devices:
-` + devices_spec
+` + devicesSpec
 
 var supportedControllers = devices.SupportedControllers{
 	"controller": func(string, devices.Options) (devices.Controller, error) {
@@ -58,8 +70,10 @@ var supportedControllers = devices.SupportedControllers{
 }
 
 var supportedDevices = devices.SupportedDevices{
-	"device": func(string, devices.Options) (devices.Device, error) {
-		return testutil.NewMockDevice("on", "off"), nil
+	"device": func(_ string, o devices.Options) (devices.Device, error) {
+		md := testutil.NewMockDevice("on", "off")
+		md.SetOutput(o.Logger != nil, true)
+		return md, nil
 	},
 }
 
@@ -83,7 +97,7 @@ func compareOperationMaps(got, want map[string][]string) bool {
 func TestParseConfig(t *testing.T) {
 	ctx := context.Background()
 
-	system, err := devices.ParseSystemConfig(ctx, []byte(simple_spec))
+	system, err := devices.ParseSystemConfig(ctx, []byte(simpleSpec))
 	if err != nil {
 		t.Fatalf("failed to parse system config: %v", err)
 	}
@@ -99,10 +113,16 @@ func TestParseConfig(t *testing.T) {
 		"disable": {"off", "command"}}); !compareOperationMaps(got, want) {
 		t.Errorf("got %v, want %v", got, want)
 	}
+
+	if got, want := ctrls["ct"].Config().RetryConfig, (devices.RetryConfig{Timeout: time.Minute * 5, Retries: 1}); !reflect.DeepEqual(got, want) {
+		t.Errorf("got %+v, want %+v", got, want)
+	}
+
 	ccfg.Operations = nil
 
 	if got, want := ccfg, (devices.ControllerConfigCommon{
-		Name: "c", Type: "controller"}); !reflect.DeepEqual(got, want) {
+		Name: "c", Type: "controller",
+		RetryConfig: devices.RetryConfig{Timeout: time.Minute, Retries: 0}}); !reflect.DeepEqual(got, want) {
 		t.Errorf("got %+v, want %+v", got, want)
 	}
 
@@ -116,9 +136,15 @@ func TestParseConfig(t *testing.T) {
 		"on": {"on", "command"}}); !compareOperationMaps(got, want) {
 		t.Errorf("got %v, want %v", got, want)
 	}
+
+	if got, want := devs["e"].Config().RetryConfig, (devices.RetryConfig{Timeout: time.Minute * 5, Retries: 3}); !reflect.DeepEqual(got, want) {
+		t.Errorf("got %+v, want %+v", got, want)
+	}
+
 	dcfg.Operations = nil
 	if got, want := dcfg, (devices.DeviceConfigCommon{
-		Name: "d", Controller: "c", Type: "device"}); !reflect.DeepEqual(got, want) {
+		Name: "d", ControllerName: "c", Type: "device",
+		RetryConfig: devices.RetryConfig{Timeout: time.Minute, Retries: 0}}); !reflect.DeepEqual(got, want) {
 		t.Errorf("got %+v, want %+v", got, want)
 	}
 
@@ -129,24 +155,25 @@ func TestParseConfig(t *testing.T) {
 }
 
 func TestBuildDevices(t *testing.T) {
+	ctx := context.Background()
 
 	var ctrls []devices.ControllerConfig
 	var devs []devices.DeviceConfig
 
-	if err := yaml.Unmarshal([]byte(controllers_spec), &ctrls); err != nil {
+	if err := yaml.Unmarshal([]byte(controllersSpec), &ctrls); err != nil {
 		t.Fatalf("failed to unmarshal controllers: %v", err)
 	}
-	if err := yaml.Unmarshal([]byte(devices_spec), &devs); err != nil {
+	if err := yaml.Unmarshal([]byte(devicesSpec), &devs); err != nil {
 		t.Fatalf("failed to unmarshal devices: %v", err)
 	}
 
-	controllers, devices, err := devices.CreateSystem(ctrls, devs)
+	controllers, devices, err := devices.CreateSystem(ctx, ctrls, devs)
 
 	if err != nil {
 		t.Fatalf("failed to build devices: %v", err)
 	}
 
-	if got, want := len(controllers), 1; got != want {
+	if got, want := len(controllers), 2; got != want {
 		t.Errorf("got %d, want %d", got, want)
 	}
 	if got, want := len(devices), 2; got != want {
@@ -162,11 +189,11 @@ func TestBuildDevices(t *testing.T) {
 		}
 	}
 
-	if got, want := devices["d"].(*testutil.MockDevice).Detail.Detail, "my-device-d"; got != want {
+	if got, want := devices["d"].(*testutil.MockDevice).DeviceConfigCustom.Detail, "my-device-d"; got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
 
-	if got, want := devices["e"].(*testutil.MockDevice).Detail.Detail, "my-device-e"; got != want {
+	if got, want := devices["e"].(*testutil.MockDevice).DeviceConfigCustom.Detail, "my-device-e"; got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
 
@@ -263,7 +290,7 @@ func TestParsePlaceAndZIP(t *testing.T) {
 func TestOperations(t *testing.T) {
 
 	ctx := context.Background()
-	system, err := devices.ParseSystemConfig(ctx, []byte(simple_spec))
+	system, err := devices.ParseSystemConfig(ctx, []byte(simpleSpec))
 	if err != nil {
 		t.Fatalf("failed to parse system config: %v", err)
 	}

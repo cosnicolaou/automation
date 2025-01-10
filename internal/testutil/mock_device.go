@@ -8,12 +8,10 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/cosnicolaou/automation/devices"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
-	"gopkg.in/yaml.v3"
 )
 
 type DeviceDetail struct {
@@ -21,9 +19,9 @@ type DeviceDetail struct {
 }
 
 type MockDevice struct {
-	devices.DeviceConfigCommon
+	devices.DeviceBase[DeviceDetail]
+
 	controller     devices.Controller
-	Detail         DeviceDetail `yaml:",inline"`
 	operations     map[string]devices.Operation
 	operationsHelp map[string]string
 	conditions     map[string]devices.Condition
@@ -55,26 +53,10 @@ func (d *MockDevice) SetOutput(logger bool, writer bool) {
 }
 
 func (d *MockDevice) AddCondition(name string, outcome bool) {
-	d.conditions[name] = func(ctx context.Context, opts devices.OperationArgs) (bool, error) {
+	d.conditions[name] = func(context.Context, devices.OperationArgs) (bool, error) {
 		return outcome, nil
 	}
 	d.conditionsHelp[name] = fmt.Sprintf("%s condition: outcome %v", name, outcome)
-}
-
-func (d *MockDevice) SetConfig(cfg devices.DeviceConfigCommon) {
-	d.DeviceConfigCommon = cfg
-}
-
-func (d MockDevice) Config() devices.DeviceConfigCommon {
-	return d.DeviceConfigCommon
-}
-
-func (d *MockDevice) CustomConfig() any {
-	return d.Detail
-}
-
-func (d *MockDevice) UnmarshalYAML(node *yaml.Node) error {
-	return node.Decode(&d.Detail)
 }
 
 func (d *MockDevice) Implementation() any {
@@ -83,10 +65,6 @@ func (d *MockDevice) Implementation() any {
 
 func (d *MockDevice) SetController(c devices.Controller) {
 	d.controller = c
-}
-
-func (d *MockDevice) ControlledByName() string {
-	return d.Controller
 }
 
 func (d *MockDevice) ControlledBy() devices.Controller {
@@ -107,10 +85,6 @@ func (d *MockDevice) Conditions() map[string]devices.Condition {
 
 func (d *MockDevice) ConditionsHelp() map[string]string {
 	return d.conditionsHelp
-}
-
-func (d *MockDevice) Timeout() time.Duration {
-	return time.Second
 }
 
 func (d *MockDevice) genericOp(_ context.Context, opName string, opts devices.OperationArgs) error {

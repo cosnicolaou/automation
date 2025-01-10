@@ -24,7 +24,7 @@ type sessionMgr struct {
 	timeCh  chan time.Time
 }
 
-func (sm *sessionMgr) Connect(ctx context.Context, reset netutil.IdleReset) (*session, error) {
+func (sm *sessionMgr) Connect(context.Context, netutil.IdleReset) (*session, error) {
 	sm.eventCh <- "connect"
 	return &session{}, nil
 }
@@ -48,7 +48,7 @@ func TestIdleManager(t *testing.T) {
 	eventCh := make(chan string, 1)
 	sm := &sessionMgr{eventCh: eventCh}
 
-	mc := netutil.NewIdleManager(ctx, sm, idle)
+	mc := netutil.NewIdleManager(sm, idle)
 	_, err := mc.Connection(ctx)
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
@@ -59,7 +59,9 @@ func TestIdleManager(t *testing.T) {
 	if got, want := <-eventCh, "disconnect"; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
-	mc.Stop(ctx, time.Second)
+	if err := mc.Stop(ctx, time.Second); err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
 }
 
 func TestIdleManagerReset(t *testing.T) {
@@ -72,7 +74,7 @@ func TestIdleManagerReset(t *testing.T) {
 	timeCh := make(chan time.Time, 1000)
 	sm := &sessionMgr{eventCh: eventCh, timeCh: timeCh}
 
-	mc := netutil.NewIdleManager(ctx, sm, idle)
+	mc := netutil.NewIdleManager(sm, idle)
 
 	numResets := 500
 	resetDelay := time.Millisecond
@@ -80,7 +82,9 @@ func TestIdleManagerReset(t *testing.T) {
 		for i := 0; i < numResets; i++ {
 			time.Sleep(resetDelay)
 			idle.Reset()
-			mc.Connection(ctx)
+			if _, err := mc.Connection(ctx); err != nil {
+				panic(err)
+			}
 		}
 	}()
 	start := time.Now()

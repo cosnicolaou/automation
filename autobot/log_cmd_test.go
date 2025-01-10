@@ -17,6 +17,48 @@ import (
 	"github.com/cosnicolaou/automation/internal"
 )
 
+func countEvents(t *testing.T, logfile string) (counts map[string]map[string]int, dates map[string][]datetime.CalendarDate) {
+	f, err := os.Open(logfile)
+	if err != nil {
+		t.Fatalf("failed to open log file: %v", err)
+	}
+	defer f.Close()
+	sc := internal.NewLogScanner(f)
+	counts = map[string]map[string]int{}
+	counts["aborted"] = map[string]int{}
+	dates = map[string][]datetime.CalendarDate{}
+	for le := range sc.Entries() {
+		if _, ok := counts[le.Msg]; !ok {
+			counts[le.Msg] = map[string]int{}
+		}
+		switch le.Msg {
+		case "year-end", "pending":
+			counts[le.Msg][le.Schedule]++
+		case "completed":
+			counts[le.Msg][le.Schedule]++
+			if !le.PreCondResult {
+				counts["aborted"][le.Schedule]++
+			}
+		case "day":
+			counts[le.Msg][le.Schedule]++
+			dates[le.Schedule] = append(dates[le.Schedule], le.Date)
+		}
+		if le.Msg == "completed" && !le.Aborted() {
+			if _, ok := counts[le.Op]; !ok {
+				counts[le.Op] = map[string]int{}
+			}
+			switch le.Op {
+			case "on", "off", "another":
+				counts[le.Op][le.Schedule]++
+			}
+		}
+	}
+	if err := sc.Err(); err != nil {
+		t.Fatalf("failed to read log file: %v", err)
+	}
+	return counts, dates
+}
+
 func TestSimulateAndLogs(t *testing.T) {
 	ctx := context.Background()
 	tmpFile := filepath.Join(t.TempDir(), "simulate.log")
@@ -35,52 +77,10 @@ func TestSimulateAndLogs(t *testing.T) {
 	if err := schedule.Simulate(ctx, fl, []string{}); err != nil {
 		t.Fatalf("failed to display config: %v", err)
 	}
-	f, err := os.Open(tmpFile)
-	if err != nil {
-		t.Fatalf("failed to open log file: %v", err)
-	}
-	defer f.Close()
-	sc := internal.NewLogScanner(f)
-	nYearEnd := map[string]int{}
-	nCompleted := map[string]int{}
-	nPending := map[string]int{}
-	nOn := map[string]int{}
-	nOff := map[string]int{}
-	nAnother := map[string]int{}
-	nDays := map[string]int{}
-	nAborted := map[string]int{}
-	dates := map[string][]datetime.CalendarDate{}
-	for le := range sc.Entries() {
-		switch le.Msg {
-		case "year-end":
-			nYearEnd[le.Schedule]++
-		case "pending":
-			nPending[le.Schedule]++
-		case "completed":
-			nCompleted[le.Schedule]++
-			if !le.PreCondResult {
-				nAborted[le.Schedule]++
-			}
-		case "day":
-			nDays[le.Schedule]++
-			dates[le.Schedule] = append(dates[le.Schedule], le.Date)
-		}
-		if le.Msg == "completed" && !le.Aborted() {
-			switch le.Op {
-			case "on":
-				nOn[le.Schedule]++
-			case "off":
-				nOff[le.Schedule]++
-			case "another":
-				nAnother[le.Schedule]++
-			}
-		}
-	}
-	if err := sc.Err(); err != nil {
-		t.Fatalf("failed to read log file: %v", err)
-	}
 
-	if got, want := nYearEnd, (map[string]int{
+	counts, dates := countEvents(t, tmpFile)
+
+	if got, want := counts["year-end"], (map[string]int{
 		"simple":                 2,
 		"precondition-sunny":     2,
 		"precondition-not-sunny": 2,
@@ -104,29 +104,29 @@ func TestSimulateAndLogs(t *testing.T) {
 		"precondition-sunny":     daysInSchedule,
 		"other-device":           31,
 	}
-	if got, want := nPending, allOps; !maps.Equal(got, want) {
+	if got, want := counts["pending"], allOps; !maps.Equal(got, want) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 
-	if got, want := nCompleted, allOps; !maps.Equal(got, want) {
+	if got, want := counts["completed"], allOps; !maps.Equal(got, want) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 
-	if got, want := nAborted, (map[string]int{
+	if got, want := counts["aborted"], (map[string]int{
 		"precondition-not-sunny": daysInSchedule * 3,
 	}); !maps.Equal(got, want) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 
-	if got, want := nOn, allOnOffOps; !maps.Equal(got, want) {
+	if got, want := counts["on"], allOnOffOps; !maps.Equal(got, want) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 
-	if got, want := nOff, allOnOffOps; !maps.Equal(got, want) {
+	if got, want := counts["off"], allOnOffOps; !maps.Equal(got, want) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 
-	if got, want := nAnother, (map[string]int{
+	if got, want := counts["another"], (map[string]int{
 		"simple":             daysInSchedule * 3,
 		"precondition-sunny": daysInSchedule * 3,
 	}); !maps.Equal(got, want) {
@@ -153,7 +153,10 @@ func TestSimulateAndLogs(t *testing.T) {
 			nextDate++
 		}
 	}
+
 	testSummaries(ctx, t, tmpFile)
+	testSummaryFlags(ctx, t, tmpFile)
+
 }
 
 func testSummaries(ctx context.Context, t *testing.T, logfile string) {
@@ -203,10 +206,14 @@ func testSummaries(ctx context.Context, t *testing.T, logfile string) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 
-	// one op per schedule will be pending at the end of the day.
-	//if got, want := strings.Count(summary, "pending:"), daysInSchedule*3; got != want {
-	//	t.Errorf("got %v, want %v", got, want)
-	//}
+}
+
+func testSummaryFlags(ctx context.Context, t *testing.T, logfile string) {
+
+	daysInSchedule := (31 + daysInSummer(2025))
+
+	var out strings.Builder
+	lc := Log{out: &out}
 
 	// Restrict to one device
 	if err := lc.Status(ctx, &LogStatusFlags{
@@ -215,7 +222,7 @@ func testSummaries(ctx context.Context, t *testing.T, logfile string) {
 	}, []string{logfile}); err != nil {
 		t.Fatalf("failed to display log: %v", err)
 	}
-	summary = out.String()
+	summary := out.String()
 	out.Reset()
 
 	if got, want := strings.Count(summary, "completed:"), 31*2; got != want {

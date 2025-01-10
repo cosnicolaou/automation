@@ -104,16 +104,16 @@ func (s *errorSession) Err() error {
 	return s.err
 }
 
-func (s *errorSession) Send(ctx context.Context, buf []byte) {
+func (s *errorSession) Send(context.Context, []byte) {
 }
 
-func (s *errorSession) SendSensitive(ctx context.Context, buf []byte) {
+func (s *errorSession) SendSensitive(context.Context, []byte) {
 }
 
-func (s *errorSession) ReadUntil(ctx context.Context, expected ...string) []byte {
+func (s *errorSession) ReadUntil(context.Context, ...string) []byte {
 	return nil
 }
 
-func (s *errorSession) Close(ctx context.Context) error {
+func (s *errorSession) Close(context.Context) error {
 	return s.err
 }

@@ -36,6 +36,8 @@ type OperationArgs struct {
 type Controller interface {
 	SetConfig(ControllerConfigCommon)
 	Config() ControllerConfigCommon
+	SetSystem(System)
+	System() System
 	CustomConfig() any
 	UnmarshalYAML(*yaml.Node) error
 	Operations() map[string]Operation
@@ -62,7 +64,6 @@ type Device interface {
 	OperationsHelp() map[string]string
 	Conditions() map[string]Condition
 	ConditionsHelp() map[string]string
-	Timeout() time.Duration
 }
 
 type ZIPCodeLookup interface {
@@ -144,7 +145,7 @@ type SupportedControllers map[string]func(typ string, opts Options) (Controller,
 
 type SupportedDevices map[string]func(typ string, opts Options) (Device, error)
 
-func CreateSystem(controllerCfg []ControllerConfig, deviceCfg []DeviceConfig, opts ...Option) (map[string]Controller, map[string]Device, error) {
+func CreateSystem(_ context.Context, controllerCfg []ControllerConfig, deviceCfg []DeviceConfig, opts ...Option) (map[string]Controller, map[string]Device, error) {
 	var options Options
 	for _, opt := range opts {
 		opt(&options)
@@ -226,6 +227,7 @@ func CreateDevices(config []DeviceConfig, options Options) (map[string]Device, e
 type ControllerBase[ConfigT any] struct {
 	ControllerConfigCommon
 	ControllerConfigCustom ConfigT
+	system                 System
 }
 
 func (cb *ControllerBase[ConfigT]) SetConfig(c ControllerConfigCommon) {
@@ -236,8 +238,16 @@ func (cb *ControllerBase[ConfigT]) Config() ControllerConfigCommon {
 	return cb.ControllerConfigCommon
 }
 
+func (cb *ControllerBase[ConfigT]) SetSystem(s System) {
+	cb.system = s
+}
+
+func (cb *ControllerBase[ConfigT]) System() System {
+	return cb.system
+}
+
 func (cb *ControllerBase[ConfigT]) CustomConfig() any {
-	return cb.CustomConfig
+	return cb.ControllerConfigCustom
 }
 
 func (cb *ControllerBase[ConfigT]) UnmarshalYAML(node *yaml.Node) error {
@@ -269,7 +279,7 @@ func (db *DeviceBase[ConfigT]) Config() DeviceConfigCommon {
 	return db.DeviceConfigCommon
 }
 
-func (db *DeviceBase[ConfigT]) CustomConfig() ConfigT {
+func (db *DeviceBase[ConfigT]) CustomConfig() any {
 	return db.DeviceConfigCustom
 }
 
@@ -279,6 +289,14 @@ func (db *DeviceBase[ConfigT]) UnmarshalYAML(node *yaml.Node) error {
 
 func (db *DeviceBase[ConfigT]) ControlledByName() string {
 	return db.ControllerName
+}
+
+func (db *DeviceBase[ConfigT]) Operations() map[string]Operation {
+	return map[string]Operation{}
+}
+
+func (db *DeviceBase[ConfigT]) OperationsHelp() map[string]string {
+	return map[string]string{}
 }
 
 func (db *DeviceBase[ConfigT]) Conditions() map[string]Condition {

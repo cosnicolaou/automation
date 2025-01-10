@@ -75,7 +75,7 @@ func formatAction(a schedule.ActionSpec[scheduler.Action]) string {
 	return out.String()
 }
 
-func (c *Config) Display(ctx context.Context, flags any, args []string) error {
+func (c *Config) Display(ctx context.Context, flags any, _ []string) error {
 	fv := flags.(*ConfigFlags)
 
 	ctx, system, err := loadSystem(ctx, &fv.ConfigFileFlags)
@@ -132,7 +132,7 @@ func opNames[Map ~map[string]V, V any](m Map) []string {
 	return keys
 }
 
-func (c *Config) Operations(ctx context.Context, flags any, args []string) error {
+func (c *Config) Operations(ctx context.Context, flags any, _ []string) error {
 
 	fv := flags.(*ConfigFlags)
 	opts := []devices.Option{

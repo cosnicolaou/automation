@@ -46,9 +46,8 @@ func (s *Scheduler) invokeOp(ctx context.Context, action Action, opts devices.Op
 
 func (s *Scheduler) runSingleOp(ctx context.Context, due time.Time, action schedule.Active[Action]) (aborted bool, err error) {
 	op := action.T.Action
-	timeout := op.Device.Timeout()
-
-	ctx, cancel := context.WithTimeoutCause(ctx, timeout, ErrOpTimeout)
+	// TODO(cnicolaou): implement retries.
+	ctx, cancel := context.WithTimeoutCause(ctx, op.Device.Config().Timeout, ErrOpTimeout)
 	defer cancel()
 	opts := devices.OperationArgs{
 		Due:    due,
@@ -72,14 +71,6 @@ func (s *Scheduler) runSingleOp(ctx context.Context, due time.Time, action sched
 	}
 	return preconditionAbort, err
 }
-
-/*
-var invocationID int64
-
-func nextInvocationID() int64 {
-	return atomic.AddInt64(&invocationID, 1)
-}
-*/
 
 func (s *Scheduler) newStatusRecord(delay time.Duration, a schedule.Active[Action]) *internal.StatusRecord {
 	rec := &internal.StatusRecord{
@@ -218,14 +209,6 @@ func (s *Scheduler) ScheduledYearEnd(cd datetime.CalendarDate) iter.Seq[schedule
 
 func (s *Scheduler) Place() datetime.Place {
 	return s.place
-}
-
-func actionAndDeviceNames(active schedule.Scheduled[Action]) (actionNames, deviceNames []string) {
-	for _, a := range active.Specs {
-		actionNames = append(actionNames, a.T.Name)
-		deviceNames = append(deviceNames, a.T.DeviceName)
-	}
-	return actionNames, deviceNames
 }
 
 type Scheduler struct {

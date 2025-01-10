@@ -18,16 +18,25 @@ var (
 	AvailableDevices     = SupportedDevices{}
 )
 
-type parameters struct {
-	Parameters []string `yaml:",flow"`
+// RetryConfig represents the configuration for retrying an operation.
+// Timeout is the initial time to wait for a successful operation and
+// Retries is the number of exponential backoff steps to take before
+// giving up, zero means no retries, one means retry once, etc.
+type RetryConfig struct {
+	Timeout time.Duration `yaml:"timeout"` // the initial time to wait for a successful operation
+	Retries int           `yaml:"retries"` // the number of exponential backoff steps to take before giving up, zero means try once, one means retry once, etc.
 }
 
+// ControllerConfigCommon represents the common configuration for a controller.
 type ControllerConfigCommon struct {
-	Name       string              `yaml:"name"`
-	Type       string              `yaml:"type"`
-	Operations map[string][]string `yaml:"operations"`
+	Name        string `yaml:"name"`
+	Type        string `yaml:"type"`
+	RetryConfig `yaml:",inline"`
+	Operations  map[string][]string `yaml:"operations"`
 }
 
+// ControllerConfig represents the configuration for a controller allowing
+// for delayed unmarshalling of the custom config field.
 type ControllerConfig struct {
 	ControllerConfigCommon
 	Config yaml.Node `yaml:",inline"`
@@ -37,17 +46,24 @@ func (lp *ControllerConfig) UnmarshalYAML(node *yaml.Node) error {
 	if err := node.Decode(&lp.ControllerConfigCommon); err != nil {
 		return err
 	}
+	if lp.ControllerConfigCommon.Timeout == 0 {
+		lp.ControllerConfigCommon.Timeout = time.Minute
+	}
 	return node.Decode(&lp.Config)
 }
 
+// DeviceConfigCommon represents the common configuration for a device.
 type DeviceConfigCommon struct {
 	Name           string              `yaml:"name"`
 	Type           string              `yaml:"type"`
 	ControllerName string              `yaml:"controller"`
 	Operations     map[string][]string `yaml:"operations"`
 	Conditions     map[string][]string `yaml:"conditions"`
+	RetryConfig    `yaml:",inline"`
 }
 
+// DeviceConfig represents the configuration for a device allowing
+// for delayed unmarshalling of the custom config field.
 type DeviceConfig struct {
 	DeviceConfigCommon
 	Config yaml.Node `yaml:",inline"`
@@ -56,6 +72,9 @@ type DeviceConfig struct {
 func (lp *DeviceConfig) UnmarshalYAML(node *yaml.Node) error {
 	if err := node.Decode(&lp.DeviceConfigCommon); err != nil {
 		return err
+	}
+	if lp.DeviceConfigCommon.Timeout == 0 {
+		lp.DeviceConfigCommon.Timeout = time.Minute
 	}
 	return node.Decode(&lp.Config)
 }
@@ -107,18 +126,6 @@ type System struct {
 	Location    Location
 	Controllers map[string]Controller
 	Devices     map[string]Device
-}
-
-func configuredAndExists(name string, configured map[string][]string, operations map[string]Operation) (Operation, bool) {
-	if ops, ok := configured[name]; ok {
-		for _, op := range ops {
-			if fn, ok := operations[op]; ok {
-				return fn, true
-			}
-		}
-	}
-	return nil, false
-
 }
 
 func (s System) ControllerConfigs(name string) (ControllerConfig, Controller, bool) {
@@ -205,7 +212,7 @@ func ParseSystemConfigFile(ctx context.Context, cfgFile string, opts ...Option) 
 	if err := cmdyaml.ParseConfigFile(ctx, cfgFile, &cfg); err != nil {
 		return System{}, err
 	}
-	return cfg.CreateSystem(opts...)
+	return cfg.CreateSystem(ctx, opts...)
 }
 
 // ParseSystemConfig parses the supplied configuration data and returns
@@ -215,7 +222,7 @@ func ParseSystemConfig(ctx context.Context, cfgData []byte, opts ...Option) (Sys
 	if err := yaml.Unmarshal(cfgData, &cfg); err != nil {
 		return System{}, err
 	}
-	return cfg.CreateSystem(opts...)
+	return cfg.CreateSystem(ctx, opts...)
 }
 
 func buildLocation(cfg LocationConfig, opts []Option) (Location, error) {
@@ -273,19 +280,23 @@ func buildLocation(cfg LocationConfig, opts []Option) (Location, error) {
 // The WithTimeLocation, WithLatLong and WithZIPCode options can be used to
 // override the location specified in the configuration. The WithZIPCodeLookup
 // option must be supplied to enable the lookup of lat/long from a zip code.
-func (cfg SystemConfig) CreateSystem(opts ...Option) (System, error) {
+func (cfg SystemConfig) CreateSystem(ctx context.Context, opts ...Option) (System, error) {
 	loc, err := buildLocation(cfg.Location, opts)
 	if err != nil {
 		return System{}, err
 	}
-	ctrl, dev, err := CreateSystem(cfg.Controllers, cfg.Devices, opts...)
+	ctrl, dev, err := CreateSystem(ctx, cfg.Controllers, cfg.Devices, opts...)
 	if err != nil {
 		return System{}, err
 	}
-	return System{
+	sys := System{
 		Config:      cfg,
 		Location:    loc,
 		Controllers: ctrl,
 		Devices:     dev,
-	}, nil
+	}
+	for _, c := range ctrl {
+		c.SetSystem(sys)
+	}
+	return sys, nil
 }

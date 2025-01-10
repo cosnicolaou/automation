@@ -33,16 +33,6 @@ var (
 	}
 )
 
-type now struct{}
-
-func (now) Evaluate(_ datetime.CalendarDate, loc *time.Location) datetime.TimeOfDay {
-	return datetime.TimeOfDayFromTime(time.Now().In(loc))
-}
-
-func (now) Name() string {
-	return "now"
-}
-
 // ParseDateRangesDynamic parses a list of date ranges that may
 // contain dynamic date ranges. Valid dynamic date ranges are
 // definmed by AnnualDynamic.

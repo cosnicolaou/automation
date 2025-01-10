@@ -47,7 +47,7 @@ func (d *IdleTimer) Reset() {
 // Wait waits for the idle to expire, for the channel to be closed or the
 // context to be canceled. The close function is called when the idle timer
 // expires or the context canceled, but not when the channel is closed.
-func (d *IdleTimer) Wait(ctx context.Context, expired func(context.Context) error) {
+func (d *IdleTimer) Wait(ctx context.Context, expired func(context.Context)) {
 	d.mu.Lock()
 	d.expired = false
 	d.ticker = time.NewTicker(d.idleTime)

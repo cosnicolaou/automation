@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/cosnicolaou/automation/devices"
-	"gopkg.in/yaml.v3"
 )
 
 type ControllerDetail struct {
@@ -19,32 +18,15 @@ type ControllerDetail struct {
 }
 
 type MockController struct {
-	devices.ControllerConfigCommon
-	Detail ControllerDetail `yaml:",inline"`
+	devices.ControllerBase[ControllerDetail]
 }
 
-func (c *MockController) SetConfig(cfg devices.ControllerConfigCommon) {
-	c.ControllerConfigCommon = cfg
-}
-
-func (c MockController) Config() devices.ControllerConfigCommon {
-	return c.ControllerConfigCommon
-}
-
-func (c *MockController) CustomConfig() any {
-	return c.Detail
-}
-
-func (c *MockController) UnmarshalYAML(node *yaml.Node) error {
-	return node.Decode(&c.Detail)
-}
-
-func (c *MockController) Enable(ctx context.Context, opts devices.OperationArgs) error {
+func (c *MockController) Enable(_ context.Context, opts devices.OperationArgs) error {
 	fmt.Fprintf(opts.Writer, "controller[%s].Enable: [%d] %v\n", c.Name, len(opts.Args), strings.Join(opts.Args, "--"))
 	return nil
 }
 
-func (c *MockController) Disable(ctx context.Context, opts devices.OperationArgs) error {
+func (c *MockController) Disable(_ context.Context, opts devices.OperationArgs) error {
 	fmt.Fprintf(opts.Writer, "controller[%s].Disable: [%d] %v\n", c.Name, len(opts.Args), strings.Join(opts.Args, "--"))
 	return nil
 }

@@ -99,7 +99,7 @@ func (sr *statusRecoder) print(out io.Writer) {
 			}
 		}
 		o.WriteRune('\n')
-		out.Write([]byte(o.String()))
+		_, _ = out.Write([]byte(o.String()))
 	}
 	banner = false
 	for rec := range sr.Pending() {

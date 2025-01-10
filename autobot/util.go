@@ -93,7 +93,7 @@ func loadZIPDatabaseDir(db *zipcode.DB, lfs fs.FS) error {
 		if filepath.Ext(path) == ".zip" {
 			fmt.Printf("loading zip file: %v\n", path)
 			if err := internal.LoadFromZIPArchive(db, lfs, path); err != nil {
-				return fmt.Errorf("failed to load database file: %v, %v\n", path, err)
+				return fmt.Errorf("failed to load database file: %v, %v", path, err)
 			}
 			return nil
 		}
@@ -103,7 +103,7 @@ func loadZIPDatabaseDir(db *zipcode.DB, lfs fs.FS) error {
 			return err
 		}
 		if err := db.Load(data); err != nil {
-			return fmt.Errorf("failed to load database file: %v, %v\n", path, err)
+			return fmt.Errorf("failed to load database file: %v, %v", path, err)
 		}
 		return nil
 	})
@@ -114,13 +114,13 @@ func loadZIPDatabase(dbdir string) (zipLookup, error) {
 	if len(dbdir) == 0 {
 		var lfs fs.FS = USZipCodes
 		if err := internal.LoadFromZIPArchive(db, lfs, "US.zip"); err != nil {
-			return zipLookup{}, fmt.Errorf("failed to load embedded US zipcode database: %v\n", err)
+			return zipLookup{}, fmt.Errorf("failed to load embedded US zipcode database: %v", err)
 		}
 		return zipLookup{DB: db}, nil
 	}
 	lfs := os.DirFS(dbdir)
 	if err := loadZIPDatabaseDir(db, lfs); err != nil {
-		return zipLookup{}, fmt.Errorf("failed to load zipcode database from directory %v: %v\n", dbdir, err)
+		return zipLookup{}, fmt.Errorf("failed to load zipcode database from directory %v: %v", dbdir, err)
 	}
 	return zipLookup{DB: db}, nil
 }

@@ -63,7 +63,7 @@ func (s *Schedule) loadFiles(ctx context.Context, fv *ConfigFileFlags, deviceOpt
 	return ctx, nil
 }
 
-func (s *Schedule) Run(ctx context.Context, flags any, args []string) error {
+func (s *Schedule) Run(ctx context.Context, flags any, _ []string) error {
 	fv := flags.(*ScheduleFlags)
 	var start datetime.CalendarDate
 	if sd := fv.StartDate; sd != "" {
@@ -107,7 +107,7 @@ func (s *Schedule) Run(ctx context.Context, flags any, args []string) error {
 
 }
 
-func (s *Schedule) Simulate(ctx context.Context, flags any, args []string) error {
+func (s *Schedule) Simulate(ctx context.Context, flags any, _ []string) error {
 	fv := flags.(*SimulateFlags)
 	var period datetime.CalendarDateRange
 	if err := period.Parse(fv.DateRange); err != nil {

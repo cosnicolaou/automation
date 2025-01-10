@@ -32,7 +32,7 @@ func Dial(ctx context.Context, addr string, version string, timeout time.Duratio
 		ids = append(ids, cs.ID)
 	}
 	cfg := tls.Config{
-		InsecureSkipVerify: true,
+		InsecureSkipVerify: true, //nolint:gosec
 		CipherSuites:       ids,
 	}
 	switch version {
