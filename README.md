@@ -1,3 +1,8 @@
+![linux](https://github.com/cosnicolaou/automation/actions/workflows/linux.yml/badge.svg)
+![macos](https://github.com/cosnicolaou/automation/actions/workflows/macos.yml/badge.svg)
+![windows](https://github.com/cosnicolaou/automation/actions/workflows/windows.yml/badge.svg)
+![CodeQL](https://github.com/cosnicolaou/automation/actions/workflows/codeql.yml/badge.svg)
+
 # automation
 
 This repository contains support for building home automation systems. In
