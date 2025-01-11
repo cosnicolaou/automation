@@ -12,8 +12,8 @@ import (
 
 	"cloudeng.io/cmdutil"
 	"cloudeng.io/cmdutil/subcmd"
-	"gitcom.com/cosnicolaou/elk/elkm1"
 	"github.com/cosnicolaou/automation/devices"
+	"github.com/cosnicolaou/elk/elkm1"
 	"github.com/cosnicolaou/lutron/homeworks"
 	"github.com/cosnicolaou/pentair/screenlogic"
 )
