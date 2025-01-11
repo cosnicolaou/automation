@@ -1,7 +1,10 @@
 cloudeng.io/algo v0.0.0-20241113171112-2102962e1386 h1:y/8IYQHTQb8lK+DLhjxcJE2DeN8xbj1yLHmXgsr2hfE=
 cloudeng.io/algo v0.0.0-20241113171112-2102962e1386/go.mod h1:Jb27copqciuPx3O2G3ZlM6PhcPzF//K2HwsdrRCoDWE=
+cloudeng.io/algo v0.0.0-20241215221655-bd556f44d3de/go.mod h1:Jb27copqciuPx3O2G3ZlM6PhcPzF//K2HwsdrRCoDWE=
 cloudeng.io/cmdutil v0.0.0-20241113171112-2102962e1386 h1:aJobHqW3BgARhAlNsanhk/eU4RICaXV6iXKc8Ot/tt0=
 cloudeng.io/cmdutil v0.0.0-20241113171112-2102962e1386/go.mod h1:VmWWlXqETCbKuEhI4YcP/r5ki7LGCXZqEI+1lIoHY2k=
+cloudeng.io/datetime v0.0.0-20250109190841-16f2cfe4fde2 h1:zqe4LlFBMUZ4Wk5CQUDn6wyFK5NilwUllPacg9ofTt8=
+cloudeng.io/datetime v0.0.0-20250109190841-16f2cfe4fde2/go.mod h1:oC+T0v8O/Dtl7wE9Q+RXfQOjHT+9OlQAjvDbWZncs70=
 cloudeng.io/file v0.0.0-20241013003937-7fc58708a1c1 h1:aAMDb2sRGeJa/5G7gtM4VNENTfbPkoHzBcNZSceYuYU=
 cloudeng.io/file v0.0.0-20241013003937-7fc58708a1c1/go.mod h1:kmcVscnnJO90nqQc4QV4E4bVNjYZTqrHPSu1OAfxFYk=
 cloudeng.io/macos v0.0.0-20241113171112-2102962e1386 h1:uSIzu1HY+cmsYzv9QJAUW66YITmzseMYFsVZpXGrgt4=
