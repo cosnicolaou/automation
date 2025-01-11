@@ -11,7 +11,7 @@ require (
 	cloudeng.io/macos v0.0.0-20241113171112-2102962e1386
 	cloudeng.io/sync v0.0.8
 	github.com/cosnicolaou/elk v0.0.0-20250111213249-e459e1d29acc
-	github.com/cosnicolaou/lutron v0.0.0-20250106184029-eda6775819a0
+	github.com/cosnicolaou/lutron v0.0.0-20250110215656-de834b58ed1a
 	github.com/cosnicolaou/pentair v0.0.0-20241212204956-4f468a766a1f
 	github.com/reiver/go-telnet v0.0.0-20180421082511-9ff0b2ab096e
 	github.com/ziutek/telnet v0.1.0

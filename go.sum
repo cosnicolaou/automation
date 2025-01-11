@@ -23,6 +23,8 @@ github.com/cosnicolaou/elk v0.0.0-20250111213249-e459e1d29acc h1:t2RjNXTj7zTxlEw
 github.com/cosnicolaou/elk v0.0.0-20250111213249-e459e1d29acc/go.mod h1:zY9CWNVUiNxEsv2sS87L1SM8Zs4DKN6uI5nZwoW9qtA=
 github.com/cosnicolaou/lutron v0.0.0-20250106184029-eda6775819a0 h1:ckLDcCgvKw8IOAJGEQ78f/NJybB42NPRAKNzQFWqsi4=
 github.com/cosnicolaou/lutron v0.0.0-20250106184029-eda6775819a0/go.mod h1:xutIBTFTZ4oaLzMIIMKOWXLGZeJ0ah9GYup4ftRpxLY=
+github.com/cosnicolaou/lutron v0.0.0-20250110215656-de834b58ed1a h1:rUHVJvrs9Hfn5EqoWlXULOq+r7BAvIGqMBpVQCLnQbQ=
+github.com/cosnicolaou/lutron v0.0.0-20250110215656-de834b58ed1a/go.mod h1:xutIBTFTZ4oaLzMIIMKOWXLGZeJ0ah9GYup4ftRpxLY=
 github.com/cosnicolaou/pentair v0.0.0-20241212204956-4f468a766a1f h1:XC5lw50USKkKMkaDMUIl9q4Jsfeh90yCmWaDpL1I8Ps=
 github.com/cosnicolaou/pentair v0.0.0-20241212204956-4f468a766a1f/go.mod h1:daCzbxsQlyFkrJhe9s4HmTOzAAmlAHq3VV12Q5KcgBM=
 github.com/keybase/go-keychain v0.0.0-20231219164618-57a3676c3af6 h1:IsMZxCuZqKuao2vNdfD82fjjgPLfyHLpR41Z88viRWs=
