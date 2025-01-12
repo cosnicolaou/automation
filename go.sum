@@ -27,6 +27,8 @@ github.com/cosnicolaou/lutron v0.0.0-20250110215656-de834b58ed1a h1:rUHVJvrs9Hfn
 github.com/cosnicolaou/lutron v0.0.0-20250110215656-de834b58ed1a/go.mod h1:xutIBTFTZ4oaLzMIIMKOWXLGZeJ0ah9GYup4ftRpxLY=
 github.com/cosnicolaou/pentair v0.0.0-20241212204956-4f468a766a1f h1:XC5lw50USKkKMkaDMUIl9q4Jsfeh90yCmWaDpL1I8Ps=
 github.com/cosnicolaou/pentair v0.0.0-20241212204956-4f468a766a1f/go.mod h1:daCzbxsQlyFkrJhe9s4HmTOzAAmlAHq3VV12Q5KcgBM=
+github.com/cosnicolaou/pentair v0.0.0-20250112003004-bff1b81f53ee h1:yorsdO9FbXRFsc28kAL7lGpKqnS6pf44/Z2o1xV+Iak=
+github.com/cosnicolaou/pentair v0.0.0-20250112003004-bff1b81f53ee/go.mod h1:daCzbxsQlyFkrJhe9s4HmTOzAAmlAHq3VV12Q5KcgBM=
 github.com/keybase/go-keychain v0.0.0-20231219164618-57a3676c3af6 h1:IsMZxCuZqKuao2vNdfD82fjjgPLfyHLpR41Z88viRWs=
 github.com/keybase/go-keychain v0.0.0-20231219164618-57a3676c3af6/go.mod h1:3VeWNIJaW+O5xpRQbPp0Ybqu1vJd/pm7s2F473HRrkw=
 github.com/mooncaker816/learnmeeus/v3 v3.0.0-20180601123323-8217f4131761 h1:vYedVmd5TrlJ81C2+/cpTWBB4TNosKI+/ZX+xsVfxmw=
