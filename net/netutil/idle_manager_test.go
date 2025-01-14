@@ -95,6 +95,10 @@ func TestIdleManagerReset(t *testing.T) {
 	time.Sleep(time.Second)
 	if got, want := len(eventCh), 2; got != want {
 		t.Errorf("got %v, want %v", got, want)
+		for e := range eventCh {
+			t.Logf("event: %v", e)
+		}
+		t.FailNow()
 	}
 	if got, want := <-eventCh, "connect"; got != want {
 		t.Errorf("got %v, want %v", got, want)
