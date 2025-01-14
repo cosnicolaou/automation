@@ -219,20 +219,21 @@ func TestParseTZLocation(t *testing.T) {
 		{"", "", gl("Local")},
 		{"Local", "", gl("Local")},
 		{"UTC", "", gl("UTC")},
-		{"UTC", "time_zone: Local", gl("UTC")},
-		{"", "time_zone:", gl("Local")},
-		{"", "time_zone: America/New_York", gl("America/New_York")},
-		{"UTC", "time_zone: America/New_York", gl("UTC")},
+		{"UTC", "time_location: Local", gl("UTC")},
+		{"", "time_location:", gl("Local")},
+		{"", "time_location: America/New_York", gl("America/New_York")},
+		{"UTC", "time_location: America/New_York", gl("UTC")},
 		{"America/New_York", "", gl("America/New_York")},
-		{"America/Los_Angeles", "time_zone: America/New_York", gl("America/Los_Angeles")},
+		{"America/Los_Angeles", "time_location: America/New_York", gl("America/Los_Angeles")},
 	} {
 		spec := tc.cfg
 		loc := gl(tc.arg)
 		system, err := devices.ParseSystemConfig(ctx, []byte(spec), devices.WithTimeLocation(loc))
 		if err != nil {
-			t.Fatalf("failed to parse system config: %v", err)
+			t.Errorf("%v: failed to parse system config: %v", i, err)
+			continue
 		}
-		if got, want := system.Location.TZ.String(), tc.expected.String(); got != want {
+		if got, want := system.Location.TimeLocation.String(), tc.expected.String(); got != want {
 			t.Errorf("%v: got %q, want %q", i, got, want)
 		}
 	}
@@ -255,7 +256,7 @@ func TestParsePlaceAndZIP(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to parse system config: %v", err)
 	}
-	if got, want := system.Location, (devices.Location{ZIPCode: "94102", Place: datetime.Place{TZ: time.Local, Latitude: 37.7749, Longitude: 122.4194}}); !reflect.DeepEqual(got, want) {
+	if got, want := system.Location, (devices.Location{ZIPCode: "94102", Place: datetime.Place{TimeLocation: time.Local, Latitude: 37.7749, Longitude: 122.4194}}); !reflect.DeepEqual(got, want) {
 		t.Errorf("got %+v, want %+v", got, want)
 	}
 
@@ -263,7 +264,7 @@ func TestParsePlaceAndZIP(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to parse system config: %v", err)
 	}
-	if got, want := system.Location, (devices.Location{ZIPCode: "12345", Place: datetime.Place{TZ: time.Local, Latitude: 23, Longitude: 43}}); !reflect.DeepEqual(got, want) {
+	if got, want := system.Location, (devices.Location{ZIPCode: "12345", Place: datetime.Place{TimeLocation: time.Local, Latitude: 23, Longitude: 43}}); !reflect.DeepEqual(got, want) {
 		t.Errorf("got %+v, want %+v", got, want)
 	}
 
@@ -274,7 +275,7 @@ func TestParsePlaceAndZIP(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to parse system config: %v", err)
 	}
-	if got, want := system.Location, (devices.Location{ZIPCode: "12345", Place: datetime.Place{TZ: time.Local, Latitude: 100, Longitude: -100}}); !reflect.DeepEqual(got, want) {
+	if got, want := system.Location, (devices.Location{ZIPCode: "12345", Place: datetime.Place{TimeLocation: time.Local, Latitude: 100, Longitude: -100}}); !reflect.DeepEqual(got, want) {
 		t.Errorf("got %+v, want %+v", got, want)
 	}
 
@@ -282,7 +283,7 @@ func TestParsePlaceAndZIP(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to parse system config: %v", err)
 	}
-	if got, want := system.Location, (devices.Location{ZIPCode: "94102", Place: datetime.Place{TZ: time.Local, Latitude: 200, Longitude: -200}}); !reflect.DeepEqual(got, want) {
+	if got, want := system.Location, (devices.Location{ZIPCode: "94102", Place: datetime.Place{TimeLocation: time.Local, Latitude: 200, Longitude: -200}}); !reflect.DeepEqual(got, want) {
 		t.Errorf("got %+v, want %+v", got, want)
 	}
 }

@@ -101,7 +101,7 @@ func (s *Schedule) Run(ctx context.Context, flags any, _ []string) error {
 		return fmt.Errorf("latitude and longitude must be specified either directly or via a zip code")
 	}
 
-	logger.Info("starting schedules", "start", start.String(), "tz", s.system.Location.TZ.String(), "zip", s.system.Location.ZIPCode, "latitude", s.system.Location.Latitude, "longitude", s.system.Location.Longitude)
+	logger.Info("starting schedules", "start", start.String(), "loc", s.system.Location.TimeLocation.String(), "zip", s.system.Location.ZIPCode, "latitude", s.system.Location.Latitude, "longitude", s.system.Location.Longitude)
 
 	return scheduler.RunSchedulers(ctx, s.schedules, s.system, start, schedulerOpts...)
 
@@ -141,7 +141,7 @@ func (s *Schedule) Simulate(ctx context.Context, flags any, _ []string) error {
 		return fmt.Errorf("latitude and longitude must be specified either directly or via a zip code")
 	}
 
-	logger.Info("starting simulated schedules", "period", period.String(), "tz", s.system.Location.TZ.String(), "zip", s.system.Location.ZIPCode, "latitude", s.system.Location.Latitude, "longitude", s.system.Location.Longitude)
+	logger.Info("starting simulated schedules", "period", period.String(), "loc", s.system.Location.TimeLocation.String(), "zip", s.system.Location.ZIPCode, "latitude", s.system.Location.Latitude, "longitude", s.system.Location.Longitude)
 
 	return scheduler.RunSimulation(ctx, s.schedules, s.system, period, schedulerOpts...)
 

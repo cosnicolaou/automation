@@ -104,12 +104,8 @@ func (s *Scheduler) completed(rec *internal.StatusRecord, precondition bool, err
 func (s *Scheduler) RunDay(ctx context.Context, place datetime.Place, active schedule.Scheduled[Action]) error {
 	for active := range active.Active(place) {
 		dueAt := active.When
-		dueAtStr := dueAt.Format(time.RFC3339)
 		started := s.timeSource.NowIn(dueAt.Location())
-		startedStr := started.Format(time.RFC3339Nano)
 		delay := dueAt.Sub(started)
-		delayStr := delay.String()
-
 		overdue := delay < 0 && -delay > time.Minute
 		id := internal.WritePendingLog(
 			s.logger,
@@ -120,9 +116,9 @@ func (s *Scheduler) RunDay(ctx context.Context, place datetime.Place, active sch
 			active.T.Args,
 			active.T.Precondition.Name,
 			active.T.Precondition.Args,
-			startedStr,
-			dueAtStr,
-			delayStr,
+			started,
+			dueAt,
+			delay,
 		)
 		if overdue {
 			continue
@@ -149,10 +145,10 @@ func (s *Scheduler) RunDay(ctx context.Context, place datetime.Place, active sch
 			active.T.Name,
 			active.T.Precondition.Name,
 			!aborted,
-			startedStr,
-			time.Now().In(dueAt.Location()).Format(time.RFC3339Nano),
-			dueAtStr,
-			delayStr,
+			started,
+			time.Now().In(dueAt.Location()),
+			dueAt,
+			delay,
 		)
 		s.completed(rec, aborted, err)
 	}
@@ -186,8 +182,8 @@ func (s *Scheduler) RunYearEnd(ctx context.Context, cd datetime.CalendarDate) er
 		return err
 	}
 	year := cd.Year()
-	yearEnd := time.Date(year, 12, 31, 23, 59, 59, int(time.Second)-1, s.place.TZ)
-	now := s.timeSource.NowIn(s.place.TZ)
+	yearEnd := time.Date(year, 12, 31, 23, 59, 59, int(time.Second)-1, s.place.TimeLocation)
+	now := s.timeSource.NowIn(s.place.TimeLocation)
 	delay := yearEnd.Sub(now)
 	internal.WriteYearEndLog(s.logger, year, delay)
 	select {

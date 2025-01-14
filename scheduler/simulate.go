@@ -27,7 +27,7 @@ func ticksToYearEnd(scheduler *schedule.AnnualScheduler[Action], year int, place
 			times = append(times, action.When.Add(-delay))
 		}
 	}
-	last := time.Date(year, 12, 31, 23, 59, 59, int(time.Second)-1, place.TZ)
+	last := time.Date(year, 12, 31, 23, 59, 59, int(time.Second)-1, place.TimeLocation)
 	times = append(times, last.Add(-delay))
 	return times
 }

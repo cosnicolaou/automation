@@ -78,7 +78,7 @@ type Options struct {
 	Session       streamconn.Session
 	Devices       SupportedDevices
 	Controllers   SupportedControllers
-	tz            *time.Location
+	loc           *time.Location
 	latitude      float64
 	longitude     float64
 	zipCode       string
@@ -92,9 +92,9 @@ func WithZIPCodeLookup(l ZIPCodeLookup) Option {
 	}
 }
 
-func WithTimeLocation(tz *time.Location) Option {
+func WithTimeLocation(loc *time.Location) Option {
 	return func(o *Options) {
-		o.tz = tz
+		o.loc = loc
 	}
 }
 

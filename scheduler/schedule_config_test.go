@@ -33,7 +33,7 @@ common_ops: &common_ops
   conditions:
     weather:
 
-time_zone: Local
+time_location: Local
 devices:
   - name: device
     type: device
@@ -177,9 +177,13 @@ schedules:
    
   - name: daylight-saving-time
     device: device
-    ranges: # California DST dates for 2024 are March 10 and November 3.
-       - 03/08:03/11
-       - 11/01:11/03
+    # California DST dates for 2024 are March 10 and November 3
+    # London DST dates for 2024 are March 31 and October 27
+    ranges:
+       - 03/09:03/10
+       - 03/31:04/01
+       - 10/26:10/27
+       - 11/02:11/03
     actions:
        on: 2:00
        off: 3:00
@@ -196,23 +200,50 @@ schedules:
 
   - name: repeating
     device: device
+    # California DST dates for 2024 are March 10 and November 3
+    # London DST dates for 2024 are March 31 and October 27
     ranges:
        - 03/09:03/10
+       - 03/30:03/31
+       - 10/26:10/27
        - 11/02:11/03
     actions:
       on: 00:00:01
     actions_detailed:
       - action: off
-        when: 01:00:00
+        when: 00:30:00
+        repeat: 1h
+      - action: another
+        when: 00:13:00
+        repeat: 21m
+
+  - name: repeating-illdefined
+    device: device
+    # California DST dates for 2024 are March 10 and November 3
+    # London DST dates for 2024 are March 31 and October 27
+    ranges:
+       - 03/09:03/10
+       - 03/30:03/31
+       - 10/26:10/27
+       - 11/02:11/03
+    actions:
+      on: 00:00:01
+    actions_detailed:
+      - action: off
+        when: 01:30:00
         repeat: 1h
       - action: another
         when: 01:13:00
-        repeat: 13m
+        repeat: 21m
 
   - name: repeating-bounded
     device: device
+    # California DST dates for 2024 are March 10 and November 3
+    # London DST dates for 2024 are March 31 and October 27
     ranges:
        - 03/09:03/10
+       - 03/31:04/01
+       - 10/26:10/27
        - 11/02:11/03
     actions:
       on: 00:01:30
@@ -271,8 +302,9 @@ var supportedControllers = devices.SupportedControllers{
 	},
 }
 
-func createSystem(t *testing.T) devices.System {
-	sys, err := devices.ParseSystemConfig(context.Background(), []byte(devicesConfig),
+func createSystem(t *testing.T, loc string) devices.System {
+	cfg := strings.ReplaceAll(devicesConfig, "time_location: Local", "time_location: "+loc)
+	sys, err := devices.ParseSystemConfig(context.Background(), []byte(cfg),
 		devices.WithDevices(supportedDevices),
 		devices.WithControllers(supportedControllers))
 	if err != nil {
@@ -291,10 +323,10 @@ func createSchedules(t *testing.T, sys devices.System) scheduler.Schedules {
 }
 
 func TestParseActionsBasic(t *testing.T) {
-	sys := createSystem(t)
+	sys := createSystem(t, "Local")
 	scheds := createSchedules(t, sys)
 
-	if got, want := len(scheds.Schedules), 21; got != want {
+	if got, want := len(scheds.Schedules), 22; got != want {
 		t.Fatalf("got %d schedules, want %d", got, want)
 	}
 
@@ -354,7 +386,7 @@ func TestParseActionsBasic(t *testing.T) {
 }
 
 func TestParseActionsMulti(t *testing.T) {
-	sys := createSystem(t)
+	sys := createSystem(t, "Local")
 	scheds := createSchedules(t, sys)
 
 	multi := scheds.Lookup("multi-time")
@@ -404,8 +436,8 @@ func TestParseActionsMulti(t *testing.T) {
 		t.Fatalf("got %d actions, want %d", got, want)
 	}
 
-	if got, want := repeat.DailyActions[1], (schedule.ActionSpec[scheduler.Action]{Name: "off",
-		Due: datetime.NewTimeOfDay(1, 0, 0),
+	if got, want := repeat.DailyActions[2], (schedule.ActionSpec[scheduler.Action]{Name: "off",
+		Due: datetime.NewTimeOfDay(0, 30, 0),
 		Repeat: schedule.RepeatSpec{
 			Interval: time.Hour,
 		},
@@ -421,7 +453,7 @@ func TestParseActionsMulti(t *testing.T) {
 }
 
 func TestParseActionsPreCond(t *testing.T) {
-	sys := createSystem(t)
+	sys := createSystem(t, "Local")
 	scheds := createSchedules(t, sys)
 
 	precondition := scheds.Lookup("precondition")
@@ -474,7 +506,7 @@ func scheduledActions(t *testing.T, scheds scheduler.Schedules, sys devices.Syst
 	dates := []datetime.Date{}
 	for active := range sr.ScheduledYearEnd(cd) {
 		for _, a := range active.Specs {
-			times = append(times, active.Date.Time(a.Due, sys.Location.TZ))
+			times = append(times, active.Date.Time(a.Due, sys.Location.TimeLocation))
 		}
 		dates = append(dates, active.Date.Date())
 	}
@@ -487,7 +519,7 @@ func scheduledTimes(t *testing.T, scheds scheduler.Schedules, sys devices.System
 }
 
 func TestParseSchedules(t *testing.T) {
-	sys := createSystem(t)
+	sys := createSystem(t, "Local")
 	scheds := createSchedules(t, sys)
 
 	scheduled := scheduledTimes(t, scheds, sys, 2024, "simple")
@@ -533,7 +565,7 @@ func TestParseSchedules(t *testing.T) {
 }
 
 func TestParseOperationOrder(t *testing.T) {
-	sys := createSystem(t)
+	sys := createSystem(t, "Local")
 	scheds := createSchedules(t, sys)
 
 	for _, tc := range []struct {
@@ -586,7 +618,7 @@ func init() {
 }
 
 func TestDynamic(t *testing.T) {
-	sys := createSystem(t)
+	sys := createSystem(t, "Local")
 	scheds := createSchedules(t, sys)
 
 	nd := datetime.NewDate
@@ -689,7 +721,7 @@ schedules:
 
 func TestValidation(t *testing.T) {
 	ctx := context.Background()
-	sys := createSystem(t)
+	sys := createSystem(t, "Local")
 	for _, tc := range []struct {
 		cfg string
 		err string

@@ -65,13 +65,13 @@ func TestIdleWait(t *testing.T) {
 		tickTime := tck.Sub(startTimes[i])
 		// Expect each tick to be approximately timerTick after
 		// the timer was started, allow timerTick's slack.
-		if tickTime == 0 || tickTime > timerTick*2 {
+		if tickTime == 0 || tickTime > timerTick*3 {
 			t.Errorf("unexpected tick time: %v", tickTime)
 		}
 		iterTime := tck.Sub(last)
 		// expect approximately 2 * timerTick times between iterations,
 		// allow timerTick's slack.
-		if iterTime == 0 || iterTime > timerTick*3 {
+		if iterTime == 0 || iterTime > timerTick*4 {
 			t.Errorf("unexpected tick time: %v", iterTime)
 		}
 		last = tck

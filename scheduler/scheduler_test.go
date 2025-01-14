@@ -7,7 +7,6 @@ package scheduler_test
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"slices"
@@ -18,6 +17,7 @@ import (
 	"cloudeng.io/datetime"
 	"cloudeng.io/errors"
 	"github.com/cosnicolaou/automation/devices"
+	"github.com/cosnicolaou/automation/internal"
 	"github.com/cosnicolaou/automation/internal/testutil"
 	"github.com/cosnicolaou/automation/scheduler"
 	"golang.org/x/text/cases"
@@ -68,7 +68,7 @@ type testAction struct {
 // with the times at which they are scheduled to run and the times that the
 // fake time source should be advanced to in order to trigger the execution
 // of the scheduler
-func allActive(s *scheduler.Scheduler, year int) (actions []testAction, activeTimes, timeSourceTicks []time.Time) {
+func allActive(s *scheduler.Scheduler, year int, preDelay time.Duration) (actions []testAction, activeTimes, timeSourceTicks []time.Time) {
 	cd := datetime.NewCalendarDate(year, 1, 1)
 	for scheduled := range s.ScheduledYearEnd(cd) {
 		for active := range scheduled.Active(s.Place()) {
@@ -78,7 +78,7 @@ func allActive(s *scheduler.Scheduler, year int) (actions []testAction, activeTi
 			// to test for DST handling, since time.Add does not handle
 			// DST changes and as such is not the same as calling time.Now()
 			// 10 milliseconds before the scheduled time.
-			timeSourceTicks = append(timeSourceTicks, active.When.Add(-time.Millisecond*10))
+			timeSourceTicks = append(timeSourceTicks, active.When.Add(-preDelay))
 			activeTimes = append(activeTimes, active.When)
 			actions = append(actions, testAction{
 				action: active.T,
@@ -111,32 +111,16 @@ func (r *recorder) Lines() []string {
 	return lines
 }
 
-type logEntry struct {
-	line         string
-	Msg          string    `json:"msg"`
-	Op           string    `json:"op"`
-	Now          time.Time `json:"now"`
-	Started      time.Time `json:"started"`
-	Due          time.Time `json:"due"`
-	NumActions   int       `json:"#actions"`
-	Error        string    `json:"err"`
-	YearEndDelay string    `json:"year-end-delay"`
-	Delay        string    `json:"delay"`
-	Date         string    `json:"date"`
-}
-
-func (r *recorder) Logs(t *testing.T) []logEntry {
-	entries := []logEntry{}
+func (r *recorder) Logs(t *testing.T) []internal.LogEntry {
+	entries := []internal.LogEntry{}
 	for _, l := range bytes.Split(r.out.Bytes(), []byte("\n")) {
 		if len(l) == 0 {
 			continue
 		}
-		var e logEntry
-		if err := json.Unmarshal(l, &e); err != nil {
-			t.Errorf("failed to unmarshal: %v: %v", string(l), err)
-			return nil
+		e, err := internal.ParseLogLine(string(l))
+		if err != nil {
+			t.Errorf("failed to parse: %v: %v", string(l), err)
 		}
-		e.line = string(l)
 		if e.Msg != "completed" && e.Msg != "year-end" && e.Msg != "failed" {
 			continue
 		}
@@ -145,10 +129,10 @@ func (r *recorder) Logs(t *testing.T) []logEntry {
 	return entries
 }
 
-func containsError(logs []logEntry) error {
+func containsError(logs []internal.LogEntry) error {
 	for _, l := range logs {
-		if l.Error != "" {
-			return errors.New(l.Error)
+		if l.Err != nil {
+			return l.Err
 		}
 	}
 	return nil
@@ -158,8 +142,8 @@ func newRecorder() *recorder {
 	return &recorder{out: bytes.NewBuffer(nil)}
 }
 
-func setupSchedules(t *testing.T) (devices.System, scheduler.Schedules) {
-	sys := createSystem(t)
+func setupSchedules(t *testing.T, loc string) (devices.System, scheduler.Schedules) {
+	sys := createSystem(t, loc)
 	spec := createSchedules(t, sys)
 	return sys, spec
 }
@@ -215,13 +199,14 @@ func TestScheduler(t *testing.T) {
 
 	ts := &timesource{ch: make(chan time.Time, 1)}
 	deviceRecorder, logRecorder, opts := newRecordersAndLogger(ts)
-	sys, spec := setupSchedules(t)
+	sys, spec := setupSchedules(t, "Local")
 
 	scheduler := createScheduler(t, sys, spec.Lookup("ranges"), opts...)
 
 	year := 2021
-	all, times, ticks := allActive(scheduler, year)
-	_, ticks = appendYearEndTimesTicks(year, sys.Location.TZ, times, ticks)
+	preDelay := time.Millisecond * 5
+	all, times, ticks := allActive(scheduler, year, preDelay)
+	_, ticks = appendYearEndTimesTicks(year, sys.Location.TimeLocation, times, ticks)
 	runScheduler(ctx, t, scheduler, year, ts, ticks)
 
 	logs := logRecorder.Logs(t)
@@ -244,7 +229,7 @@ func TestScheduler(t *testing.T) {
 		if got, want := logs[i].Due, times[i]; !got.Equal(want) {
 			t.Errorf("got %v, want %v", got, want)
 		}
-		if logs[i].YearEndDelay != "" {
+		if logs[i].YearEndDelay != 0 {
 			t.Errorf("unexpected year end")
 		}
 		op := []string{"another", "on", "off"}[i%3]
@@ -252,7 +237,7 @@ func TestScheduler(t *testing.T) {
 			t.Errorf("got %v, want %v", got, want)
 		}
 	}
-	if logs[len(logs)-1].YearEndDelay == "" {
+	if logs[len(logs)-1].YearEndDelay == 0 {
 		t.Errorf("missing year end delay")
 	}
 
@@ -285,9 +270,9 @@ func TestScheduleRealTime(t *testing.T) {
 	ctx := context.Background()
 	year := time.Now().Year()
 
-	sys, spec := setupSchedules(t)
+	sys, spec := setupSchedules(t, "Local")
 
-	now := time.Now().In(sys.Location.TZ)
+	now := time.Now().In(sys.Location.TimeLocation)
 	today := datetime.DateFromTime(now)
 	sched := spec.Lookup("simple")
 	sched.Dates.Ranges = []datetime.DateRange{datetime.NewDateRange(today, today)}
@@ -305,7 +290,8 @@ func TestScheduleRealTime(t *testing.T) {
 
 	scheduler := createScheduler(t, sys, sched, opts...)
 
-	all, _, _ := allActive(scheduler, year)
+	preDelay := time.Millisecond * 5
+	all, _, _ := allActive(scheduler, year, preDelay)
 	cd := datetime.NewCalendarDate(year, 1, 1)
 
 	var errs errors.M
@@ -352,7 +338,7 @@ func TestTimeout(t *testing.T) {
 	ctx := context.Background()
 	year := time.Now().Year()
 
-	sys, spec := setupSchedules(t)
+	sys, spec := setupSchedules(t, "Local")
 
 	logRecorder := newRecorder()
 	logger := slog.New(slog.NewJSONHandler(logRecorder, nil))
@@ -368,7 +354,7 @@ func TestTimeout(t *testing.T) {
 	} {
 		ctx, cancel := context.WithCancel(ctx)
 
-		now := time.Now().In(sys.Location.TZ)
+		now := time.Now().In(sys.Location.TimeLocation)
 		today := datetime.DateFromTime(now)
 		sched := spec.Lookup(tc.sched) // slow device schedule
 		sched.Dates.Ranges = []datetime.DateRange{datetime.NewDateRange(today, today)}
@@ -400,7 +386,7 @@ func TestTimeout(t *testing.T) {
 func TestMultiYear(t *testing.T) {
 	ctx := context.Background()
 
-	sys, spec := setupSchedules(t)
+	sys, spec := setupSchedules(t, "Local")
 
 	ts := &timesource{ch: make(chan time.Time, 1)}
 	deviceRecorder := newRecorder()
@@ -414,10 +400,11 @@ func TestMultiYear(t *testing.T) {
 
 	scheduler := createScheduler(t, sys, spec.Lookup("multi-year"), opts...)
 
-	all2023, times2023, ticks2023 := allActive(scheduler, 2023)
-	times2023, ticks2023 = appendYearEndTimesTicks(2023, sys.Location.TZ, times2023, ticks2023)
-	all2024, times2024, ticks2024 := allActive(scheduler, 2024)
-	times2024, ticks2024 = appendYearEndTimesTicks(2024, sys.Location.TZ, times2024, ticks2024)
+	preDelay := time.Millisecond * 5
+	all2023, times2023, ticks2023 := allActive(scheduler, 2023, preDelay)
+	times2023, ticks2023 = appendYearEndTimesTicks(2023, sys.Location.TimeLocation, times2023, ticks2023)
+	all2024, times2024, ticks2024 := allActive(scheduler, 2024, preDelay)
+	times2024, ticks2024 = appendYearEndTimesTicks(2024, sys.Location.TimeLocation, times2024, ticks2024)
 	times := append(append([]time.Time(nil), times2023...), times2024...)
 	ticks := append(append([]time.Time(nil), ticks2023...), ticks2024...)
 
@@ -449,7 +436,7 @@ func TestMultiYear(t *testing.T) {
 	}
 
 	for i, l := range logs {
-		if got, want := l.Due, times[i]; l.YearEndDelay == "" && !got.Equal(want) {
+		if got, want := l.Due, times[i]; l.YearEndDelay == 0 && !got.Equal(want) {
 			t.Errorf("got %v, want %v", got, want)
 		}
 	}
@@ -462,78 +449,74 @@ func TestMultiYear(t *testing.T) {
 func TestDST(t *testing.T) {
 	ctx := context.Background()
 
-	ts := &timesource{ch: make(chan time.Time, 1)}
-	deviceRecorder, logRecorder, opts := newRecordersAndLogger(ts)
-	sys, spec := setupSchedules(t)
+	preDelay := time.Millisecond * 5
+	for _, loc := range []string{"America/Los_Angeles", "Europe/London"} {
+		ts := &timesource{ch: make(chan time.Time, 1)}
+		deviceRecorder, logRecorder, opts := newRecordersAndLogger(ts)
+		sys, spec := setupSchedules(t, loc)
 
-	year := 2024
+		year := 2024
 
-	scheduler := createScheduler(t, sys, spec.Lookup("daylight-saving-time"), opts...)
+		scheduler := createScheduler(t, sys, spec.Lookup("daylight-saving-time"), opts...)
 
-	all, times, ticks := allActive(scheduler, year)
-	times, ticks = appendYearEndTimesTicks(year, sys.Location.TZ, times, ticks)
-	runScheduler(ctx, t, scheduler, year, ts, ticks)
+		all, times, ticks := allActive(scheduler, year, preDelay)
+		times, ticks = appendYearEndTimesTicks(year, sys.Location.TimeLocation, times, ticks)
+		runScheduler(ctx, t, scheduler, year, ts, ticks)
 
-	// Make sure all operations were called despite the DST transitions.
-	opsLines := deviceRecorder.Lines()
-	ndays := 4 + 3
-	if got, want := len(opsLines), (ndays * 3); got != want {
-		t.Errorf("got %d, want %d", got, want)
-	}
-
-	for i := 0; i < len(opsLines)/3; i++ {
-		on := opsLines[i*3]
-		another := opsLines[i*3+1]
-		off := opsLines[i*3+2]
-		if got, want := on, "device[device].On: [0] "; got != want {
-			t.Errorf("%v: got %v, want %v", i, got, want)
-		}
-		if got, want := another, "device[device].Another: [2] arg1--arg2"; got != want {
-			t.Errorf("%v: got %v, want %v", i, got, want)
-		}
-		if got, want := off, "device[device].Off: [0] "; got != want {
-			t.Errorf("%v: got %v, want %v", i, got, want)
-		}
-	}
-
-	logs := logRecorder.Logs(t)
-	if err := containsError(logs); err != nil {
-		t.Fatal(err)
-	}
-
-	if got, want := len(logs), (ndays*3)+1; got != want {
-		t.Errorf("got %d, want %d", got, want)
-	}
-
-	// Check that the due times are as consistent across the logs and the scheduler.
-	for i := 0; i < len(logs)/3; i++ {
-		on := logs[i*3]
-		another := logs[i*3+1]
-		off := logs[i*3+2]
-		if got, want := on.Due, times[i*3]; !got.Equal(want) {
-			t.Errorf("%v: got %v, want %v", i, got, want)
-		}
-		if got, want := another.Due, times[i*3+1]; !got.Equal(want) {
-			t.Errorf("%v: got %v, want %v", i, got, want)
-		}
-		if got, want := off.Due, times[i*3+2]; !got.Equal(want) {
-			t.Errorf("%v: got %v, want %v", i, got, want)
+		// Make sure all operations were called despite the DST transitions.
+		opsLines := deviceRecorder.Lines()
+		ndays := 2 + 2 + 2 + 2
+		if got, want := len(opsLines), (ndays * 3); got != want {
+			t.Errorf("%v: got %d, want %d", loc, got, want)
 		}
 
-		if got, want := on.Due, all[i*3].when; !got.Equal(want) {
-			t.Errorf("%v: got %v, want %v", i, got, want)
+		for i := 0; i < len(opsLines); i++ {
+			expected := []string{"device[device].On: [0] ",
+				"device[device].Another: [2] arg1--arg2",
+				"device[device].Off: [0] "}[i%3]
+			if got, want := opsLines[i], expected; got != want {
+				t.Errorf("%v: %v: got %v, want %v", loc, i, got, want)
+			}
 		}
-		if got, want := another.Due, all[i*3+1].when; !got.Equal(want) {
-			t.Errorf("%v: got %v, want %v", i, got, want)
+
+		logs := logRecorder.Logs(t)
+		if err := containsError(logs); err != nil {
+			t.Fatal(err)
 		}
-		if got, want := off.Due, all[i*3+2].when; !got.Equal(want) {
-			t.Errorf("%v: got %v, want %v", i, got, want)
+
+		if got, want := len(logs), (ndays*3)+1; got != want {
+			t.Errorf("%v: got %d, want %d", loc, got, want)
+		}
+
+		// Check that the due times are as consistent across the logs and the scheduler.
+		for i := 0; i < len(logs)/3; i++ {
+			on := logs[i*3]
+			another := logs[i*3+1]
+			off := logs[i*3+2]
+			if got, want := on.Due, times[i*3]; !got.Equal(want) {
+				t.Errorf("%v: %v: got %v, want %v", loc, i, got, want)
+			}
+			if got, want := another.Due, times[i*3+1]; !got.Equal(want) {
+				t.Errorf("%v: %v: got %v, want %v", loc, i, got, want)
+			}
+			if got, want := off.Due, times[i*3+2]; !got.Equal(want) {
+				t.Errorf("%v: %v: got %v, want %v", loc, i, got, want)
+			}
+
+			if got, want := on.Due, all[i*3].when; !got.Equal(want) {
+				t.Errorf("%v: %v: got %v, want %v", loc, i, got, want)
+			}
+			if got, want := another.Due, all[i*3+1].when; !got.Equal(want) {
+				t.Errorf("%v: %v: got %v, want %v", loc, i, got, want)
+			}
+			if got, want := off.Due, all[i*3+2].when; !got.Equal(want) {
+				t.Errorf("%v: %v: got %v, want %v", loc, i, got, want)
+			}
 		}
 	}
-
 }
 
-func operationsByDate(logs []logEntry) (
+func operationsByDate(logs []internal.LogEntry) (
 	days []datetime.Date,
 	timesByDate map[datetime.Date]map[string][]time.Time,
 	opsByName map[string][]int,
@@ -542,7 +525,7 @@ func operationsByDate(logs []logEntry) (
 	timesByDate = map[datetime.Date]map[string][]time.Time{}
 	opsByName = map[string][]int{}
 	for _, l := range logs {
-		if l.YearEndDelay != "" {
+		if l.YearEndDelay != 0 {
 			break
 		}
 		date := datetime.DateFromTime(l.Due)
@@ -567,99 +550,199 @@ func operationsByDate(logs []logEntry) (
 	return
 }
 
+func applyDelta(base, delta []int) []int {
+	result := make([]int, len(base))
+	for i := range base {
+		result[i] = base[i] + delta[i]
+	}
+	return result
+}
+
 func TestRepeats(t *testing.T) {
 	ctx := context.Background()
 
-	ts := &timesource{ch: make(chan time.Time, 1)}
-	_, logRecorder, opts := newRecordersAndLogger(ts)
-	sys, spec := setupSchedules(t)
+	preDelay := time.Millisecond * 5
 
-	scheduler := createScheduler(t, sys, spec.Lookup("repeating"), opts...)
+	// On is called once per day for both repeating and repeating-illdefined schedules
+	baseOn := []int{1, 1, 1, 1, 1, 1, 1, 1}
 
-	year := 2024
-	//	ndays := 2 + 2
-	all, _, ticks := allActive(scheduler, year)
-	_, ticks = appendYearEndTimesTicks(year, sys.Location.TZ, nil, ticks)
+	// Off is called 24 times per day for the repeating schedule.
+	baseOff := []int{24, 24, 24, 24, 24, 24, 24, 24}
+	// Another is called 68 times per day for the repeating schedule.
+	anotherDuration := 21
+	nAnother := (((24 * 60) - 13) / anotherDuration) + 1
+	baseAnother := []int{nAnother, nAnother, nAnother, nAnother, nAnother, nAnother, nAnother, nAnother}
 
-	runScheduler(ctx, t, scheduler, year, ts, ticks)
+	// Off is called 23 times per day for the repeating-illdefined schedule
+	baseOffIllDefined := []int{23, 23, 23, 23, 23, 23, 23, 23}
+	// Another is called 66 times per day for the repeating-illdefined schedule.
+	nAnotherIllDefined := (((24 * 60) - (60 + 13)) / anotherDuration) + 1
+	baseAnotherIllDefined := []int{nAnotherIllDefined, nAnotherIllDefined, nAnotherIllDefined, nAnotherIllDefined, nAnotherIllDefined, nAnotherIllDefined, nAnotherIllDefined, nAnotherIllDefined}
 
-	logs := logRecorder.Logs(t)
-	if err := containsError(logs); err != nil {
-		t.Fatal(err)
-	}
+	// The repeating-illdefined schedule has the repeats starting during
+	// a DST transition (ie. 1AM to 2AM) whose treatment is not well defined by
+	// the time.Date function. time.Date behaves differently
+	// for America/Los_Angeles and Europe/London for example, 1:30AM
+	// on the DST to ST transition is returned as 1:30AM PDT and 1:30AM GMT
+	// respectively, ie. the timezone is set differently in each location
+	// leading to a different number of invocations of an action depending
+	// on the location. However, the interval between repeats is always correct
+	// and the number of operations will be the same if the repeat starts
+	// before, and traverses the transition. This latter point explains the
+	// difference in behaviour between Los Angeles and London in that for
+	// LA a time in the transition is returned as being before it, whereas
+	// for London it is returned as being after the transition.
+	// The different handling for each case is shown below:
+	//
+	// America/Los_Angeles: 03/10/2024 00:59:00 -> 2024-03-10 00:59:00 -0800 PST (isdst: false)
+	// America/Los_Angeles: 03/10/2024 01:30:00 -> 2024-03-10 01:30:00 -0800 PST (isdst: false)
+	// America/Los_Angeles: 03/10/2024 02:00:00 -> 2024-03-10 01:00:00 -0800 PST (isdst: false)
+	// America/Los_Angeles: 11/03/2024 00:59:00 -> 2024-11-03 00:59:00 -0700 PDT (isdst: true)
+	// America/Los_Angeles: 11/03/2024 01:30:00 -> 2024-11-03 01:30:00 -0700 PDT (isdst: true)
+	// America/Los_Angeles: 11/03/2024 02:00:00 -> 2024-11-03 02:00:00 -0800 PST (isdst: false)
+	// Europe/London: 03/31/2024 00:59:00 -> 2024-03-31 00:59:00 +0000 GMT (isdst: false)
+	// Europe/London: 03/31/2024 01:30:00 -> 2024-03-31 02:30:00 +0100 BST (isdst: true)
+	// Europe/London: 03/31/2024 02:00:00 -> 2024-03-31 02:00:00 +0100 BST (isdst: true)
+	// Europe/London: 10/27/2024 00:59:00 -> 2024-10-27 00:59:00 +0100 BST (isdst: true)
+	// Europe/London: 10/27/2024 01:30:00 -> 2024-10-27 01:30:00 +0000 GMT (isdst: false)
+	// Europe/London: 10/27/2024 02:00:00 -> 2024-10-27 02:00:00 +0000 GMT (isdst: false)
 
-	for i, l := range logs {
-		if l.YearEndDelay != "" {
-			break
+	// The DST deltas for well defined transitions are:
+	// 	Off: -1 and +1
+	//    1 repeat is lost on the day that DST starts and gained on the day that
+	//    DST ends.
+	//
+	//  Another: -2 and +3
+	//   -2 repeats between 1am and 2am on 3/10, 3/31 are lost
+	//   3 repeats between 1am and 2am on 11/3, 10/27 are gained
+	//
+	// UTC does not have DST so the deltas are zero.
+	//
+	springOnDelta, fallOnDelta := -1, 1
+	springAnotherDelta, fallAnotherDelta := -2, 3
+	offDeltaCA := []int{0, springOnDelta, 0, 0, 0, 0, 0, fallOnDelta}
+	anotherDeltaCA := []int{0, springAnotherDelta, 0, 0, 0, 0, 0, fallAnotherDelta}
+	// CA and UK have the same values, just in different positions corresponding
+	// to the different dates.
+	offDeltaUK := []int{0, 0, 0, springOnDelta, 0, fallOnDelta, 0, 0}
+	anotherDeltaUK := []int{0, 0, 0, springAnotherDelta, 0, fallAnotherDelta, 0, 0}
+
+	for _, tc := range []struct {
+		loc                    string
+		schedule               string
+		baseOff, baseAnother   []int
+		offDelta, anotherDelta []int
+	}{
+		{loc: "America/Los_Angeles", schedule: "repeating",
+			baseOff: baseOff, baseAnother: baseAnother,
+			offDelta:     offDeltaCA,
+			anotherDelta: anotherDeltaCA},
+		{loc: "Europe/London", schedule: "repeating",
+			baseOff: baseOff, baseAnother: baseAnother,
+			offDelta:     offDeltaUK,
+			anotherDelta: anotherDeltaUK},
+		{loc: "America/Los_Angeles", schedule: "repeating-illdefined",
+			baseOff: baseOffIllDefined, baseAnother: baseAnotherIllDefined,
+			offDelta:     offDeltaCA,
+			anotherDelta: []int{0, -3, 0, 0, 0, 0, 0, 2}},
+		{loc: "Europe/London", schedule: "repeating-illdefined",
+			// Europe/London sets GMT for 1:30AM and hence there are no repeats
+			// on 10/27/2024.
+			baseOff: baseOffIllDefined, baseAnother: baseAnotherIllDefined,
+			offDelta:     []int{0, 0, 0, -1, 0, 0, 0, 0},
+			anotherDelta: []int{0, 0, 0, -3, 0, 0, 0, 0}},
+		{loc: "UTC", schedule: "repeating",
+			baseOff: baseOff, baseAnother: baseAnother,
+			offDelta:     []int{0, 0, 0, 0, 0, 0, 0, 0},
+			anotherDelta: []int{0, 0, 0, 0, 0, 0, 0, 0}},
+	} {
+		ts := &timesource{ch: make(chan time.Time, 1)}
+		_, logRecorder, opts := newRecordersAndLogger(ts)
+		sys, spec := setupSchedules(t, tc.loc)
+
+		if got, want := sys.Location.TimeLocation.String(), tc.loc; got != want {
+			t.Fatalf("got %v, want %v", got, want)
 		}
-		if got, want := l.Due, all[i].when; !got.Equal(want) {
-			t.Errorf("got %v, want %v", got, want)
+
+		scheduler := createScheduler(t, sys, spec.Lookup(tc.schedule), opts...)
+
+		year := 2024
+		all, _, ticks := allActive(scheduler, year, preDelay)
+		_, ticks = appendYearEndTimesTicks(year, sys.Location.TimeLocation, nil, ticks)
+
+		runScheduler(ctx, t, scheduler, year, ts, ticks)
+
+		logs := logRecorder.Logs(t)
+		if err := containsError(logs); err != nil {
+			t.Fatal(err)
 		}
-		if got, want := l.Started, ticks[i]; !got.Equal(want) {
-			t.Errorf("got %v, want %v", got, want)
-		}
-	}
 
-	// Look at operations per day
-	days, startedTimes, opsPerDay := operationsByDate(logs)
-
-	// add repeats for 'off' operations, per day.
-	expectedOff := 23 // once per hour starting at 1am
-	// 23 repeats on a normal day, 22 on ST-DST and 24 on ST-DST.
-	expectedOffPerday := []int{expectedOff, expectedOff - 1, expectedOff, expectedOff + 1}
-
-	expectedAnother := ((24*60*60)-((60+14)*60))/(13*60) + 1
-
-	// 5 repeats between 1am and 2am on 3/10 are lost
-	// 5 repeats between 1am and 2am on 11/3 are gained, but there is one less
-	//   repeat at the end of the day.
-	expectedAnotherPerday := []int{expectedAnother, expectedAnother - 5, expectedAnother, expectedAnother + 5 - 1}
-
-	// One 'on' operation per day
-	if got, want := opsPerDay["on"], []int{1, 1, 1, 1}; !slices.Equal(got, want) {
-		t.Errorf("got %v, want %v", got, want)
-	}
-
-	if got, want := opsPerDay["off"], expectedOffPerday; !slices.Equal(got, want) {
-		t.Errorf("got %v, want %v", got, want)
-	}
-
-	if got, want := opsPerDay["another"], expectedAnotherPerday; !slices.Equal(got, want) {
-		t.Errorf("got %v, want %v", got, want)
-	}
-
-	// The intervals should always be the same.
-	for _, day := range days {
-		prevNow := startedTimes[day]["off"][0]
-		for _, cur := range startedTimes[day]["off"][1:] {
-			if got, want := cur.Sub(prevNow), time.Hour; got != want {
-				t.Errorf("%v: %v: got %v, want %v", prevNow, cur, got, want)
+		for i, l := range logs {
+			if l.YearEndDelay != 0 {
+				break
 			}
-			prevNow = cur
-		}
-		prevAnother := startedTimes[day]["another"][0]
-		for _, cur := range startedTimes[day]["another"][1:] {
-			if got, want := cur.Sub(prevAnother), time.Minute*13; got != want {
-				t.Errorf("%v: %v: got %v, want %v", prevAnother, cur, got, want)
+			if got, want := l.Due, all[i].when; !got.Equal(want) {
+				t.Errorf("%v: %v: got %v, want %v", tc.loc, tc.schedule, got, want)
 			}
-			prevAnother = cur
+			if got, want := l.Started, ticks[i]; !got.Equal(want) {
+				t.Errorf("%v: %v: got %v, want %v", tc.loc, tc.schedule, got, want)
+			}
+		}
+
+		// Look at operations per day
+		days, startedTimes, opsPerDay := operationsByDate(logs)
+
+		// On is not affected by DST
+		if got, want := opsPerDay["on"], baseOn; !slices.Equal(got, want) {
+			t.Errorf("%v: %v: 'on': got %v, want %v", tc.loc, tc.schedule, got, want)
+		}
+
+		expectedOff := applyDelta(tc.baseOff, tc.offDelta)
+		if got, want := opsPerDay["off"], expectedOff; !slices.Equal(got, want) {
+			t.Errorf("%v: %v: 'off': got %v, want %v", tc.loc, tc.schedule, got, want)
+		}
+
+		expectedAnother := applyDelta(tc.baseAnother, tc.anotherDelta)
+		if got, want := opsPerDay["another"], expectedAnother; !slices.Equal(got, want) {
+			t.Errorf("%v: %v: 'another': got %v, want %v", tc.loc, tc.schedule, got, want)
+		}
+
+		// The intervals should always be the same.
+		for _, day := range days {
+			if got, want, ok := compareIntervals(startedTimes[day]["off"], time.Hour); !ok {
+				t.Errorf("%v: %v: %v: got %v, want %v", tc.loc, tc.schedule, day, got, want)
+			}
+			if got, want, ok := compareIntervals(startedTimes[day]["another"], time.Minute*time.Duration(anotherDuration)); !ok {
+				t.Errorf("%v: %v: %v: got %v, want %v", tc.loc, tc.schedule, day, got, want)
+			}
 		}
 	}
+}
+
+func compareIntervals(times []time.Time, repeat time.Duration) (got, want time.Duration, ok bool) {
+	p := times[0]
+	for _, c := range times[1:] {
+		if got, want := c.Sub(p), repeat; got != want {
+			return got, want, false
+		}
+		p = c
+	}
+	return 0, 0, true
 }
 
 func TestRepeatsBounded(t *testing.T) {
 	ctx := context.Background()
 
+	preDelay := time.Millisecond * 5
 	ts := &timesource{ch: make(chan time.Time, 1)}
 	_, logRecorder, opts := newRecordersAndLogger(ts)
-	sys, spec := setupSchedules(t)
+	sys, spec := setupSchedules(t, "Local")
 
 	scheduler := createScheduler(t, sys, spec.Lookup("repeating-bounded"), opts...)
 
 	year := 2024
-	//	ndays := 2 + 2
-	all, _, ticks := allActive(scheduler, year)
-	_, ticks = appendYearEndTimesTicks(year, sys.Location.TZ, nil, ticks)
+	all, _, ticks := allActive(scheduler, year, preDelay)
+	_, ticks = appendYearEndTimesTicks(year, sys.Location.TimeLocation, nil, ticks)
 	runScheduler(ctx, t, scheduler, year, ts, ticks)
 
 	logs := logRecorder.Logs(t)
@@ -668,7 +751,7 @@ func TestRepeatsBounded(t *testing.T) {
 	}
 
 	for i, l := range logs {
-		if l.YearEndDelay != "" {
+		if l.YearEndDelay != 0 {
 			break
 		}
 		if got, want := l.Due, all[i].when; !got.Equal(want) {
@@ -683,12 +766,12 @@ func TestRepeatsBounded(t *testing.T) {
 	days, startedTimes, opsPerDay := operationsByDate(logs)
 
 	// One 'on' operation per day
-	if got, want := opsPerDay["on"], []int{1, 1, 1, 1}; !slices.Equal(got, want) {
+	if got, want := opsPerDay["on"], []int{1, 1, 1, 1, 1, 1, 1, 1}; !slices.Equal(got, want) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 
 	// Five 'off' operations per day, since num_repeats is set to 4.
-	if got, want := opsPerDay["off"], []int{5, 5, 5, 5}; !slices.Equal(got, want) {
+	if got, want := opsPerDay["off"], []int{5, 5, 5, 5, 5, 5, 5, 5}; !slices.Equal(got, want) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 

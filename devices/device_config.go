@@ -90,11 +90,11 @@ func locationFromValue(value string) (*time.Location, error) {
 	return location, nil
 }
 
-type TimeZone struct {
+type TimeLocation struct {
 	*time.Location
 }
 
-func (tz *TimeZone) UnmarshalYAML(node *yaml.Node) error {
+func (tz *TimeLocation) UnmarshalYAML(node *yaml.Node) error {
 	l, err := locationFromValue(node.Value)
 	if err != nil {
 		return err
@@ -104,10 +104,10 @@ func (tz *TimeZone) UnmarshalYAML(node *yaml.Node) error {
 }
 
 type LocationConfig struct {
-	TZ        *TimeZone `yaml:"time_zone" cmd:"the timezone for the location in time.Location format"`
-	ZIPCode   string    `yaml:"zip_code" cmd:"the zip/postal code for the location"`
-	Latitude  float64   `yaml:"latitude" cmd:"the latitude for the location"`
-	Longitude float64   `yaml:"longitude" cmd:"the longitude for the location"`
+	TimeLocation *TimeLocation `yaml:"time_location" cmd:"the system location for time in time.Location format"`
+	ZIPCode      string        `yaml:"zip_code" cmd:"the zip/postal for the system used to determine it's latitude and longitude, but not used for time"`
+	Latitude     float64       `yaml:"latitude" cmd:"the latitude for the location"`
+	Longitude    float64       `yaml:"longitude" cmd:"the longitude for the location"`
 }
 
 type Location struct {
@@ -237,18 +237,18 @@ func buildLocation(cfg LocationConfig, opts []Option) (Location, error) {
 		},
 		ZIPCode: cfg.ZIPCode,
 	}
-	if cfg.TZ != nil {
-		loc.TZ = cfg.TZ.Location
+	if cfg.TimeLocation != nil {
+		loc.TimeLocation = cfg.TimeLocation.Location
 	}
-	if o.tz != nil {
-		loc.TZ = o.tz
+	if o.loc != nil {
+		loc.TimeLocation = o.loc
 	}
-	if loc.TZ == nil {
+	if loc.TimeLocation == nil {
 		tz, err := time.LoadLocation("Local")
 		if err != nil {
 			return loc, err
 		}
-		loc.TZ = tz
+		loc.TimeLocation = tz
 	}
 
 	if o.latitude != 0 {

@@ -18,7 +18,7 @@ var invocationID int64
 // action returned by the scheduler for any given day. It returns a unique
 // identifier for the operation that must be passed to LogCompletion except
 // for overdue operations which are not logged as being completed.
-func WritePendingLog(l *slog.Logger, overdue, dryRun bool, device, op string, args []string, precondition string, preArgs []string, now, dueAt, delay string) int64 {
+func WritePendingLog(l *slog.Logger, overdue, dryRun bool, device, op string, args []string, precondition string, preArgs []string, now, dueAt time.Time, delay time.Duration) int64 {
 	id := atomic.AddInt64(&invocationID, 1)
 	msg := LogPending
 	if overdue {
@@ -32,6 +32,7 @@ func WritePendingLog(l *slog.Logger, overdue, dryRun bool, device, op string, ar
 		"args", args,
 		"pre", precondition,
 		"pre-args", preArgs,
+		"loc", dueAt.Location().String(),
 		"now", now,
 		"due", dueAt,
 		"delay", delay)
@@ -42,7 +43,7 @@ func WritePendingLog(l *slog.Logger, overdue, dryRun bool, device, op string, ar
 // every operation non-overdue that was logged as pending. The id must be the value
 // returned by LogPending.
 func WriteCompletionLog(l *slog.Logger, id int64, err error,
-	dryRun bool, device, op, precondition string, preconditionResult bool, started, now, dueAt, delay string) {
+	dryRun bool, device, op, precondition string, preconditionResult bool, started, now, dueAt time.Time, delay time.Duration) {
 	msg := LogCompleted
 	if err != nil {
 		msg = LogFailed
@@ -55,6 +56,7 @@ func WriteCompletionLog(l *slog.Logger, id int64, err error,
 		"pre", precondition,
 		"pre-result", preconditionResult,
 		"started", started,
+		"loc", dueAt.Location().String(),
 		"now", now,
 		"due", dueAt,
 		"delay", delay,
@@ -74,7 +76,7 @@ const (
 // when all scheduled events for the year have been executed and the
 // scheduler simply has to wait for the next year to start.
 func WriteYearEndLog(l *slog.Logger, year int, delay time.Duration) {
-	l.Info(LogYearEnd, "year", year, "year-end-delay", delay.String())
+	l.Info(LogYearEnd, "year", year, "year-end-delay", delay)
 }
 
 func WriteNewDayLog(l *slog.Logger, date datetime.CalendarDate, nActions int) {

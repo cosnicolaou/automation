@@ -16,82 +16,61 @@ import (
 	"cloudeng.io/datetime"
 )
 
+type logEntry struct {
+	Msg           string    `json:"msg"`
+	Mod           string    `json:"mod"`
+	DryRun        bool      `json:"dry-run"`
+	Schedule      string    `json:"schedule"`
+	Device        string    `json:"device"`
+	ID            int64     `json:"id"`
+	Op            string    `json:"op"`
+	Args          []string  `json:"args"`
+	PreCond       string    `json:"pre"`
+	PreCondArgs   []string  `json:"pre-args"`
+	PreCondResult bool      `json:"pre-result"`
+	NumActions    int       `json:"#actions"`
+	YearEndDelay  int       `json:"year-end-delay"`
+	Err           string    `json:"err"`
+	Date          LogDate   `json:"date"`
+	Now           time.Time `json:"now"`
+	Due           time.Time `json:"due"`
+	Started       time.Time `json:"started"`
+	Delay         int       `json:"delay"`
+	Location      string    `json:"loc"`
+	YearEnd       int       `json:"year"`
+}
+
 type LogEntry struct {
-	Msg           string   `json:"msg"`
-	DateStr       string   `json:"date"`
-	Mod           string   `json:"mod"`
-	DryRun        bool     `json:"dry-run"`
-	Schedule      string   `json:"schedule"`
-	Device        string   `json:"device"`
-	ID            int64    `json:"id"`
-	Op            string   `json:"op"`
-	Args          []string `json:"args"`
-	PreCond       string   `json:"pre"`
-	PreCondArgs   []string `json:"pre-args"`
-	PreCondResult bool     `json:"pre-result"`
-	NumActions    int      `json:"#actions"`
-	NowStr        string   `json:"now"`
-	StartedStr    string   `json:"started"`
-	DueStr        string   `json:"due"`
-	DelayStr      string   `json:"delay"`
-	ErrStr        string   `json:"err"`
+	logEntry
 
-	Date    datetime.CalendarDate
-	Now     time.Time
-	Due     time.Time
-	Started time.Time
-	Delay   time.Duration
-	Err     error
-
-	LogEntry string // Original log line
+	Date         datetime.CalendarDate
+	Now          time.Time
+	Due          time.Time
+	Started      time.Time
+	Delay        time.Duration
+	YearEndDelay time.Duration
+	Err          error
+	LogEntry     string // Original log line
 }
 
 func ParseLogLine(line string) (LogEntry, error) {
 	var le LogEntry
 	le.LogEntry = line
-	if err := json.Unmarshal([]byte(line), &le); err != nil {
+	if err := json.Unmarshal([]byte(line), &le.logEntry); err != nil {
 		return le, err
 	}
-	var err error
-	if len(le.DelayStr) != 0 {
-		le.Delay, err = time.ParseDuration(le.DelayStr)
-		if err != nil {
-			fmt.Printf("failed to parse duration: %v: %v: %v\n", le.DelayStr, err, line)
-			return le, err
-		}
+	loc, err := time.LoadLocation(le.logEntry.Location)
+	if err != nil {
+		return le, err
 	}
-	if len(le.NowStr) != 0 {
-		le.Now, err = time.Parse(time.RFC3339Nano, le.NowStr)
-		if err != nil {
-			fmt.Printf("failed to parse time: %v: %v: %v\n", le.NowStr, err, line)
-			return le, err
-		}
-	}
-	if len(le.StartedStr) != 0 {
-		le.Started, err = time.Parse(time.RFC3339Nano, le.StartedStr)
-		if err != nil {
-			fmt.Printf("failed to parse time: %v: %v: %v\n", le.StartedStr, err, line)
-			return le, err
-		}
-	}
-	if len(le.DueStr) != 0 {
-		le.Due, err = time.Parse(time.RFC3339, le.DueStr)
-		if err != nil {
-			fmt.Printf(
-				"failed to parse time: %v: %v: %v\n", le.DueStr, err, line)
-			return le, err
-		}
-	}
-	if len(le.DateStr) != 0 {
-		tmp := new(datetime.CalendarDate)
-		if err := tmp.Parse(le.DateStr); err != nil {
-			fmt.Printf("failed to parse date: %v: %v: %v\n", le.DateStr, err, line)
-			return le, err
-		}
-		le.Date = *tmp
-	}
-	if le.ErrStr != "" {
-		le.Err = errors.New(le.ErrStr)
+	le.Date = datetime.CalendarDate(le.logEntry.Date)
+	le.Now = le.logEntry.Now.In(loc)
+	le.Due = le.logEntry.Due.In(loc)
+	le.Started = le.logEntry.Started.In(loc)
+	le.Delay = time.Duration(le.logEntry.Delay)
+	le.YearEndDelay = time.Duration(le.logEntry.YearEndDelay)
+	if e := le.logEntry.Err; e != "" {
+		le.Err = errors.New(e)
 	}
 	return le, nil
 }
@@ -139,14 +118,11 @@ func (ls *LogScanner) Entries() iter.Seq[LogEntry] {
 				ls.err = ls.sc.Err()
 				return
 			}
-			if ls.err != nil {
-				return
-			}
 			line := ls.sc.Text()
 			le, err := ParseLogLine(line)
 			if err != nil {
 				ls.err = err
-				continue
+				return
 			}
 			if !yield(le) {
 				return
