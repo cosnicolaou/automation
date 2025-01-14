@@ -80,6 +80,7 @@ func TestIdleManagerReset(t *testing.T) {
 	numResets := 500
 	resetDelay := time.Millisecond
 	go func() {
+		idle.Reset()
 		for i := 0; i < numResets; i++ {
 			time.Sleep(resetDelay)
 			idle.Reset()
