@@ -592,34 +592,54 @@ func TestRepeats(t *testing.T) {
 	// difference in behaviour between Los Angeles and London in that for
 	// LA a time in the transition is returned as being before it, whereas
 	// for London it is returned as being after the transition.
-	// The different handling for each case is shown below:
+	// The different handling for each case is shown below
 	//
-	// America/Los_Angeles: 03/10/2024 00:59:00 -> 2024-03-10 00:59:00 -0800 PST (isdst: false)
-	// America/Los_Angeles: 03/10/2024 01:30:00 -> 2024-03-10 01:30:00 -0800 PST (isdst: false)
-	// America/Los_Angeles: 03/10/2024 02:00:00 -> 2024-03-10 01:00:00 -0800 PST (isdst: false)
-	// America/Los_Angeles: 11/03/2024 00:59:00 -> 2024-11-03 00:59:00 -0700 PDT (isdst: true)
-	// America/Los_Angeles: 11/03/2024 01:30:00 -> 2024-11-03 01:30:00 -0700 PDT (isdst: true)
-	// America/Los_Angeles: 11/03/2024 02:00:00 -> 2024-11-03 02:00:00 -0800 PST (isdst: false)
-	// Europe/London: 03/31/2024 00:59:00 -> 2024-03-31 00:59:00 +0000 GMT (isdst: false)
-	// Europe/London: 03/31/2024 01:30:00 -> 2024-03-31 02:30:00 +0100 BST (isdst: true)
-	// Europe/London: 03/31/2024 02:00:00 -> 2024-03-31 02:00:00 +0100 BST (isdst: true)
-	// Europe/London: 10/27/2024 00:59:00 -> 2024-10-27 00:59:00 +0100 BST (isdst: true)
-	// Europe/London: 10/27/2024 01:30:00 -> 2024-10-27 01:30:00 +0000 GMT (isdst: false)
-	// Europe/London: 10/27/2024 02:00:00 -> 2024-10-27 02:00:00 +0000 GMT (isdst: false)
+	// time.Date(2024, 3, 10, 2, 59, 0, 0, America/Los_Angeles) -> 2024-03-10 01:59:00 -0800 PST (isdst: false)
+	// time.Date(2024, 3, 10, 3, 0, 0, 0, America/Los_Angeles) -> 2024-03-10 03:00:00 -0700 PDT (isdst: true)
+	//
+	// time.Date(2024, 3, 31, 0, 59, 0, 0, Europe/London) -> 2024-03-31 00:59:00 +0000 GMT (isdst: false)
+	// time.Date(2024, 3, 31, 1, 0, 0, 0, Europe/London) -> 2024-03-31 02:00:00 +0100 BST (isdst: true)
+	//
+	// time.Date(2024, 11, 3, 1, 59, 0, 0, America/Los_Angeles) -> 2024-11-03 01:59:00 -0700 PDT (isdst: true)
+	// time.Date(2024, 11, 3, 2, 0, 0, 0, America/Los_Angeles) -> 2024-11-03 02:00:00 -0800 PST (isdst: false)
+	//
+	// time.Date(2024, 10, 27, 0, 59, 0, 0, Europe/London) -> 2024-10-27 00:59:00 +0100 BST (isdst: true)
+	// time.Date(2024, 10, 27, 1, 0, 0, 0, Europe/London) -> 2024-10-27 01:00:00 +0000 GMT (isdst: false)
 
-	// The DST deltas for well defined transitions are:
-	// 	Off: -1 and +1
-	//    1 repeat is lost on the day that DST starts and gained on the day that
-	//    DST ends.
+	// CA/UK spring 'repeating' schedules are as follows:
+	// CA/UK: no-transition:     ... 01:37 01:58 02:19 02:40 03:01 03:22 03:43 ... 23:40
+	// CA/UK: spring-transition: ... 01:37 01:58 ----------- 03:19 03:40 04:01 ... 23:48
+	// CA/UK: fall-transition:   ... 01:37 01:58 01:19 01:40 02:01 02:22 02:43 03:04 ... 23:43
+	//                                                    +++++++++++++++++
+	// The transition loses the 2 repeats between 2am and 1am on 3/10 in the spring
+	// gains 3 in the fall.
+
+	// CA 'repeating-illdefined' schedules are as follows:
+	// CA: no-transitions:    01:13 01:34 01:55 02:16 02:37 02:58 03:19 03:40 ... 23:58
+	// CA: spring-transition: 01:13 01:34 01:55 ----------------- 03:16 03:37 ... 23:55
+	// CA: fall-transition:   01:13 01:34 01:55 02:16 02:37 02:58 03:19 03:40 ... 23:58
+	//                                                      +++++
+	// The transition loses 3 in the spring and gains 1 in the fall.
 	//
-	//  Another: -2 and +3
-	//   -2 repeats between 1am and 2am on 3/10, 3/31 are lost
-	//   3 repeats between 1am and 2am on 11/3, 10/27 are gained
+	// UK 'repeating-illdefined' schedules are as follows:
+	// UK: no-transitions: same as CA, repeated for clarity
+	// UK: no-transitions:    01:13 01:34 01:55 02:16 02:37 02:58 03:19 03:40 ... 23:58
+	// UK: spring-transition: ----------------- 02:13 02:34 02:55 03:16 03:37 ... 23:55
+	// UK: fall-transition:   01:13 01:34 01:55 02:16 02:37 02:58 03:19 03:40 ... 23:58
+	// The transition loses 3 in the spring, but none in the fall since all of the repeats
+	// fall past the transition as determined by time.Date.
+	// The differences between the CA and UK are entirely due to how the time.Date function
+	// handles the transition times. In all cases the internal is maintained correctly.
+	// Similarly the 'off' operation for the UK loses 1 item in the spring, but gains
+	// none in the fall.
 	//
 	// UTC does not have DST so the deltas are zero.
-	//
+
 	springOnDelta, fallOnDelta := -1, 1
 	springAnotherDelta, fallAnotherDelta := -2, 3
+	springCADelta, fallCADelta := -3, 1
+	springUKDelta, fallUKDelta := -3, 0
+
 	offDeltaCA := []int{0, springOnDelta, 0, 0, 0, 0, 0, fallOnDelta}
 	anotherDeltaCA := []int{0, springAnotherDelta, 0, 0, 0, 0, 0, fallAnotherDelta}
 	// CA and UK have the same values, just in different positions corresponding
@@ -627,7 +647,7 @@ func TestRepeats(t *testing.T) {
 	offDeltaUK := []int{0, 0, 0, springOnDelta, 0, fallOnDelta, 0, 0}
 	anotherDeltaUK := []int{0, 0, 0, springAnotherDelta, 0, fallAnotherDelta, 0, 0}
 
-	for _, tc := range []struct {
+	for i, tc := range []struct {
 		loc                    string
 		schedule               string
 		baseOff, baseAnother   []int
@@ -644,13 +664,11 @@ func TestRepeats(t *testing.T) {
 		{loc: "America/Los_Angeles", schedule: "repeating-illdefined",
 			baseOff: baseOffIllDefined, baseAnother: baseAnotherIllDefined,
 			offDelta:     offDeltaCA,
-			anotherDelta: []int{0, -3, 0, 0, 0, 0, 0, 2}},
+			anotherDelta: []int{0, springCADelta, 0, 0, 0, 0, 0, fallCADelta}},
 		{loc: "Europe/London", schedule: "repeating-illdefined",
-			// Europe/London sets GMT for 1:30AM and hence there are no repeats
-			// on 10/27/2024.
 			baseOff: baseOffIllDefined, baseAnother: baseAnotherIllDefined,
 			offDelta:     []int{0, 0, 0, -1, 0, 0, 0, 0},
-			anotherDelta: []int{0, 0, 0, -3, 0, 0, 0, 0}},
+			anotherDelta: []int{0, 0, 0, springUKDelta, 0, fallUKDelta, 0, 0}},
 		{loc: "UTC", schedule: "repeating",
 			baseOff: baseOff, baseAnother: baseAnother,
 			offDelta:     []int{0, 0, 0, 0, 0, 0, 0, 0},

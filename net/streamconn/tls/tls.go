@@ -39,7 +39,6 @@ func Dial(ctx context.Context, addr string, version string, timeout time.Duratio
 	case "1.0":
 		cfg.MinVersion = tls.VersionTLS10
 		cfg.MaxVersion = tls.VersionTLS10
-
 	case "1.2":
 		cfg.MinVersion = tls.VersionTLS12
 		cfg.MaxVersion = tls.VersionTLS12
