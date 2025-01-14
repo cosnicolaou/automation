@@ -67,7 +67,7 @@ func TestIdleManager(t *testing.T) {
 func TestIdleManagerReset(t *testing.T) {
 	ctx := context.Background()
 
-	timerTick := time.Millisecond * 10
+	timerTick := time.Millisecond * 15
 	idle := netutil.NewIdleTimer(timerTick)
 
 	eventCh := make(chan string, 1000)
@@ -75,6 +75,7 @@ func TestIdleManagerReset(t *testing.T) {
 	sm := &sessionMgr{eventCh: eventCh, timeCh: timeCh}
 
 	mc := netutil.NewIdleManager(sm, idle)
+	start := time.Now()
 
 	numResets := 500
 	resetDelay := time.Millisecond
@@ -87,7 +88,7 @@ func TestIdleManagerReset(t *testing.T) {
 			}
 		}
 	}()
-	start := time.Now()
+
 	_, err := mc.Connection(ctx)
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
