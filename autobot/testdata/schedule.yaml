@@ -1,0 +1,60 @@
+schedules:
+  - name: simple
+    device: device
+    months: jan
+    ranges:
+      - summer
+    actions:
+      on: 00:01:00
+      off: 00:02:00
+    actions_detailed:
+      - action: another
+        args: ["1"]
+        when: 00:03:00
+        repeat: 1h
+        num_repeats: 2
+
+  - name: precondition-not-sunny
+    device: device
+    months: jan
+    ranges:
+      - summer
+    actions:
+      on: 00:01:00
+      off: 00:02:00
+    actions_detailed:
+      - action: another
+        args: ["1"]
+        when: 00:03:00
+        repeat: 1h
+        num_repeats: 2
+        precondition:
+          device: device
+          op: "!weather" # this evaluates to 'not weather sunny' which will be false
+          args: ["sunny"]
+
+  - name: precondition-sunny
+    device: device
+    months: jan
+    ranges:
+      - summer
+    actions:
+      on: 00:01:00
+      off: 00:02:00
+    actions_detailed:
+      - action: another
+        args: ["1"]
+        when: 00:03:00
+        repeat: 1h
+        num_repeats: 2
+        precondition:
+          device: device
+          op: "weather" # this evaluates to 'weather sunny' which will be true
+          args: ["sunny"]
+
+  - name: other-device
+    device: other-device
+    months: jan
+    actions:
+      on: 00:01:00
+      off: 00:02:00
