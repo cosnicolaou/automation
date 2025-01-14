@@ -647,7 +647,7 @@ func TestRepeats(t *testing.T) {
 	offDeltaUK := []int{0, 0, 0, springOnDelta, 0, fallOnDelta, 0, 0}
 	anotherDeltaUK := []int{0, 0, 0, springAnotherDelta, 0, fallAnotherDelta, 0, 0}
 
-	for i, tc := range []struct {
+	for _, tc := range []struct {
 		loc                    string
 		schedule               string
 		baseOff, baseAnother   []int
