@@ -16,6 +16,7 @@ import (
 	"github.com/cosnicolaou/elk/elkm1"
 	"github.com/cosnicolaou/lutron/homeworks"
 	"github.com/cosnicolaou/pentair/screenlogic"
+	"github.com/cosnicolaou/weather/weatherdev"
 )
 
 const cmdSpec = `name: autobot
@@ -49,6 +50,11 @@ commands:
           scheduled time to scheduled time with minimal delay
         arguments:
           - <schedule>...
+      - name: print
+        summary: |
+          print the requested schedules, or all schedules if none are specified
+        arguments:
+          - <schedule>...
   - name: config
     summary: query/inspect the configuration file
     commands:
@@ -77,6 +83,7 @@ func cli() *subcmd.CommandSetYAML {
 	schedule := &Schedule{}
 	cmd.Set("schedule", "run").MustRunner(schedule.Run, &ScheduleFlags{})
 	cmd.Set("schedule", "simulate").MustRunner(schedule.Simulate, &SimulateFlags{})
+	// cmd.Set("schedule", "print").MustRunner(schedule.Print, &SchedulePrintFlags{})
 
 	log := &Log{out: os.Stdout}
 	cmd.Set("logs", "status").MustRunner(log.Status, &LogStatusFlags{})
@@ -90,6 +97,8 @@ func init() {
 		maps.All(screenlogic.SupportedControllers()))
 	maps.Insert(devices.AvailableControllers,
 		maps.All(elkm1.SupportedControllers()))
+	maps.Insert(devices.AvailableControllers,
+		maps.All(weatherdev.SupportedControllers()))
 
 	maps.Insert(devices.AvailableDevices,
 		maps.All(homeworks.SupportedDevices()))
@@ -97,6 +106,8 @@ func init() {
 		maps.All(screenlogic.SupportedDevices()))
 	maps.Insert(devices.AvailableDevices,
 		maps.All(elkm1.SupportedDevices()))
+	maps.Insert(devices.AvailableDevices,
+		maps.All(weatherdev.SupportedDevices()))
 }
 
 var errInterrupt = errors.New("interrupt")
