@@ -7,8 +7,10 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
+	"strings"
 	"time"
 
 	"cloudeng.io/datetime"
@@ -29,6 +31,11 @@ type SimulateFlags struct {
 	LogFile   string        `subcmd:"log-file,,log file"`
 	DateRange string        `subcmd:"date-range,,date range in <month>/<day>/<year>:<year>/<month>/<day> format"`
 	Delay     time.Duration `subcmd:"delay,10ms,delay between each simulated time step and the scheduled time"`
+}
+
+type SchedulePrintFlags struct {
+	ConfigFileFlags
+	DateRange string `subcmd:"date-range,,date range in <month>/<day>/<year>:<year>/<month>/<day> format"`
 }
 
 type Schedule struct {
@@ -107,7 +114,22 @@ func (s *Schedule) Run(ctx context.Context, flags any, _ []string) error {
 
 }
 
-func (s *Schedule) Simulate(ctx context.Context, flags any, _ []string) error {
+func (s *Schedule) filterSchedules(schedules []scheduler.Annual, allowed []string) []scheduler.Annual {
+	if len(allowed) == 0 {
+		return schedules
+	}
+	filtered := []scheduler.Annual{}
+	for _, sched := range schedules {
+		for _, name := range allowed {
+			if sched.Name == name {
+				filtered = append(filtered, sched)
+			}
+		}
+	}
+	return filtered
+}
+
+func (s *Schedule) Simulate(ctx context.Context, flags any, args []string) error {
 	fv := flags.(*SimulateFlags)
 	var period datetime.CalendarDateRange
 	if err := period.Parse(fv.DateRange); err != nil {
@@ -137,6 +159,8 @@ func (s *Schedule) Simulate(ctx context.Context, flags any, _ []string) error {
 		return err
 	}
 
+	s.schedules.Schedules = s.filterSchedules(s.schedules.Schedules, args)
+
 	if s.system.Location.Latitude == 0 && s.system.Location.Longitude == 0 {
 		return fmt.Errorf("latitude and longitude must be specified either directly or via a zip code")
 	}
@@ -145,4 +169,54 @@ func (s *Schedule) Simulate(ctx context.Context, flags any, _ []string) error {
 
 	return scheduler.RunSimulation(ctx, s.schedules, s.system, period, schedulerOpts...)
 
+}
+
+func (s *Schedule) Print(ctx context.Context, flags any, args []string) error {
+	fv := flags.(*SchedulePrintFlags)
+	var dr datetime.CalendarDateRange
+	if f := fv.DateRange; len(f) > 0 {
+		if err := dr.Parse(f); err != nil {
+			return err
+		}
+	} else {
+		today := datetime.CalendarDateFromTime(time.Now())
+		dr = datetime.NewCalendarDateRange(today, today)
+	}
+
+	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
+	deviceOpts := []devices.Option{
+		devices.WithLogger(logger),
+	}
+	_, err := s.loadFiles(ctx, &fv.ConfigFileFlags, deviceOpts)
+	if err != nil {
+		return err
+	}
+
+	s.schedules.Schedules = s.filterSchedules(s.schedules.Schedules, args)
+
+	cal, err := scheduler.NewCalendar(s.schedules, s.system)
+	if err != nil {
+		return err
+	}
+	for day := range dr.Dates() {
+		fmt.Printf("%v\n", day)
+		actions := cal.Scheduled(day)
+		for _, a := range actions {
+			args := ""
+			if len(a.T.Args) > 0 {
+				args = strings.Join(a.T.Args, " ")
+				args = " " + args
+			}
+			pre := ""
+			if a.T.Precondition.Condition != nil {
+				pre = fmt.Sprintf("\t\tif %v", a.T.Precondition.Name)
+				if a.T.Precondition.Args != nil {
+					pre += fmt.Sprintf(" %v", a.T.Precondition.Args)
+				}
+			}
+			fmt.Printf("  %v: % 10v %v.%v%s\n", a.When, a.Name, a.T.DeviceName, a.T.Name, args)
+		}
+	}
+
+	return nil
 }
