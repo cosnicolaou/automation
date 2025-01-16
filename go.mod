@@ -13,7 +13,7 @@ require (
 	github.com/cosnicolaou/elk v0.0.0-20250115010947-f61fb661abf5
 	github.com/cosnicolaou/lutron v0.0.0-20250115011004-ba67b4d4d937
 	github.com/cosnicolaou/pentair v0.0.0-20250115011051-10f1ce25c822
-	github.com/cosnicolaou/weather v0.0.0-20250116001637-1963443e48de
+	github.com/cosnicolaou/weather v0.0.0-20250116202323-85eb2db9ff13
 	github.com/reiver/go-telnet v0.0.0-20180421082511-9ff0b2ab096e
 	github.com/ziutek/telnet v0.1.0
 	golang.org/x/text v0.21.0

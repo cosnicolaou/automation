@@ -77,6 +77,8 @@ github.com/cosnicolaou/weather v0.0.0-20250116000749-aaafc5a9ba11 h1:cHgmnWgOVPx
 github.com/cosnicolaou/weather v0.0.0-20250116000749-aaafc5a9ba11/go.mod h1:RAUseuax7w8FOqvhNWIzvUWLr1AFPLqKLT1y4lHPjNs=
 github.com/cosnicolaou/weather v0.0.0-20250116001637-1963443e48de h1:3Rr/oADVlFuSwKDH+XyTNe3QWFxFoi3/utEvIEtsJsA=
 github.com/cosnicolaou/weather v0.0.0-20250116001637-1963443e48de/go.mod h1:RAUseuax7w8FOqvhNWIzvUWLr1AFPLqKLT1y4lHPjNs=
+github.com/cosnicolaou/weather v0.0.0-20250116202323-85eb2db9ff13 h1:Ad65TuI8tNjLytmWR9JQk1S8U6LiUlP5Wfg40vCpW9g=
+github.com/cosnicolaou/weather v0.0.0-20250116202323-85eb2db9ff13/go.mod h1:gzpOa/gRakINcGohbesIGi0dDqw9Bkdkn1PQiCCCt+A=
 github.com/keybase/go-keychain v0.0.0-20231219164618-57a3676c3af6 h1:IsMZxCuZqKuao2vNdfD82fjjgPLfyHLpR41Z88viRWs=
 github.com/keybase/go-keychain v0.0.0-20231219164618-57a3676c3af6/go.mod h1:3VeWNIJaW+O5xpRQbPp0Ybqu1vJd/pm7s2F473HRrkw=
 github.com/keybase/go-keychain v0.0.0-20250107162724-3747e5bfbb71 h1:1+B+0oORGfgT2adCEqDAdWwm7uX6PJMIwloZ4KkWo+o=
