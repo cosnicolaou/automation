@@ -33,23 +33,29 @@ func NewCalendar(schedules Schedules, system devices.System, opts ...Option) (*C
 	return c, nil
 }
 
-func (c *Calendar) Scheduled(date datetime.CalendarDate) []schedule.Active[Action] {
+type CalendarEntry struct {
+	Schedule string
+	schedule.Active[Action]
+}
+
+func (c *Calendar) Scheduled(date datetime.CalendarDate) []CalendarEntry {
 	yp := datetime.YearPlace{
-		Year: date.Year(),
-		Place: datetime.Place{
-			TimeLocation: c.place.TimeLocation,
-		},
+		Year:  date.Year(),
+		Place: c.place,
 	}
 	month, day := date.Month(), date.Day()
 	today := datetime.NewDateRange(
 		datetime.NewDate(month, day),
 		datetime.NewDate(month, day),
 	)
-	actions := make([]schedule.Active[Action], 0, 50)
+	actions := make([]CalendarEntry, 0, 50)
 	for _, schedule := range c.schedulers {
 		for perDay := range schedule.scheduler.Scheduled(yp, schedule.schedule.Dates, today) {
 			for action := range perDay.Active(c.place) {
-				actions = append(actions, action)
+				actions = append(actions, CalendarEntry{
+					Schedule: schedule.schedule.Name,
+					Active:   action,
+				})
 			}
 		}
 	}

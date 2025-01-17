@@ -27,9 +27,13 @@ require (
 	cloudeng.io/text v0.0.11 // indirect
 	cloudeng.io/webapi/clients/nws v0.0.0-20250116040431-a16229cf0935 // indirect
 	cloudeng.io/webapi/operations v0.0.0-20250116040431-a16229cf0935 // indirect
+	github.com/jedib0t/go-pretty/v6 v6.6.5 // indirect
 	github.com/keybase/go-keychain v0.0.0-20250107162724-3747e5bfbb71 // indirect
+	github.com/mattn/go-runewidth v0.0.15 // indirect
 	github.com/mooncaker816/learnmeeus/v3 v3.0.0-20180601123323-8217f4131761 // indirect
 	github.com/nathan-osman/go-sunrise v1.1.0 // indirect
 	github.com/reiver/go-oi v1.0.0 // indirect
+	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/soniakeys/unit v1.0.0 // indirect
+	golang.org/x/sys v0.29.0 // indirect
 )

@@ -85,7 +85,7 @@ type precondition struct {
 }
 
 type actionDetailed struct {
-	When         timeOfDay      `yaml:"when" cmd:"time of day when the action is to be taken"`
+	When         string         `yaml:"when" cmd:"time of day when the action is to be taken"`
 	Action       string         `yaml:"action" cmd:"action to be taken"`
 	Args         []string       `yaml:"args,flow" cmd:"argument to be passed to the action"`
 	Precondition precondition   `yaml:"precondition" cmd:"precondition that must be satisfied before the action is taken"`
@@ -96,11 +96,11 @@ type actionDetailed struct {
 }
 
 type actionScheduleConfig struct {
-	Name            string               `yaml:"name" cmd:"name of the schedule"`
-	Device          string               `yaml:"device" cmd:"name of the device that the schedule applies to"`
-	Dates           datesConfig          `yaml:",inline" cmd:"dates that the schedule applies to"`
-	Actions         map[string]timeOfDay `yaml:"actions" cmd:"actions to be taken and when"`
-	ActionsDetailed []actionDetailed     `yaml:"actions_detailed" cmd:"actions that accept arguments"`
+	Name            string            `yaml:"name" cmd:"name of the schedule"`
+	Device          string            `yaml:"device" cmd:"name of the device that the schedule applies to"`
+	Dates           datesConfig       `yaml:",inline" cmd:"dates that the schedule applies to"`
+	Actions         map[string]string `yaml:"actions" cmd:"actions to be taken and when"`
+	ActionsDetailed []actionDetailed  `yaml:"actions_detailed" cmd:"actions that accept arguments"`
 }
 
 type schedulesConfig struct {
@@ -219,14 +219,14 @@ func (cfg schedulesConfig) createSchedules(sys devices.System) (Schedules, error
 		annual.Dates = dates
 
 		for name, when := range csched.Actions {
-			actions, err := cfg.createActions(sys, string(when), csched.Name, csched.Device, name, actionDetailed{})
+			actions, err := cfg.createActions(sys, when, csched.Name, csched.Device, name, actionDetailed{})
 			if err != nil {
 				return Schedules{}, err
 			}
 			annual.DailyActions = append(annual.DailyActions, actions...)
 		}
 		for _, details := range csched.ActionsDetailed {
-			actions, err := cfg.createActions(sys, string(details.When), csched.Name, csched.Device, details.Action, details)
+			actions, err := cfg.createActions(sys, details.When, csched.Name, csched.Device, details.Action, details)
 			if err != nil {
 				return Schedules{}, err
 			}

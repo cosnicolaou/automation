@@ -58,7 +58,7 @@ func parseFunctionAndDelta(s string) (datetime.DynamicTimeOfDay, time.Duration, 
 	s = strings.TrimSpace(s)
 	pidx, nidx := strings.Index(s, "+"), strings.Index(s, "-")
 	if pidx != -1 && nidx != -1 {
-		return nil, 0, fmt.Errorf("dynamic time of day with multiple deltas: %v", s)
+		return nil, 0, fmt.Errorf("dynamic time of day with multiple deltas: %q", s)
 	}
 	idx := max(pidx, nidx)
 	name := s
@@ -70,7 +70,7 @@ func parseFunctionAndDelta(s string) (datetime.DynamicTimeOfDay, time.Duration, 
 	name = strings.TrimSpace(name)
 	dyn, ok := DailyDynamic[name]
 	if !ok {
-		return nil, 0, fmt.Errorf("unknown dynamic time or invalid time: %v", s)
+		return nil, 0, fmt.Errorf("unknown dynamic time or invalid time: %q", s)
 	}
 	if len(delta) == 0 {
 		return dyn, 0, nil

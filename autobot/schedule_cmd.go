@@ -17,6 +17,7 @@ import (
 	"github.com/cosnicolaou/automation/devices"
 	"github.com/cosnicolaou/automation/internal"
 	"github.com/cosnicolaou/automation/scheduler"
+	"github.com/jedib0t/go-pretty/v6/table"
 )
 
 type ScheduleFlags struct {
@@ -35,7 +36,8 @@ type SimulateFlags struct {
 
 type SchedulePrintFlags struct {
 	ConfigFileFlags
-	DateRange string `subcmd:"date-range,,date range in <month>/<day>/<year>:<year>/<month>/<day> format"`
+	DateRange string `subcmd:"date-range,,date range in <month>/<day>/<year>:<year>/<month>/<day> 	format"`
+	Date      string `subcmd:"date,,date in <month>/<day>/<year> format"`
 }
 
 type Schedule struct {
@@ -179,8 +181,13 @@ func (s *Schedule) Print(ctx context.Context, flags any, args []string) error {
 			return err
 		}
 	} else {
-		today := datetime.CalendarDateFromTime(time.Now())
-		dr = datetime.NewCalendarDateRange(today, today)
+		day := datetime.CalendarDateFromTime(time.Now())
+		if f := fv.Date; len(f) > 0 {
+			if err := day.Parse(f); err != nil {
+				return err
+			}
+		}
+		dr = datetime.NewCalendarDateRange(day, day)
 	}
 
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
@@ -198,25 +205,32 @@ func (s *Schedule) Print(ctx context.Context, flags any, args []string) error {
 	if err != nil {
 		return err
 	}
+
+	tw := table.NewWriter()
+	tw.SetColumnConfigs([]table.ColumnConfig{
+		{Number: 1, AutoMerge: true},
+		{Number: 2, AutoMerge: true},
+	})
+	tw.AppendHeader(table.Row{"Date", "Time", "Schedule", "Device", "Operation", "Condition"})
 	for day := range dr.Dates() {
-		fmt.Printf("%v\n", day)
 		actions := cal.Scheduled(day)
 		for _, a := range actions {
-			args := ""
+			op := a.T.Name
 			if len(a.T.Args) > 0 {
-				args = strings.Join(a.T.Args, " ")
-				args = " " + args
+				op += "(" + strings.Join(a.T.Args, ", ") + ")"
 			}
 			pre := ""
 			if a.T.Precondition.Condition != nil {
-				pre = fmt.Sprintf("\t\tif %v", a.T.Precondition.Name)
+				pre = fmt.Sprintf("if %v", a.T.Precondition.Name)
 				if a.T.Precondition.Args != nil {
-					pre += fmt.Sprintf(" %v", a.T.Precondition.Args)
+					pre += "(" + strings.Join(a.T.Precondition.Args, ", ") + ")"
 				}
 			}
-			fmt.Printf("  %v: % 10v %v.%v%s\n", a.When, a.Name, a.T.DeviceName, a.T.Name, args)
+			tod := datetime.NewTimeOfDay(a.When.Hour(), a.When.Minute(), a.When.Second())
+			tw.AppendRow(table.Row{day, tod, a.Schedule, a.T.DeviceName, op, pre})
 		}
+		tw.AppendSeparator()
 	}
-
+	fmt.Println(tw.Render())
 	return nil
 }
