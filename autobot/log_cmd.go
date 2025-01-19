@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cosnicolaou/automation/internal"
+	"github.com/cosnicolaou/automation/internal/logging"
 )
 
 type LogFlags struct {
@@ -30,10 +30,10 @@ type Log struct {
 	out io.Writer
 }
 
-type logEntryHandler func(internal.LogEntry) error
+type logEntryHandler func(logging.Entry) error
 
 func (l *Log) processLog(rd io.Reader, fv *LogStatusFlags, lh logEntryHandler) error {
-	sc := internal.NewLogScanner(rd)
+	sc := logging.NewScanner(rd)
 	for le := range sc.Entries() {
 		if len(fv.Device) > 0 && le.Device != fv.Device {
 			continue
@@ -51,8 +51,8 @@ func (l *Log) processLog(rd io.Reader, fv *LogStatusFlags, lh logEntryHandler) e
 func (l *Log) Status(_ context.Context, flags any, args []string) error {
 	fv := flags.(*LogStatusFlags)
 	srh := statusRecoder{
-		StatusRecorder:   internal.NewStatusRecorder(),
-		pending:          make(map[int64]*internal.StatusRecord),
+		StatusRecorder:   logging.NewStatusRecorder(),
+		pending:          make(map[int64]*logging.StatusRecord),
 		streamingSummary: fv.StreamingSummary,
 		dailySummary:     fv.DailySummary,
 		out:              l.out,
@@ -74,8 +74,8 @@ func (l *Log) Status(_ context.Context, flags any, args []string) error {
 }
 
 type statusRecoder struct {
-	*internal.StatusRecorder
-	pending          map[int64]*internal.StatusRecord
+	*logging.StatusRecorder
+	pending          map[int64]*logging.StatusRecord
 	streamingSummary bool
 	dailySummary     bool
 	out              io.Writer
@@ -111,29 +111,29 @@ func (sr *statusRecoder) print(out io.Writer) {
 	}
 }
 
-func (sr *statusRecoder) process(le internal.LogEntry) error {
+func (sr *statusRecoder) process(le logging.Entry) error {
 	if le.Mod != "scheduler" {
 		return nil
 	}
 	printSummary := sr.streamingSummary
 	switch le.Msg {
-	case internal.LogPending:
+	case logging.LogPending:
 		rec := le.StatusRecord()
 		rec.Pending = le.Now
 		rec = sr.NewPending(rec)
 		sr.pending[le.ID] = rec
 		return nil
-	case internal.LogCompleted, internal.LogFailed:
+	case logging.LogCompleted, logging.LogFailed:
 		pending, ok := sr.pending[le.ID]
 		if !ok {
 			return nil
 		}
 		sr.PendingDone(pending, le.PreCondResult, le.Err)
-	case internal.LogNewDay, internal.LogYearEnd:
+	case logging.LogNewDay, logging.LogYearEnd:
 		if sr.dailySummary {
 			printSummary = true
 		}
-	case internal.LogTooLate:
+	case logging.LogTooLate:
 		fmt.Fprintf(sr.out, "% 70v: too late: due at: %v, delay: %v", le.Name(), le.Due, le.Delay)
 	default: // ignore all other messages.
 		return nil

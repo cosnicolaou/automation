@@ -2,7 +2,7 @@
 // Use of this source code is governed by the Apache-2.0
 // license that can be found in the LICENSE file.
 
-package internal
+package logging
 
 import (
 	"fmt"
@@ -17,59 +17,59 @@ const (
 	TimeWithTZNano = "2006-01-02T15:04:05.999999999 MST"
 )
 
-type LogTime time.Time
+type Time time.Time
 
-func (lt LogTime) MarshalJSON() ([]byte, error) {
+func (lt Time) MarshalJSON() ([]byte, error) {
 	b := []byte(time.Time(lt).Format(TimeWithTZ))
 	fmt.Printf("LT: %s\n", b)
 	return b, nil
 }
 
-func (lt *LogTime) UnmarshalJSON(data []byte) error {
+func (lt *Time) UnmarshalJSON(data []byte) error {
 	t, err := time.Parse(TimeWithTZ, string(data))
 	if err != nil {
 		return err
 	}
-	*lt = LogTime(t)
+	*lt = Time(t)
 	return nil
 }
 
-type LogTimeNano time.Time
+type TimeNano time.Time
 
-func (lt LogTimeNano) MarshalJSON() ([]byte, error) {
+func (lt TimeNano) MarshalJSON() ([]byte, error) {
 	return []byte(time.Time(lt).Format(TimeWithTZNano)), nil
 }
 
-func (lt *LogTimeNano) UnmarshalJSON(data []byte) error {
+func (lt *TimeNano) UnmarshalJSON(data []byte) error {
 	t, err := time.Parse(TimeWithTZNano, string(data))
 	if err != nil {
 		return err
 	}
-	*lt = LogTimeNano(t)
+	*lt = TimeNano(t)
 	return nil
 }
 
-type LogDuration time.Duration
+type Duration time.Duration
 
-func (ld LogDuration) MarshalJSON() ([]byte, error) {
+func (ld Duration) MarshalJSON() ([]byte, error) {
 	return []byte(time.Duration(ld).String()), nil
 }
 
-func (ld *LogDuration) UnmarshalJSON(data []byte) error {
+func (ld *Duration) UnmarshalJSON(data []byte) error {
 	d, err := time.ParseDuration(string(data))
 	if err != nil {
 		return err
 	}
-	*ld = LogDuration(d)
+	*ld = Duration(d)
 	return nil
 }
 
-type LogDate datetime.CalendarDate
+type Date datetime.CalendarDate
 
-func (ld LogDate) MarshalJSON() ([]byte, error) {
+func (ld Date) MarshalJSON() ([]byte, error) {
 	return []byte(datetime.CalendarDate(ld).String()), nil
 }
 
-func (ld *LogDate) UnmarshalJSON(data []byte) error {
+func (ld *Date) UnmarshalJSON(data []byte) error {
 	return (*datetime.CalendarDate)(ld).Parse(strings.Trim(string(data), `"`))
 }

@@ -17,7 +17,7 @@ import (
 	"cloudeng.io/datetime"
 	"cloudeng.io/errors"
 	"github.com/cosnicolaou/automation/devices"
-	"github.com/cosnicolaou/automation/internal"
+	"github.com/cosnicolaou/automation/internal/logging"
 	"github.com/cosnicolaou/automation/internal/testutil"
 	"github.com/cosnicolaou/automation/scheduler"
 	"golang.org/x/text/cases"
@@ -111,13 +111,13 @@ func (r *recorder) Lines() []string {
 	return lines
 }
 
-func (r *recorder) Logs(t *testing.T) []internal.LogEntry {
-	entries := []internal.LogEntry{}
+func (r *recorder) Logs(t *testing.T) []logging.Entry {
+	entries := []logging.Entry{}
 	for _, l := range bytes.Split(r.out.Bytes(), []byte("\n")) {
 		if len(l) == 0 {
 			continue
 		}
-		e, err := internal.ParseLogLine(string(l))
+		e, err := logging.ParseLogLine(string(l))
 		if err != nil {
 			t.Errorf("failed to parse: %v: %v", string(l), err)
 		}
@@ -129,7 +129,7 @@ func (r *recorder) Logs(t *testing.T) []internal.LogEntry {
 	return entries
 }
 
-func containsError(logs []internal.LogEntry) error {
+func containsError(logs []logging.Entry) error {
 	for _, l := range logs {
 		if l.Err != nil {
 			return l.Err
@@ -516,7 +516,7 @@ func TestDST(t *testing.T) {
 	}
 }
 
-func operationsByDate(logs []internal.LogEntry) (
+func operationsByDate(logs []logging.Entry) (
 	days []datetime.Date,
 	timesByDate map[datetime.Date]map[string][]time.Time,
 	opsByName map[string][]int,

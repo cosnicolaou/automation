@@ -15,7 +15,7 @@ import (
 
 	"cloudeng.io/datetime"
 	"github.com/cosnicolaou/automation/devices"
-	"github.com/cosnicolaou/automation/internal"
+	"github.com/cosnicolaou/automation/internal/logging"
 	"github.com/cosnicolaou/automation/scheduler"
 	"github.com/jedib0t/go-pretty/v6/table"
 )
@@ -93,7 +93,7 @@ func (s *Schedule) Run(ctx context.Context, flags any, _ []string) error {
 		devices.WithLogger(logger),
 	}
 
-	sr := internal.NewStatusRecorder()
+	sr := logging.NewStatusRecorder()
 	schedulerOpts := []scheduler.Option{
 		scheduler.WithLogger(logger),
 		scheduler.WithOperationWriter(os.Stdout),
@@ -148,7 +148,7 @@ func (s *Schedule) Simulate(ctx context.Context, flags any, args []string) error
 		devices.WithLogger(logger),
 	}
 
-	sr := internal.NewStatusRecorder()
+	sr := logging.NewStatusRecorder()
 	schedulerOpts := []scheduler.Option{
 		scheduler.WithLogger(logger),
 		scheduler.WithOperationWriter(os.Stdout),

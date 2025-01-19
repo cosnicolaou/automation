@@ -2,7 +2,7 @@
 // Use of this source code is governed by the Apache-2.0
 // license that can be found in the LICENSE file.
 
-package internal
+package logging
 
 import (
 	"bufio"
@@ -31,7 +31,7 @@ type logEntry struct {
 	NumActions    int       `json:"#actions"`
 	YearEndDelay  int       `json:"year-end-delay"`
 	Err           string    `json:"err"`
-	Date          LogDate   `json:"date"`
+	Date          Date      `json:"date"`
 	Now           time.Time `json:"now"`
 	Due           time.Time `json:"due"`
 	Started       time.Time `json:"started"`
@@ -40,7 +40,7 @@ type logEntry struct {
 	YearEnd       int       `json:"year"`
 }
 
-type LogEntry struct {
+type Entry struct {
 	logEntry
 
 	Date         datetime.CalendarDate
@@ -53,8 +53,8 @@ type LogEntry struct {
 	LogEntry     string // Original log line
 }
 
-func ParseLogLine(line string) (LogEntry, error) {
-	var le LogEntry
+func ParseLogLine(line string) (Entry, error) {
+	var le Entry
 	le.LogEntry = line
 	if err := json.Unmarshal([]byte(line), &le.logEntry); err != nil {
 		return le, err
@@ -75,15 +75,15 @@ func ParseLogLine(line string) (LogEntry, error) {
 	return le, nil
 }
 
-func (le LogEntry) Aborted() bool {
+func (le Entry) Aborted() bool {
 	return le.PreCond != "" && !le.PreCondResult
 }
 
-func (le LogEntry) Name() string {
+func (le Entry) Name() string {
 	return fmt.Sprintf("%v:%v.%v", le.Schedule, le.Device, le.Op)
 }
 
-func (le LogEntry) StatusRecord() *StatusRecord {
+func (le Entry) StatusRecord() *StatusRecord {
 	sr := &StatusRecord{
 		ID:                 le.ID,
 		Schedule:           le.Schedule,
@@ -99,20 +99,20 @@ func (le LogEntry) StatusRecord() *StatusRecord {
 	return sr
 }
 
-type LogScanner struct {
+type Scanner struct {
 	sc  *bufio.Scanner
 	err error
 }
 
-func NewLogScanner(rd io.Reader) *LogScanner {
-	return &LogScanner{sc: bufio.NewScanner(rd)}
+func NewScanner(rd io.Reader) *Scanner {
+	return &Scanner{sc: bufio.NewScanner(rd)}
 }
 
 // Entries returns an iterator for over the LogScanner's LogEntry's. Note
 // that the iterator will stop if an error is encountered and that the
 // Scanner's Err method should be checked after the iterator has completed.
-func (ls *LogScanner) Entries() iter.Seq[LogEntry] {
-	return func(yield func(LogEntry) bool) {
+func (ls *Scanner) Entries() iter.Seq[Entry] {
+	return func(yield func(Entry) bool) {
 		for {
 			if !ls.sc.Scan() {
 				ls.err = ls.sc.Err()
@@ -131,6 +131,6 @@ func (ls *LogScanner) Entries() iter.Seq[LogEntry] {
 	}
 }
 
-func (ls *LogScanner) Err() error {
+func (ls *Scanner) Err() error {
 	return ls.err
 }
