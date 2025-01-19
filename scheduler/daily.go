@@ -10,18 +10,10 @@ import (
 
 	"cloudeng.io/datetime/schedule"
 	"github.com/cosnicolaou/automation/devices"
-	"gopkg.in/yaml.v3"
 )
 
-type timeOfDay string
-
-func (t *timeOfDay) UnmarshalYAML(node *yaml.Node) error {
-	var atl ActionTimeList
-	*t = timeOfDay(node.Value)
-	return atl.Parse(node.Value)
-}
-
 type Precondition struct {
+	Device    string
 	Name      string
 	Condition devices.Condition
 	Args      []string

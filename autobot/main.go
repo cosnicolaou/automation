@@ -83,7 +83,7 @@ func cli() *subcmd.CommandSetYAML {
 	schedule := &Schedule{}
 	cmd.Set("schedule", "run").MustRunner(schedule.Run, &ScheduleFlags{})
 	cmd.Set("schedule", "simulate").MustRunner(schedule.Simulate, &SimulateFlags{})
-	// cmd.Set("schedule", "print").MustRunner(schedule.Print, &SchedulePrintFlags{})
+	cmd.Set("schedule", "print").MustRunner(schedule.Print, &SchedulePrintFlags{})
 
 	log := &Log{out: os.Stdout}
 	cmd.Set("logs", "status").MustRunner(log.Status, &LogStatusFlags{})
