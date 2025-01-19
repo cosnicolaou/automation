@@ -14,6 +14,7 @@ require (
 	github.com/cosnicolaou/lutron v0.0.0-20250119025248-26a281652da7
 	github.com/cosnicolaou/pentair v0.0.0-20250115011051-10f1ce25c822
 	github.com/cosnicolaou/weather v0.0.0-20250116202323-85eb2db9ff13
+	github.com/jedib0t/go-pretty/v6 v6.6.5
 	github.com/reiver/go-telnet v0.0.0-20180421082511-9ff0b2ab096e
 	github.com/ziutek/telnet v0.1.0
 	golang.org/x/text v0.21.0
@@ -21,14 +22,13 @@ require (
 )
 
 require (
-	cloudeng.io v0.0.0-20250114011922-deda84865886 // indirect
 	cloudeng.io/file v0.0.0-20250115012004-c76cbf27f83d // indirect
 	cloudeng.io/net v0.0.0-20250115012004-c76cbf27f83d // indirect
 	cloudeng.io/text v0.0.11 // indirect
 	cloudeng.io/webapi/clients/nws v0.0.0-20250116040431-a16229cf0935 // indirect
 	cloudeng.io/webapi/operations v0.0.0-20250116040431-a16229cf0935 // indirect
-	github.com/jedib0t/go-pretty/v6 v6.6.5 // indirect
 	github.com/keybase/go-keychain v0.0.0-20250107162724-3747e5bfbb71 // indirect
+	github.com/kr/text v0.2.0 // indirect
 	github.com/mattn/go-runewidth v0.0.15 // indirect
 	github.com/mooncaker816/learnmeeus/v3 v3.0.0-20180601123323-8217f4131761 // indirect
 	github.com/nathan-osman/go-sunrise v1.1.0 // indirect
