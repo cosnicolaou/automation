@@ -18,7 +18,7 @@ import (
 	"cloudeng.io/datetime/schedule"
 	"cloudeng.io/sync/errgroup"
 	"github.com/cosnicolaou/automation/devices"
-	"github.com/cosnicolaou/automation/internal"
+	"github.com/cosnicolaou/automation/internal/logging"
 )
 
 var ErrOpTimeout = errors.New("op-timeout")
@@ -72,8 +72,8 @@ func (s *Scheduler) runSingleOp(ctx context.Context, due time.Time, action sched
 	return preconditionAbort, err
 }
 
-func (s *Scheduler) newStatusRecord(delay time.Duration, a schedule.Active[Action]) *internal.StatusRecord {
-	rec := &internal.StatusRecord{
+func (s *Scheduler) newStatusRecord(delay time.Duration, a schedule.Active[Action]) *logging.StatusRecord {
+	rec := &logging.StatusRecord{
 		Schedule: s.schedule.Name,
 		Due:      a.When,
 		Delay:    delay,
@@ -86,7 +86,7 @@ func (s *Scheduler) newStatusRecord(delay time.Duration, a schedule.Active[Actio
 	return rec
 }
 
-func (s *Scheduler) newPending(id int64, delay time.Duration, a schedule.Active[Action]) *internal.StatusRecord {
+func (s *Scheduler) newPending(id int64, delay time.Duration, a schedule.Active[Action]) *logging.StatusRecord {
 	if sr := s.statusRecorder; sr != nil {
 		rec := s.newStatusRecord(delay, a)
 		rec.ID = id
@@ -95,7 +95,7 @@ func (s *Scheduler) newPending(id int64, delay time.Duration, a schedule.Active[
 	return nil
 }
 
-func (s *Scheduler) completed(rec *internal.StatusRecord, precondition bool, err error) {
+func (s *Scheduler) completed(rec *logging.StatusRecord, precondition bool, err error) {
 	if sr := s.statusRecorder; sr != nil {
 		sr.PendingDone(rec, precondition, err)
 	}
@@ -107,7 +107,7 @@ func (s *Scheduler) RunDay(ctx context.Context, place datetime.Place, active sch
 		started := s.timeSource.NowIn(dueAt.Location())
 		delay := dueAt.Sub(started)
 		overdue := delay < 0 && -delay > time.Minute
-		id := internal.WritePendingLog(
+		id := logging.WritePending(
 			s.logger,
 			overdue,
 			s.dryRun,
@@ -136,7 +136,7 @@ func (s *Scheduler) RunDay(ctx context.Context, place datetime.Place, active sch
 		if !s.dryRun {
 			aborted, err = s.runSingleOp(ctx, dueAt, active)
 		}
-		internal.WriteCompletionLog(
+		logging.WriteCompletion(
 			s.logger,
 			id,
 			err,
@@ -164,7 +164,7 @@ func (s *Scheduler) RunYear(ctx context.Context, cd datetime.CalendarDate) error
 	}
 	toYearEnd := datetime.NewDateRange(cd.Date(), datetime.NewDate(12, 31))
 	for active := range s.scheduler.Scheduled(yp, s.schedule.Dates, toYearEnd) {
-		internal.WriteNewDayLog(s.logger, active.Date, len(active.Specs))
+		logging.WriteNewDay(s.logger, active.Date, len(active.Specs))
 		if len(active.Specs) == 0 {
 			continue
 		}
@@ -185,7 +185,7 @@ func (s *Scheduler) RunYearEnd(ctx context.Context, cd datetime.CalendarDate) er
 	yearEnd := time.Date(year, 12, 31, 23, 59, 59, int(time.Second)-1, s.place.TimeLocation)
 	now := s.timeSource.NowIn(s.place.TimeLocation)
 	delay := yearEnd.Sub(now)
-	internal.WriteYearEndLog(s.logger, year, delay)
+	logging.WriteYearEnd(s.logger, year, delay)
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
@@ -221,7 +221,7 @@ type options struct {
 	logger         *slog.Logger
 	opWriter       io.Writer
 	dryRun         bool
-	statusRecorder *internal.StatusRecorder
+	statusRecorder *logging.StatusRecorder
 	simulatedDelay time.Duration
 }
 
@@ -269,7 +269,7 @@ func WithDryRun(v bool) Option {
 	}
 }
 
-func WithStatusRecorder(sr *internal.StatusRecorder) Option {
+func WithStatusRecorder(sr *logging.StatusRecorder) Option {
 	return func(o *options) {
 		o.statusRecorder = sr
 	}

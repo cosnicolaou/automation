@@ -14,7 +14,7 @@ import (
 
 	"cloudeng.io/datetime"
 	"cloudeng.io/geospatial/astronomy"
-	"github.com/cosnicolaou/automation/internal"
+	"github.com/cosnicolaou/automation/internal/logging"
 )
 
 func countEvents(t *testing.T, logfile string) (counts map[string]map[string]int, dates map[string][]datetime.CalendarDate) {
@@ -23,7 +23,7 @@ func countEvents(t *testing.T, logfile string) (counts map[string]map[string]int
 		t.Fatalf("failed to open log file: %v", err)
 	}
 	defer f.Close()
-	sc := internal.NewLogScanner(f)
+	sc := logging.NewScanner(f)
 	counts = map[string]map[string]int{}
 	counts["aborted"] = map[string]int{}
 	dates = map[string][]datetime.CalendarDate{}
