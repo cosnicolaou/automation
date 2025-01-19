@@ -13,6 +13,7 @@ import (
 )
 
 type Precondition struct {
+	Device    string
 	Name      string
 	Condition devices.Condition
 	Args      []string

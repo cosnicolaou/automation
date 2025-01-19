@@ -221,7 +221,7 @@ func (s *Schedule) Print(ctx context.Context, flags any, args []string) error {
 			}
 			pre := ""
 			if a.T.Precondition.Condition != nil {
-				pre = fmt.Sprintf("if %v", a.T.Precondition.Name)
+				pre = fmt.Sprintf("if %v.%v", a.T.Precondition.Device, a.T.Precondition.Name)
 				if a.T.Precondition.Args != nil {
 					pre += "(" + strings.Join(a.T.Precondition.Args, ", ") + ")"
 				}

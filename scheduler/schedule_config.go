@@ -193,6 +193,7 @@ func (cfg schedulesConfig) createActions(sys devices.System, times, scheduleName
 					Args:       details.Args,
 				},
 				Precondition: Precondition{
+					Device:    details.Precondition.Device,
 					Name:      details.Precondition.Op,
 					Condition: condition,
 					Args:      details.Precondition.Args,

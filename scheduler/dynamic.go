@@ -28,8 +28,9 @@ var (
 	}
 
 	DailyDynamic = map[string]datetime.DynamicTimeOfDay{
-		"sunrise": astronomy.SunRise{},
-		"sunset":  astronomy.SunSet{},
+		"sunrise":   astronomy.SunRise{},
+		"sunset":    astronomy.SunSet{},
+		"solarnoon": astronomy.SolarNoon{},
 	}
 )
 

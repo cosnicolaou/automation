@@ -5,13 +5,13 @@ go 1.23.1
 require (
 	cloudeng.io/algo v0.0.0-20250115012004-c76cbf27f83d
 	cloudeng.io/cmdutil v0.0.0-20250115012004-c76cbf27f83d
-	cloudeng.io/datetime v0.0.0-20250115012004-c76cbf27f83d
+	cloudeng.io/datetime v0.0.0-20250119024745-8a46e9bdda10
 	cloudeng.io/errors v0.0.10
-	cloudeng.io/geospatial v0.0.0-20250115012004-c76cbf27f83d
+	cloudeng.io/geospatial v0.0.0-20250119024745-8a46e9bdda10
 	cloudeng.io/macos v0.0.0-20250115012004-c76cbf27f83d
 	cloudeng.io/sync v0.0.8
 	github.com/cosnicolaou/elk v0.0.0-20250115010947-f61fb661abf5
-	github.com/cosnicolaou/lutron v0.0.0-20250115011004-ba67b4d4d937
+	github.com/cosnicolaou/lutron v0.0.0-20250119025248-26a281652da7
 	github.com/cosnicolaou/pentair v0.0.0-20250115011051-10f1ce25c822
 	github.com/cosnicolaou/weather v0.0.0-20250116202323-85eb2db9ff13
 	github.com/reiver/go-telnet v0.0.0-20180421082511-9ff0b2ab096e
