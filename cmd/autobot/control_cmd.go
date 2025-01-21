@@ -16,7 +16,7 @@ import (
 	"time"
 
 	"cloudeng.io/cmdutil"
-	"github.com/cosnicolaou/automation/autobot/internal/webapi"
+	"github.com/cosnicolaou/automation/cmd/autobot/internal/webapi"
 	"github.com/cosnicolaou/automation/devices"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/pkg/browser"

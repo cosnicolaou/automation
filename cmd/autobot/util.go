@@ -15,8 +15,8 @@ import (
 
 	"cloudeng.io/cmdutil/keystore"
 	"cloudeng.io/geospatial/zipcode"
-	"github.com/cosnicolaou/automation/autobot/internal"
-	"github.com/cosnicolaou/automation/autobot/internal/zipfs"
+	"github.com/cosnicolaou/automation/cmd/autobot/internal"
+	"github.com/cosnicolaou/automation/cmd/autobot/internal/zipfs"
 	"github.com/cosnicolaou/automation/devices"
 	"github.com/cosnicolaou/automation/scheduler"
 )
