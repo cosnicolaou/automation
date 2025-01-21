@@ -6,7 +6,6 @@ package main
 
 import (
 	"context"
-	"embed"
 	"fmt"
 	"io/fs"
 	"os"
@@ -17,6 +16,7 @@ import (
 	"cloudeng.io/cmdutil/keystore"
 	"cloudeng.io/geospatial/zipcode"
 	"github.com/cosnicolaou/automation/autobot/internal"
+	"github.com/cosnicolaou/automation/autobot/internal/zipfs"
 	"github.com/cosnicolaou/automation/devices"
 	"github.com/cosnicolaou/automation/scheduler"
 )
@@ -54,9 +54,6 @@ func loadSchedules(ctx context.Context, fv *ConfigFileFlags, sys devices.System)
 	}
 	return scheds, nil
 }
-
-//go:embed US.zip
-var USZipCodes embed.FS
 
 type zipLookup struct {
 	*zipcode.DB
@@ -112,7 +109,7 @@ func loadZIPDatabaseDir(db *zipcode.DB, lfs fs.FS) error {
 func loadZIPDatabase(dbdir string) (zipLookup, error) {
 	db := zipcode.NewDB()
 	if len(dbdir) == 0 {
-		var lfs fs.FS = USZipCodes
+		var lfs fs.FS = zipfs.USZipCodes
 		if err := internal.LoadFromZIPArchive(db, lfs, "US.zip"); err != nil {
 			return zipLookup{}, fmt.Errorf("failed to load embedded US zipcode database: %v", err)
 		}

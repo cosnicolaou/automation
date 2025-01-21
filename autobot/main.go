@@ -23,13 +23,15 @@ const cmdSpec = `name: autobot
 summary: autobot is a command line tool for interacting with home automation systems
 commands:
   - name: control
-    summary: issue a series of commands to control/interact with a homne automation system
+    summary: issue a series of commands to control/interact with home automation systems
     commands:
       - name: run
+        summary: run a single operation on a device or controller
         arguments:
           - <name.op> - name of the device or controller and the operation to perform
           - <parameters>...
       - name: condition
+        summary: run a single pre-condition test
         arguments:
           - <name.condition> - name of the device and the condition to test
           - <parameters>...
@@ -49,14 +51,11 @@ commands:
         arguments:
           - <schedule>...
       - name: simulate
-        summary: |
-          run the scheduler using simulated time so that it skips from
-          scheduled time to scheduled time with minimal delay
+        summary: run the scheduler using simulated time so that it skips from scheduled time to scheduled time with minimal delay
         arguments:
           - <schedule>...
       - name: print
-        summary: |
-          print the requested schedules, or all schedules if none are specified
+        summary: print the requested schedules, or all schedules if none are specified
         arguments:
           - <schedule>...
   - name: config

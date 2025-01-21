@@ -7,7 +7,7 @@ package webapi
 import (
 	"net/http"
 
-	"github.com/cosnicolaou/automation/internal/webassets"
+	"github.com/cosnicolaou/automation/autobot/internal/webassets"
 )
 
 func AppendTestServerEndpoints(mux *http.ServeMux,
