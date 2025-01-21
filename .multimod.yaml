@@ -16,7 +16,7 @@ annotate:
   [
     "goannotate",
     "--config=${MULTIMOD_ROOT}/copyright-annotation.yaml",
-    "--annotation=cloudeng-copyright",
+    "--annotation=personal-copyright",
   ]
 usage: ["gousage", "--overwrite", "./..."]
 update: ["go", "get", "-u", "./...", ";", "go", "mod", "tidy"]
