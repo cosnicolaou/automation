@@ -133,7 +133,6 @@ func opNames[Map ~map[string]V, V any](m Map) []string {
 }
 
 func (c *Config) Operations(ctx context.Context, flags any, _ []string) error {
-
 	fv := flags.(*ConfigFlags)
 	opts := []devices.Option{
 		devices.WithLogger(slog.New(slog.NewTextHandler(os.Stderr, nil)))}
@@ -142,46 +141,9 @@ func (c *Config) Operations(ctx context.Context, flags any, _ []string) error {
 	if err != nil {
 		return err
 	}
-
-	for _, cfg := range system.Config.Controllers {
-		available := system.Controllers[cfg.Name].Operations()
-		sorted := opNames(available)
-		fmt.Fprintf(c.out, "Controller: %v\n", cfg.Name)
-		for _, op := range sorted {
-			_, configured := cfg.Operations[op]
-			if !configured {
-				fmt.Fprintf(c.out, "  %v: but not configured\n", op)
-				continue
-			}
-			h := system.Controllers[cfg.Name].OperationsHelp()[op]
-			fmt.Fprintf(c.out, "  %v:  %v\n", op, h)
-		}
-	}
-
-	for _, cfg := range system.Config.Devices {
-		availableOps := system.Devices[cfg.Name].Operations()
-		sorted := opNames(availableOps)
-		fmt.Fprintf(c.out, "Device: %v\n", cfg.Name)
-		for _, op := range sorted {
-			_, configured := cfg.Operations[op]
-			if !configured {
-				fmt.Fprintf(c.out, "  %v: but not configured\n", op)
-				continue
-			}
-			h := system.Devices[cfg.Name].OperationsHelp()[op]
-			fmt.Fprintf(c.out, "  %v:  %v\n", op, h)
-		}
-		availableConditions := system.Devices[cfg.Name].Conditions()
-		sorted = opNames(availableConditions)
-		for _, op := range sorted {
-			_, configured := cfg.Conditions[op]
-			if !configured {
-				fmt.Fprintf(c.out, "  %v: but not configured\n", op)
-				continue
-			}
-			h := system.Devices[cfg.Name].ConditionsHelp()[op]
-			fmt.Fprintf(c.out, "  %v:  %v\n", op, h)
-		}
-	}
+	ctrl, dev, conds := newOperationsTables(system, "")
+	fmt.Println(ctrl.Render())
+	fmt.Println(dev.Render())
+	fmt.Println(conds.Render())
 	return nil
 }

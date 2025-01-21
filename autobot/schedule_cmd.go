@@ -10,14 +10,12 @@ import (
 	"io"
 	"log/slog"
 	"os"
-	"strings"
 	"time"
 
 	"cloudeng.io/datetime"
 	"github.com/cosnicolaou/automation/devices"
 	"github.com/cosnicolaou/automation/internal/logging"
 	"github.com/cosnicolaou/automation/scheduler"
-	"github.com/jedib0t/go-pretty/v6/table"
 )
 
 type ScheduleFlags struct {
@@ -206,31 +204,7 @@ func (s *Schedule) Print(ctx context.Context, flags any, args []string) error {
 		return err
 	}
 
-	tw := table.NewWriter()
-	tw.SetColumnConfigs([]table.ColumnConfig{
-		{Number: 1, AutoMerge: true},
-		{Number: 2, AutoMerge: true},
-	})
-	tw.AppendHeader(table.Row{"Date", "Time", "Schedule", "Device", "Operation", "Condition"})
-	for day := range dr.Dates() {
-		actions := cal.Scheduled(day)
-		for _, a := range actions {
-			op := a.T.Name
-			if len(a.T.Args) > 0 {
-				op += "(" + strings.Join(a.T.Args, ", ") + ")"
-			}
-			pre := ""
-			if a.T.Precondition.Condition != nil {
-				pre = fmt.Sprintf("if %v.%v", a.T.Precondition.Device, a.T.Precondition.Name)
-				if a.T.Precondition.Args != nil {
-					pre += "(" + strings.Join(a.T.Precondition.Args, ", ") + ")"
-				}
-			}
-			tod := datetime.NewTimeOfDay(a.When.Hour(), a.When.Minute(), a.When.Second())
-			tw.AppendRow(table.Row{day, tod, a.Schedule, a.T.DeviceName, op, pre})
-		}
-		tw.AppendSeparator()
-	}
+	tw := newCalendarTable(cal, dr)
 	fmt.Println(tw.Render())
 	return nil
 }

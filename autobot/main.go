@@ -29,7 +29,7 @@ commands:
         arguments:
           - <name.op> - name of the device or controller and the operation to perform
           - <parameters>...
-      - name: test
+      - name: condition
         arguments:
           - <name.condition> - name of the device and the condition to test
           - <parameters>...
@@ -37,6 +37,10 @@ commands:
         summary: read commands from a file
         arguments:
           - <filename> - the file to read commands from
+      - name: serve-test-page
+        summary: run a local webserver with links to every operation and condition to simplify testing
+        arguments:
+
   - name: schedule
     summary: schedule a series of commands to be executed at specific times
     commands:
@@ -73,8 +77,9 @@ func cli() *subcmd.CommandSetYAML {
 
 	control := &Control{}
 	cmd.Set("control", "run").MustRunner(control.Run, &ControlFlags{})
-	cmd.Set("control", "test").MustRunner(control.Test, &ControlFlags{})
+	cmd.Set("control", "condition").MustRunner(control.Condition, &ControlFlags{})
 	cmd.Set("control", "script").MustRunner(control.RunScript, &ControlScriptFlags{})
+	cmd.Set("control", "serve-test-page").MustRunner(control.ServeTestPage, &ControlTestPageFlags{})
 
 	config := &Config{out: os.Stdout}
 	cmd.Set("config", "display").MustRunner(config.Display, &ConfigFlags{})
