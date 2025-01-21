@@ -8,11 +8,18 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
+	"net/http"
 	"os"
 	"strings"
+	"time"
 
+	"cloudeng.io/cmdutil"
 	"github.com/cosnicolaou/automation/devices"
+	"github.com/cosnicolaou/automation/internal/webapi"
+	"github.com/jedib0t/go-pretty/v6/table"
+	"github.com/pkg/browser"
 )
 
 type ControlFlags struct {
@@ -23,11 +30,16 @@ type ControlScriptFlags struct {
 	ControlFlags
 }
 
+type ControlTestPageFlags struct {
+	ControlFlags
+	Port string `subcmd:"port,8080,port to listen on"`
+}
+
 type Control struct {
 	system devices.System
 }
 
-func (c *Control) runOp(ctx context.Context, system devices.System, nameAndOp string, args []string) error {
+func (c *Control) runOp(ctx context.Context, system devices.System, writer io.Writer, nameAndOp string, args []string) error {
 	parts := strings.Split(nameAndOp, ".")
 	if len(parts) != 2 {
 		return fmt.Errorf("invalid operation: %v, should be name.operation", nameAndOp)
@@ -44,7 +56,7 @@ func (c *Control) runOp(ctx context.Context, system devices.System, nameAndOp st
 			args = pars
 		}
 		opts := devices.OperationArgs{
-			Writer: os.Stdout,
+			Writer: writer,
 			Args:   args,
 		}
 		if err := fn(ctx, opts); err != nil {
@@ -58,7 +70,7 @@ func (c *Control) runOp(ctx context.Context, system devices.System, nameAndOp st
 			args = pars
 		}
 		opts := devices.OperationArgs{
-			Writer: os.Stdout,
+			Writer: writer,
 			Args:   args,
 		}
 		if err := fn(ctx, opts); err != nil {
@@ -70,7 +82,7 @@ func (c *Control) runOp(ctx context.Context, system devices.System, nameAndOp st
 	return fmt.Errorf("unknown or not configured operation: %v, %v", name, op)
 }
 
-func (c *Control) runCondition(ctx context.Context, system devices.System, nameAndOp string, args []string) (bool, error) {
+func (c *Control) runCondition(ctx context.Context, system devices.System, writer io.Writer, nameAndOp string, args []string) (bool, error) {
 	parts := strings.Split(nameAndOp, ".")
 	if len(parts) != 2 {
 		return false, fmt.Errorf("invalid condition: %v, should be name.condition", nameAndOp)
@@ -86,7 +98,7 @@ func (c *Control) runCondition(ctx context.Context, system devices.System, nameA
 			args = pars
 		}
 		opts := devices.OperationArgs{
-			Writer: os.Stdout,
+			Writer: writer,
 			Args:   args,
 		}
 		result, err := fn(ctx, opts)
@@ -119,20 +131,20 @@ func (c *Control) Run(ctx context.Context, flags any, args []string) error {
 	}
 	cmd := args[0]
 	parameters := args[1:]
-	if err := c.runOp(ctx, c.system, cmd, parameters); err != nil {
+	if err := c.runOp(ctx, c.system, os.Stdout, cmd, parameters); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (c *Control) Test(ctx context.Context, flags any, args []string) error {
+func (c *Control) Condition(ctx context.Context, flags any, args []string) error {
 	ctx, err := c.setup(ctx, flags.(*ControlFlags))
 	if err != nil {
 		return err
 	}
 	cmd := args[0]
 	parameters := args[1:]
-	result, err := c.runCondition(ctx, c.system, cmd, parameters)
+	result, err := c.runCondition(ctx, c.system, os.Stdout, cmd, parameters)
 	if err != nil {
 		return err
 	}
@@ -145,9 +157,7 @@ func (c *Control) RunScript(ctx context.Context, flags any, args []string) error
 	if err != nil {
 		return err
 	}
-
 	scriptFile := args[0]
-
 	f, err := os.Open(scriptFile)
 	if err != nil {
 		return fmt.Errorf("failed to open script file: %v: %v", scriptFile, err)
@@ -165,9 +175,90 @@ func (c *Control) RunScript(ctx context.Context, flags any, args []string) error
 		}
 		cmd := parts[0]
 		parameters := parts[1:]
-		if err := c.runOp(ctx, c.system, cmd, parameters); err != nil {
+		if err := c.runOp(ctx, c.system, os.Stdout, cmd, parameters); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func renderHTML(t table.Writer) string {
+	t.SetStyle(table.Style{
+		HTML: table.HTMLOptions{
+			CSSClass:    "table",
+			EmptyColumn: "&nbsp;",
+			EscapeText:  false,
+			Newline:     "<br/>",
+		}})
+	return t.RenderHTML()
+}
+
+func decodeArgs(r *http.Request) (string, string, []string) {
+	pars := r.URL.Query()
+	dev := pars.Get("device")
+	op := pars.Get("op")
+	return dev, op, pars["arg"]
+}
+
+func (c *Control) serveOperation(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+	dev, op, args := decodeArgs(r)
+	if dev == "" || op == "" {
+		http.Error(w, "missing device or operation", http.StatusBadRequest)
+		return
+	}
+	if err := c.runOp(ctx, c.system, w, dev+"."+op, args); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
+func (c *Control) serveCondition(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+	_, _, _ = ctx, w, r
+}
+
+func (c *Control) ServeTestPage(ctx context.Context, flags any, _ []string) error {
+	fv := flags.(*ControlTestPageFlags)
+	ctx, err := c.setup(ctx, &fv.ControlFlags)
+	if err != nil {
+		return err
+	}
+
+	addr := fmt.Sprintf("127.0.0.1:%v", fv.Port)
+
+	ctrl, dev, conds := newOperationsTables(c.system, addr)
+	ctrlList, devList, devWithCondList := newDevicesTables(c.system)
+
+	mux := http.NewServeMux()
+	webapi.AppendTestServerEndpoints(mux,
+		fv.ConfigFileFlags.SystemFile,
+		renderHTML(ctrlList),
+		renderHTML(devList),
+		renderHTML(devWithCondList),
+		renderHTML(ctrl),
+		renderHTML(dev),
+		renderHTML(conds),
+	)
+
+	mux.HandleFunc("/api/operation", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		c.serveOperation(ctx, w, r)
+	})
+
+	mux.HandleFunc("/api/condition", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		c.serveCondition(ctx, w, r)
+	})
+
+	server := &http.Server{
+		Addr:              addr,
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+
+	fmt.Printf("running server at http://%v\n", addr)
+	cmdutil.HandleSignals(func() {
+		_ = server.Shutdown(ctx)
+	}, os.Interrupt)
+	_ = browser.OpenURL("http://" + addr)
+	return server.ListenAndServe()
 }

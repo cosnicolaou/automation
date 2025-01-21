@@ -33,8 +33,12 @@ github.com/cosnicolaou/elk v0.0.0-20250115010947-f61fb661abf5 h1:V67sqZpEcj0YCj8
 github.com/cosnicolaou/elk v0.0.0-20250115010947-f61fb661abf5/go.mod h1:F74+5gfjkoOEI+qaA/i//9NdFdN2qWHhyIFbW651huE=
 github.com/cosnicolaou/lutron v0.0.0-20250119025248-26a281652da7 h1:nVS/HlXWQgORmOwI5qM/AlwpViVNcPYWUGno+A+XCYY=
 github.com/cosnicolaou/lutron v0.0.0-20250119025248-26a281652da7/go.mod h1:5NcygPhpjPUIhKdbGk86wd6q7g3KXa0QeJxHzc6t5v4=
+github.com/cosnicolaou/lutron v0.0.0-20250121201900-1bd05aebc0b3 h1:IMwdVjwMcmBp0BqHEHwzk6TH9xGeRg4+H7SqtL12x0s=
+github.com/cosnicolaou/lutron v0.0.0-20250121201900-1bd05aebc0b3/go.mod h1:5NcygPhpjPUIhKdbGk86wd6q7g3KXa0QeJxHzc6t5v4=
 github.com/cosnicolaou/pentair v0.0.0-20250115011051-10f1ce25c822 h1:ReRnUq58jYv78M7bmLlZQcUJ8OIISzRg6NEU0g9Ccm4=
 github.com/cosnicolaou/pentair v0.0.0-20250115011051-10f1ce25c822/go.mod h1:nrAxCEaoFxC3uQ5wiO2F/SxMt7Lbqqy2PwEFPaJU8Ek=
+github.com/cosnicolaou/pentair v0.0.0-20250121201957-30449c5ab533 h1:dtrSu/DpiPzX9nBZGJgRWmj0Clc5aIhWvcMUrVqsFPU=
+github.com/cosnicolaou/pentair v0.0.0-20250121201957-30449c5ab533/go.mod h1:nrAxCEaoFxC3uQ5wiO2F/SxMt7Lbqqy2PwEFPaJU8Ek=
 github.com/cosnicolaou/weather v0.0.0-20250116202323-85eb2db9ff13 h1:Ad65TuI8tNjLytmWR9JQk1S8U6LiUlP5Wfg40vCpW9g=
 github.com/cosnicolaou/weather v0.0.0-20250116202323-85eb2db9ff13/go.mod h1:gzpOa/gRakINcGohbesIGi0dDqw9Bkdkn1PQiCCCt+A=
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
@@ -54,6 +58,8 @@ github.com/mooncaker816/learnmeeus/v3 v3.0.0-20180601123323-8217f4131761 h1:vYed
 github.com/mooncaker816/learnmeeus/v3 v3.0.0-20180601123323-8217f4131761/go.mod h1:8wv0gR1RFJAL+HmFF56VgVmoi+yJUcPWtJfboy31AQo=
 github.com/nathan-osman/go-sunrise v1.1.0 h1:ZqZmtmtzs8Os/DGQYi0YMHpuUqR/iRoJK+wDO0wTCw8=
 github.com/nathan-osman/go-sunrise v1.1.0/go.mod h1:RcWqhT+5ShCZDev79GuWLayetpJp78RSjSWxiDowmlM=
+github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c h1:+mdjkGKdHQG3305AYmdv1U2eRNDiU2ErMBj1gwrq8eQ=
+github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c/go.mod h1:7rwL4CYBLnjLxUqIJNnCWiEdr3bn6IUYi15bNlnbCCU=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/reiver/go-oi v1.0.0 h1:nvECWD7LF+vOs8leNGV/ww+F2iZKf3EYjYZ527turzM=
@@ -72,6 +78,7 @@ github.com/stretchr/testify v1.10.0 h1:Xv5erBjTwe/5IxqUQTdXv5kgmIvbHo3QQyRwhJsOf
 github.com/stretchr/testify v1.10.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf8C91i36aY=
 github.com/ziutek/telnet v0.1.0 h1:Fds2AqweYyoRHX/5X8ikiyqIcSl156Sf2xCvURfqXHA=
 github.com/ziutek/telnet v0.1.0/go.mod h1:3M/h4qudUBZA8n+N4ywQIu2auiHUJNdqLUIKDAbG2M4=
+golang.org/x/sys v0.1.0/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/sys v0.29.0 h1:TPYlXGxvx1MGTn2GiZDhnjPA9wZzZeGKHHmKhHYvgaU=
 golang.org/x/sys v0.29.0/go.mod h1:/VUhepiaJMQUp4+oa/7Zr1D23ma6VTLIYjOOTFZPUcA=
 golang.org/x/text v0.21.0 h1:zyQAAkrwaneQ066sspRyJaG9VNi/YJ1NfzcGB3hZ/qo=

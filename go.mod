@@ -11,8 +11,8 @@ require (
 	cloudeng.io/macos v0.0.0-20250115012004-c76cbf27f83d
 	cloudeng.io/sync v0.0.8
 	github.com/cosnicolaou/elk v0.0.0-20250115010947-f61fb661abf5
-	github.com/cosnicolaou/lutron v0.0.0-20250119025248-26a281652da7
-	github.com/cosnicolaou/pentair v0.0.0-20250115011051-10f1ce25c822
+	github.com/cosnicolaou/lutron v0.0.0-20250121201900-1bd05aebc0b3
+	github.com/cosnicolaou/pentair v0.0.0-20250121201957-30449c5ab533
 	github.com/cosnicolaou/weather v0.0.0-20250116202323-85eb2db9ff13
 	github.com/jedib0t/go-pretty/v6 v6.6.5
 	github.com/reiver/go-telnet v0.0.0-20180421082511-9ff0b2ab096e
@@ -32,6 +32,7 @@ require (
 	github.com/mattn/go-runewidth v0.0.15 // indirect
 	github.com/mooncaker816/learnmeeus/v3 v3.0.0-20180601123323-8217f4131761 // indirect
 	github.com/nathan-osman/go-sunrise v1.1.0 // indirect
+	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
 	github.com/reiver/go-oi v1.0.0 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/soniakeys/unit v1.0.0 // indirect
