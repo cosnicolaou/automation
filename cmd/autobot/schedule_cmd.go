@@ -204,7 +204,7 @@ func (s *Schedule) Print(ctx context.Context, flags any, args []string) error {
 		return err
 	}
 
-	tw := newCalendarTable(cal, dr)
+	tw := tableManager{}.Calendar(cal, dr)
 	fmt.Println(tw.Render())
 	return nil
 }

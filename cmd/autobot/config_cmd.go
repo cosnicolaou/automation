@@ -141,9 +141,9 @@ func (c *Config) Operations(ctx context.Context, flags any, _ []string) error {
 	if err != nil {
 		return err
 	}
-	ctrl, dev, conds := newOperationsTables(system, "")
-	fmt.Println(ctrl.Render())
-	fmt.Println(dev.Render())
-	fmt.Println(conds.Render())
+	tm := tableManager{html: false}
+	fmt.Println(tm.Controllers(system).Render())
+	fmt.Println(tm.Devices(system).Render())
+	fmt.Println(tm.Conditions(system).Render())
 	return nil
 }
