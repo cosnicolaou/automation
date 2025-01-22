@@ -7,6 +7,7 @@ package webapi
 import (
 	"context"
 	"fmt"
+	"html"
 	"io"
 	"net/http"
 	"strings"
@@ -165,7 +166,7 @@ func (c Control) ServeCondition(ctx context.Context, w http.ResponseWriter, r *h
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	fmt.Fprintf(w, "%v.%v(%v) => %v", dev, op, strings.Join(args, ", "), result)
+	fmt.Fprintf(w, "%v.%v(%v) => %v", html.EscapeString(dev), html.EscapeString(op), html.EscapeString(strings.Join(args, ", ")), result)
 }
 
 func AppendControlAPIEndpoints(ctx context.Context, c Control, mux *http.ServeMux) {
