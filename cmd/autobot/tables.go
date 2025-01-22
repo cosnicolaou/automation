@@ -16,7 +16,11 @@ import (
 	"github.com/jedib0t/go-pretty/v6/table"
 )
 
-func newCalendarTable(cal *scheduler.Calendar, dr datetime.CalendarDateRange) table.Writer {
+type tableManager struct {
+	html bool
+}
+
+func (tm tableManager) Calendar(cal *scheduler.Calendar, dr datetime.CalendarDateRange) table.Writer {
 	tw := table.NewWriter()
 	tw.SetColumnConfigs([]table.ColumnConfig{
 		{Number: 1, AutoMerge: true},
@@ -45,7 +49,21 @@ func newCalendarTable(cal *scheduler.Calendar, dr datetime.CalendarDateRange) ta
 	return tw
 }
 
-func urlForOp(host, device, op string, args []string, cond bool) string {
+func (tm tableManager) RenderHTML(tw table.Writer) string {
+	tw.SetStyle(table.Style{
+		HTML: table.HTMLOptions{
+			CSSClass:    "table",
+			EmptyColumn: "&nbsp;",
+			EscapeText:  false,
+			Newline:     "<br/>",
+		}})
+	return tw.RenderHTML()
+}
+
+func (tm tableManager) withAPICall(device, op string, args []string, configured, cond bool) string {
+	if !tm.html || !configured {
+		return op
+	}
 	params := url.Values{}
 	params.Add("device", device)
 	params.Add("op", op)
@@ -53,13 +71,13 @@ func urlForOp(host, device, op string, args []string, cond bool) string {
 		params.Add("arg", a)
 	}
 	if cond {
-		return fmt.Sprintf("<a href=\"http://%v/api/condition?%v\">click</a>", host, params.Encode())
+		return fmt.Sprintf("<a href=\"/api/condition?%v\">%v</a>", params.Encode(), op)
 	}
-	return fmt.Sprintf("<a href=\"http://%v/api/operation?%v\">click</a>", host, params.Encode())
+	return fmt.Sprintf("<a href=\"/api/operation?%v\">%v</a>", params.Encode(), op)
 }
 
-func deviceID(dev string, cond, id bool) string {
-	if !id {
+func (tm tableManager) withDivID(dev string, cond bool) string {
+	if !tm.html {
 		return dev
 	}
 	if cond {
@@ -68,140 +86,134 @@ func deviceID(dev string, cond, id bool) string {
 	return fmt.Sprintf("<a id=\"%v\">%v</a>", dev, dev)
 }
 
-func operationsRows(device string, ops []string, args map[string][]string, opsHelp map[string]string, host string, condition bool) []table.Row {
-	html := len(host) > 0
+func (tm tableManager) operationsRows(device string, ops []string, args map[string][]string, opsHelp map[string]string, condition bool) []table.Row {
 	rows := []table.Row{}
 	for _, op := range ops {
 		pars, configured := args[op]
 		help := opsHelp[op]
 		row := table.Row{
-			deviceID(device, condition, html),
-			op,
+			tm.withDivID(device, condition),
+			tm.withAPICall(device, op, pars, configured, condition),
 			strings.Join(pars, ", "),
 			help,
 			configured,
-		}
-		if configured && html {
-			row = append(row, urlForOp(host, device, op, pars, condition))
 		}
 		rows = append(rows, row)
 	}
 	return rows
 }
 
-func controllerTable(sys devices.System, host string) table.Writer {
-	controllerOps := table.NewWriter()
-	controllerOps.SetColumnConfigs([]table.ColumnConfig{
+func (tm tableManager) newOperationsTableHeader(tile, optype string) table.Writer {
+	tw := table.NewWriter()
+	tw.SetTitle(tile)
+	tw.SetColumnConfigs([]table.ColumnConfig{
 		{Number: 1, AutoMerge: true},
 	})
-	controllerOps.SetTitle("Controller Operations")
-	header := table.Row{"Controller", "Operation", "Args", "Help", "Configured"}
-	if len(host) > 0 {
-		header = append(header, "Click to run")
-	}
-	controllerOps.AppendHeader(header)
+	tw.AppendHeader(table.Row{"Name", optype, "Args", "Help", "Configured"})
+	return tw
+}
+
+func (tm tableManager) ControllerOperations(sys devices.System) table.Writer {
+	tw := tm.newOperationsTableHeader("Controller Operations", "Operation")
 	for _, c := range sys.Config.Controllers {
-		rows := operationsRows(
+		rows := tm.operationsRows(
 			c.Name,
 			opNames(sys.Controllers[c.Name].Operations()),
 			c.Operations,
 			sys.Controllers[c.Name].OperationsHelp(),
-			host,
 			false,
 		)
 		for _, row := range rows {
-			controllerOps.AppendRow(row)
+			tw.AppendRow(row)
 		}
 	}
-	return controllerOps
+	return tw
 }
 
-func devicesTable(sys devices.System, conditions bool, host string) table.Writer {
-	deviceOps := table.NewWriter()
-	deviceOps.SetTitle("Device Operations")
-	header := table.Row{"Device", "Operation", "Args", "Help", "Configured"}
+func (tm tableManager) devicesOrConditions(sys devices.System, conditions bool) []table.Row {
+	rows := []table.Row{}
 	if conditions {
-		deviceOps.SetTitle("Device Conditions")
-		header[1] = "Condition"
-	}
-	deviceOps.SetColumnConfigs([]table.ColumnConfig{
-		{Number: 1, AutoMerge: true},
-	})
-	if len(host) > 0 {
-		header = append(header, "Click to run")
-	}
-	deviceOps.AppendHeader(header)
-
-	for _, d := range sys.Config.Devices {
-		var rows []table.Row
-		if conditions {
-			rows = operationsRows(
+		for _, d := range sys.Config.Devices {
+			nr := tm.operationsRows(
 				d.Name,
 				opNames(sys.Devices[d.Name].Conditions()),
 				d.Conditions,
 				sys.Devices[d.Name].ConditionsHelp(),
-				host,
 				true)
-		} else {
-			rows = operationsRows(
-				d.Name,
-				opNames(sys.Devices[d.Name].Operations()),
-				d.Operations,
-				sys.Devices[d.Name].OperationsHelp(),
-				host,
-				false)
+			rows = append(rows, nr...)
 		}
-		for _, row := range rows {
-			deviceOps.AppendRow(row)
-		}
+		return rows
 	}
-	return deviceOps
+	for _, d := range sys.Config.Devices {
+		nr := tm.operationsRows(
+			d.Name,
+			opNames(sys.Devices[d.Name].Operations()),
+			d.Operations,
+			sys.Devices[d.Name].OperationsHelp(),
+			false)
+		rows = append(rows, nr...)
+	}
+	return rows
 }
 
-func newOperationsTables(sys devices.System, host string) (controllerOps, deviceOps, deviceConds table.Writer) {
-	controllerOps = controllerTable(sys, host)
-	deviceOps = devicesTable(sys, false, host)
-	deviceConds = devicesTable(sys, true, host)
-	return
-}
-
-func newDeviceTables(title, header string, devs []string, anchor string, conditions bool) table.Writer {
-	tw := table.NewWriter()
-	tw.SetTitle(title)
-	row := table.Row{header}
-	if len(anchor) > 0 {
-		row = append(row, "")
-	}
-	tw.AppendHeader(row)
-	for _, d := range devs {
-		row := table.Row{d}
-		if len(anchor) == 0 {
-			row = append(row, d)
-			tw.AppendRow(row)
-		}
-		dn := d
-		if conditions {
-			dn = "cond:" + d
-		}
-		row = append(row, fmt.Sprintf("<a href=\"%v#%v\">%v</a>", anchor, dn, d))
+func (tm tableManager) DeviceOperations(sys devices.System) table.Writer {
+	tw := tm.newOperationsTableHeader("Device Operations", "Operation")
+	rows := tm.devicesOrConditions(sys, false)
+	for _, row := range rows {
 		tw.AppendRow(row)
 	}
 	return tw
 }
 
-func newDevicesTables(sys devices.System) (controllers, devices, devicesWithConditions table.Writer) {
-	controllers = newDeviceTables("Controllers", "Controller", opNames(sys.Controllers), "/controllers", false)
+func (tm tableManager) DeviceConditions(sys devices.System) table.Writer {
+	tw := tm.newOperationsTableHeader("Device Conditions", "Conditions")
+	rows := tm.devicesOrConditions(sys, true)
+	for _, row := range rows {
+		tw.AppendRow(row)
+	}
+	return tw
+}
 
-	devices = newDeviceTables("Devices", "Device", opNames(sys.Devices), "/devices", false)
+func (tm tableManager) withAnchor(dev, tag string, conditions bool) string {
+	if !tm.html {
+		return dev
+	}
+	dn := dev
+	if conditions {
+		dn = "cond:" + dev
+	}
+	return fmt.Sprintf("<a href=\"%v#%v\">%v</a>", tag, dn, dev)
+}
 
-	hasConditions := []string{}
+func (tm tableManager) newList(title string, devs []string, anchor string, conditions bool) table.Writer {
+	tw := table.NewWriter()
+	tw.SetTitle(title)
+	tw.AppendHeader(table.Row{"Name"})
+	for _, d := range devs {
+
+		row := table.Row{tm.withAnchor(d, anchor, conditions)}
+		tw.AppendRow(row)
+	}
+	return tw
+}
+
+func (tm tableManager) Controllers(sys devices.System) table.Writer {
+	devs := opNames(sys.Controllers)
+	return tm.newList("Controllers", devs, "/controllers", false)
+}
+
+func (tm tableManager) Devices(sys devices.System) table.Writer {
+	devs := opNames(sys.Devices)
+	return tm.newList("Devices", devs, "/devices", false)
+}
+
+func (tm tableManager) Conditions(sys devices.System) table.Writer {
+	devs := []string{}
 	for _, d := range sys.Config.Devices {
 		if d.Conditions != nil {
-			hasConditions = append(hasConditions, d.Name)
+			devs = append(devs, d.Name)
 		}
 	}
-	slices.Sort(hasConditions)
-	devicesWithConditions = newDeviceTables("Devices with Conditions", "Device", hasConditions, "/conditions", true)
-
-	return
+	slices.Sort(devs)
+	return tm.newList("Conditions", devs, "/conditions", false)
 }

@@ -62,7 +62,7 @@ func (tc *telnetConn) ReadUntil(ctx context.Context, expected []string) ([]byte,
 		tc.logger.Log(ctx, slog.LevelWarn, "readUntil failed", "text", expected, "err", err)
 		return nil, err
 	}
-	tc.logger.Log(ctx, slog.LevelInfo, "readUntil", "text", expected)
+	tc.logger.Log(ctx, slog.LevelInfo, "readUntil", "text", expected, "response", string(buf))
 	return buf, err
 }
 

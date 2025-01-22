@@ -3,15 +3,15 @@ module github.com/cosnicolaou/automation
 go 1.23.1
 
 require (
-	cloudeng.io/algo v0.0.0-20250115012004-c76cbf27f83d
-	cloudeng.io/cmdutil v0.0.0-20250115012004-c76cbf27f83d
+	cloudeng.io/algo v0.0.0-20250119024745-8a46e9bdda10
+	cloudeng.io/cmdutil v0.0.0-20250119024745-8a46e9bdda10
 	cloudeng.io/datetime v0.0.0-20250119024745-8a46e9bdda10
 	cloudeng.io/errors v0.0.10
 	cloudeng.io/geospatial v0.0.0-20250119024745-8a46e9bdda10
 	cloudeng.io/macos v0.0.0-20250115012004-c76cbf27f83d
 	cloudeng.io/sync v0.0.8
 	github.com/cosnicolaou/elk v0.0.0-20250115010947-f61fb661abf5
-	github.com/cosnicolaou/lutron v0.0.0-20250121201900-1bd05aebc0b3
+	github.com/cosnicolaou/lutron v0.0.0-20250122004625-c37e52a5c7a9
 	github.com/cosnicolaou/pentair v0.0.0-20250121201957-30449c5ab533
 	github.com/cosnicolaou/weather v0.0.0-20250116202323-85eb2db9ff13
 	github.com/jedib0t/go-pretty/v6 v6.6.5
@@ -22,6 +22,7 @@ require (
 )
 
 require (
+	cloudeng.io/citools/multimod v0.0.0-20230309185036-6b2b12133652 // indirect
 	cloudeng.io/file v0.0.0-20250115012004-c76cbf27f83d // indirect
 	cloudeng.io/net v0.0.0-20250115012004-c76cbf27f83d // indirect
 	cloudeng.io/text v0.0.11 // indirect

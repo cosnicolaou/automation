@@ -1,7 +1,13 @@
 cloudeng.io/algo v0.0.0-20250115012004-c76cbf27f83d h1:+e8hj9pHft4jZCd9VB36hQI94KsZPQZZafz9ODXNyzc=
 cloudeng.io/algo v0.0.0-20250115012004-c76cbf27f83d/go.mod h1:UZ8vyc4kEQUKOdaj5K0KfFZjUbSguHKBTEkhzA17zmw=
+cloudeng.io/algo v0.0.0-20250119024745-8a46e9bdda10 h1:hQ4D7NqphZ8fVobPymPYzzS9maZsLOByA2fKXXAlTXE=
+cloudeng.io/algo v0.0.0-20250119024745-8a46e9bdda10/go.mod h1:UZ8vyc4kEQUKOdaj5K0KfFZjUbSguHKBTEkhzA17zmw=
+cloudeng.io/citools/multimod v0.0.0-20230309185036-6b2b12133652 h1:3FoDNXrU8DVLPIY3fUWUdqSZA70B4K2WIbAniQbyyJI=
+cloudeng.io/citools/multimod v0.0.0-20230309185036-6b2b12133652/go.mod h1:i3a6KWcW1tbUgBCEcnBuMhlEtisJLEpDPpXmfAFGkgw=
 cloudeng.io/cmdutil v0.0.0-20250115012004-c76cbf27f83d h1:AtK3SS/E4gW0Q0mK1lqEwBCUVGNz88Db3J5Nf+/AmWc=
 cloudeng.io/cmdutil v0.0.0-20250115012004-c76cbf27f83d/go.mod h1:SaquTd0cZsJxXo4C/UzVIlGGgqSqxXXaWpZj8O35zg4=
+cloudeng.io/cmdutil v0.0.0-20250119024745-8a46e9bdda10 h1:BRG1xmkniP+I5anb3a3GWJJMixDOqDQMIPteBar//yM=
+cloudeng.io/cmdutil v0.0.0-20250119024745-8a46e9bdda10/go.mod h1:SaquTd0cZsJxXo4C/UzVIlGGgqSqxXXaWpZj8O35zg4=
 cloudeng.io/datetime v0.0.0-20250119024745-8a46e9bdda10 h1:4jcZ53jFZeP4M3yk0QveIbbeFyMkgyWAboHApXnKBE0=
 cloudeng.io/datetime v0.0.0-20250119024745-8a46e9bdda10/go.mod h1:oC+T0v8O/Dtl7wE9Q+RXfQOjHT+9OlQAjvDbWZncs70=
 cloudeng.io/debug v0.0.0-20231026032435-4ad1389db593 h1:WEFkomseqbtoV3sDgMh25BeMUjajGB3nFRUbV1X/auo=
@@ -35,6 +41,8 @@ github.com/cosnicolaou/lutron v0.0.0-20250119025248-26a281652da7 h1:nVS/HlXWQgOR
 github.com/cosnicolaou/lutron v0.0.0-20250119025248-26a281652da7/go.mod h1:5NcygPhpjPUIhKdbGk86wd6q7g3KXa0QeJxHzc6t5v4=
 github.com/cosnicolaou/lutron v0.0.0-20250121201900-1bd05aebc0b3 h1:IMwdVjwMcmBp0BqHEHwzk6TH9xGeRg4+H7SqtL12x0s=
 github.com/cosnicolaou/lutron v0.0.0-20250121201900-1bd05aebc0b3/go.mod h1:5NcygPhpjPUIhKdbGk86wd6q7g3KXa0QeJxHzc6t5v4=
+github.com/cosnicolaou/lutron v0.0.0-20250122004625-c37e52a5c7a9 h1:mDEtkNmBj9Q+/WPDvMP0rqktqfxkobzMGBMO61YdHVg=
+github.com/cosnicolaou/lutron v0.0.0-20250122004625-c37e52a5c7a9/go.mod h1:5NcygPhpjPUIhKdbGk86wd6q7g3KXa0QeJxHzc6t5v4=
 github.com/cosnicolaou/pentair v0.0.0-20250115011051-10f1ce25c822 h1:ReRnUq58jYv78M7bmLlZQcUJ8OIISzRg6NEU0g9Ccm4=
 github.com/cosnicolaou/pentair v0.0.0-20250115011051-10f1ce25c822/go.mod h1:nrAxCEaoFxC3uQ5wiO2F/SxMt7Lbqqy2PwEFPaJU8Ek=
 github.com/cosnicolaou/pentair v0.0.0-20250121201957-30449c5ab533 h1:dtrSu/DpiPzX9nBZGJgRWmj0Clc5aIhWvcMUrVqsFPU=
