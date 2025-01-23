@@ -187,7 +187,7 @@ func (c Control) ServeOperation(ctx context.Context, w http.ResponseWriter, r *h
 		c.httpError(ctx, w, r.URL, "op-end", "missing device or operation", http.StatusBadRequest)
 		return
 	}
-	or, err := c.RunOperation(ctx, w, dev+"."+op, args)
+	or, err := c.RunOperation(ctx, io.Discard, dev+"."+op, args)
 	if err != nil {
 		c.httpError(ctx, w, r.URL, "op-end", err.Error(), http.StatusInternalServerError)
 		return
@@ -203,7 +203,7 @@ func (c Control) ServeCondition(ctx context.Context, w http.ResponseWriter, r *h
 		c.httpError(ctx, w, r.URL, "cond-end", "missing device or operation", http.StatusBadRequest)
 		return
 	}
-	cr, err := c.RunCondition(ctx, w, dev+"."+op, args)
+	cr, err := c.RunCondition(ctx, io.Discard, dev+"."+op, args)
 	if err != nil {
 		c.httpError(ctx, w, r.URL, "cond-end", err.Error(), http.StatusInternalServerError)
 		return
