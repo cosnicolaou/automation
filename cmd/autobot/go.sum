@@ -13,6 +13,8 @@ cloudeng.io/file v0.0.0-20250119024745-8a46e9bdda10 h1:beVESn7Y/6FM4aW3Z9ATTPaPE
 cloudeng.io/file v0.0.0-20250119024745-8a46e9bdda10/go.mod h1:cpn65256dvwrs7+iULJk+DSTiCtzVdb9ojENSHNQUkE=
 cloudeng.io/geospatial v0.0.0-20250119024745-8a46e9bdda10 h1:QXrCvjtqWppYblWLVYFp3pEyeNT6mPwkuKhcHq9YMAQ=
 cloudeng.io/geospatial v0.0.0-20250119024745-8a46e9bdda10/go.mod h1:3PUOypnT3/76rwv/a21Z00NXeVpjQKaDNnt/A8ysVTY=
+cloudeng.io/io v0.0.0-20241215221655-bd556f44d3de h1:E5CTwbqhmOaLArTi/iUDxgSdKdV8HU2R+Qsz9xTapkM=
+cloudeng.io/io v0.0.0-20241215221655-bd556f44d3de/go.mod h1:a0lVHdBu3pI1Of93M7SnYVaSHKUN+VrONnOeNKX/wvM=
 cloudeng.io/macos v0.0.0-20250119024745-8a46e9bdda10 h1:FqxEPYr0mSBCbrGc1AQuWp7kJgTOdwIW12M/HYRXOEo=
 cloudeng.io/macos v0.0.0-20250119024745-8a46e9bdda10/go.mod h1:6Jv8oRfK6FBr/mriNWd1tgzipX8iAkH/dqoGTcBf/og=
 cloudeng.io/net v0.0.0-20250119024745-8a46e9bdda10 h1:xClg1NM7LjAu79jrEHtPILLzesyeQjuZSKV/Gz5juEM=
@@ -29,6 +31,8 @@ cloudeng.io/webapi/operations v0.0.0-20250116040431-a16229cf0935 h1:nBMi5vXrtWYk
 cloudeng.io/webapi/operations v0.0.0-20250116040431-a16229cf0935/go.mod h1:uGPvy9FlXotcdATf7+b2lZNGDVfRe1C7MqS3wBVGeq0=
 cloudeng.io/webapi/webapitestutil v0.0.0-20250115163522-2e8054cafced h1:EMd0bCqObKJ/zGJhxjS+5niY18WSdFYcn29MyM/y6+0=
 cloudeng.io/webapi/webapitestutil v0.0.0-20250115163522-2e8054cafced/go.mod h1:cMF03lbZy2+oWkCUD3CPtKzxClTGjqbIyk2E/IMVQtA=
+cloudeng.io/webapp v0.0.0-20250119024745-8a46e9bdda10 h1:NQbqYSuY1H0Sz82chEaduzALTTygETFw3zVGt6bgWPE=
+cloudeng.io/webapp v0.0.0-20250119024745-8a46e9bdda10/go.mod h1:IPGULnUD3umqwOCIS2Wh+wyGehzBjXcMHlrkdqyunmM=
 github.com/cosnicolaou/automation v0.0.0-20250122061522-fdfeca1e29c0 h1:hcWQQ5x5XhNxx1ghno+r3sqGyGhKcPLzZAta67b7oI4=
 github.com/cosnicolaou/automation v0.0.0-20250122061522-fdfeca1e29c0/go.mod h1:uev+qDvPwkXZUByWYjk7qLnKA7vad/9xziiMZgvSzbk=
 github.com/cosnicolaou/elk v0.0.0-20250115010947-f61fb661abf5 h1:V67sqZpEcj0YCj8L/rDZCDuj38psxmK6T4ezT2EoPuo=

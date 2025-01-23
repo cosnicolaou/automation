@@ -7,19 +7,28 @@ package webassets
 import (
 	"html/template"
 	"io"
+	"io/fs"
+	"net/http"
 )
 
-var (
-	testServerIndex *template.Template
-	runOpsPage      *template.Template
-)
-
-func init() {
-	testServerIndex = createTemplateOrDie("static/test-homepage.html")
-	runOpsPage = createTemplateOrDie("static/runops.html")
+type Pages struct {
+	cfs fs.FS
 }
 
-func TestPageIndex(w io.Writer, system, controllers, devices, conditions string) error {
+func NewPages(cfs fs.FS) Pages {
+	return Pages{cfs: cfs}
+}
+
+var (
+	testPage = "test-homepage.html"
+	opsPage  = "runops.html"
+)
+
+func (p Pages) FS() http.FileSystem {
+	return http.FS(p.cfs)
+}
+
+func (p Pages) TestPageIndex(w io.Writer, system, controllers, devices, conditions string) error {
 	d := struct {
 		Name        string
 		Controllers template.HTML
@@ -27,15 +36,23 @@ func TestPageIndex(w io.Writer, system, controllers, devices, conditions string)
 		Conditions  template.HTML
 	}{
 		Name:        system,
-		Controllers: template.HTML(controllers), //nolint:gosec
-		Devices:     template.HTML(devices),     //nolint:gosec
-		Conditions:  template.HTML(conditions),  //nolint:gosec
+		Controllers: template.HTML(controllers), //nolint: gosec
+		Devices:     template.HTML(devices),     //nolint: gosec
+		Conditions:  template.HTML(conditions),  //nolint: gosec
 	}
-	return testServerIndex.Execute(w, &d)
 
+	/*_, err := readContents(p.cfs, testPage)
+	if err != nil {
+		fmt.Printf("failed to read contents: %v, %v\n", testPage, err)
+	}*/
+	tpl, err := template.ParseFS(p.cfs, testPage)
+	if err != nil {
+		return err
+	}
+	return tpl.Execute(w, &d)
 }
 
-func RunOpsPage(w io.Writer, system, title, table string) error {
+func (p Pages) RunOpsPage(w io.Writer, system, title, table string) error {
 	d := struct {
 		Name  string
 		Title string
@@ -43,7 +60,11 @@ func RunOpsPage(w io.Writer, system, title, table string) error {
 	}{
 		Name:  system,
 		Title: title,
-		Table: template.HTML(table), //nolint:gosec
+		Table: template.HTML(table), //nolint: gosec
 	}
-	return runOpsPage.Execute(w, &d)
+	tpl, err := template.ParseFS(p.cfs, opsPage)
+	if err != nil {
+		return err
+	}
+	return tpl.Execute(w, &d)
 }

@@ -46,11 +46,11 @@ type Controller interface {
 }
 
 // Operation represents a single operation that can be performed on a device.
-type Operation func(ctx context.Context, opts OperationArgs) error
+type Operation func(ctx context.Context, opts OperationArgs) (any, error)
 
 // Condition represents a condition that can be evaluated to determine if an
 // operation should be performed.
-type Condition func(ctx context.Context, opts OperationArgs) (bool, error)
+type Condition func(ctx context.Context, opts OperationArgs) (any, bool, error)
 
 type Device interface {
 	SetConfig(DeviceConfigCommon)

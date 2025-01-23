@@ -10,9 +10,9 @@ require (
 	cloudeng.io/geospatial v0.0.0-20250119024745-8a46e9bdda10
 	cloudeng.io/macos v0.0.0-20250119024745-8a46e9bdda10
 	cloudeng.io/sync v0.0.8
-	github.com/cosnicolaou/elk v0.0.0-20250115010947-f61fb661abf5
-	github.com/cosnicolaou/lutron v0.0.0-20250122005807-8aea0872161e
-	github.com/cosnicolaou/pentair v0.0.0-20250121201957-30449c5ab533
+	github.com/cosnicolaou/elk v0.0.0-20250123181233-ffe8c37253f0
+	github.com/cosnicolaou/lutron v0.0.0-20250123180432-f561c3b9c88b
+	github.com/cosnicolaou/pentair v0.0.0-20250123180934-166818624f7a
 	github.com/cosnicolaou/weather v0.0.0-20250116202323-85eb2db9ff13
 	github.com/jedib0t/go-pretty/v6 v6.6.5
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c

@@ -12,12 +12,21 @@ import (
 	"time"
 
 	"cloudeng.io/cmdutil"
+	wa "cloudeng.io/webapp/webassets"
+	"github.com/cosnicolaou/automation/cmd/autobot/internal/webassets"
 )
 
 type WebUIFlags struct {
 	Port     string `subcmd:"port,8080,port to listen on"`
 	CertFile string `subcmd:"cert,,certificate file"`
 	KeyFile  string `subcmd:"key,,key file"`
+	Assets   string `subcmd:"assets,,path to assets"`
+}
+
+func (fv WebUIFlags) Pages() webassets.Pages {
+	rfs := wa.NewAssets("static", webassets.Static,
+		wa.EnableReloading(fv.Assets, time.Now(), true))
+	return webassets.NewPages(rfs)
 }
 
 func (fv WebUIFlags) CreateWebServer(ctx context.Context, mux *http.ServeMux) (*http.Server, func() error, string, error) {

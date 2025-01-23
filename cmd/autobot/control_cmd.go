@@ -33,12 +33,13 @@ type ControlTestPageFlags struct {
 
 type Control struct {
 	system devices.System
+	logger *slog.Logger
 }
 
 func (c *Control) setup(ctx context.Context, fv *ControlFlags) (context.Context, error) {
-	logger := slog.New(slog.NewJSONHandler(os.Stderr, nil))
+	c.logger = slog.New(slog.NewJSONHandler(os.Stderr, nil))
 	opts := []devices.Option{
-		devices.WithLogger(logger),
+		devices.WithLogger(c.logger),
 	}
 	ctx, sys, err := loadSystem(ctx, &fv.ConfigFileFlags, opts...)
 	if err != nil {
@@ -55,7 +56,7 @@ func (c *Control) Run(ctx context.Context, flags any, args []string) error {
 	}
 	cmd := args[0]
 	parameters := args[1:]
-	cc := webapi.NewControlClient(c.system)
+	cc := webapi.NewControlClient(c.system, c.logger)
 	return cc.RunOperation(ctx, os.Stdout, cmd, parameters)
 }
 
@@ -66,7 +67,7 @@ func (c *Control) Condition(ctx context.Context, flags any, args []string) error
 	}
 	cmd := args[0]
 	parameters := args[1:]
-	cc := webapi.NewControlClient(c.system)
+	cc := webapi.NewControlClient(c.system, c.logger)
 	result, err := cc.RunCondition(ctx, os.Stdout, cmd, parameters)
 	if err != nil {
 		return err
@@ -87,7 +88,7 @@ func (c *Control) RunScript(ctx context.Context, flags any, args []string) error
 	}
 	defer f.Close()
 	scanner := bufio.NewScanner(f)
-	cc := webapi.NewControlClient(c.system)
+	cc := webapi.NewControlClient(c.system, c.logger)
 	for scanner.Scan() {
 		line := scanner.Text()
 		if strings.HasPrefix(line, "#") {
@@ -119,9 +120,11 @@ func (c *Control) ServeTestPage(ctx context.Context, flags any, _ []string) erro
 		return err
 	}
 
-	tm := tableManager{html: true}
+	pages := fv.WebUIFlags.Pages()
+	tm := tableManager{html: true, js: true}
 	webapi.AppendTestServerEndpoints(mux,
 		fv.ConfigFileFlags.SystemFile,
+		pages,
 		tm.RenderHTML(tm.Controllers(c.system)),
 		tm.RenderHTML(tm.Devices(c.system)),
 		tm.RenderHTML(tm.Conditions(c.system)),
@@ -130,7 +133,7 @@ func (c *Control) ServeTestPage(ctx context.Context, flags any, _ []string) erro
 		tm.RenderHTML(tm.DeviceConditions(c.system)),
 	)
 
-	cc := webapi.NewControlClient(c.system)
+	cc := webapi.NewControlClient(c.system, c.logger)
 	webapi.AppendControlAPIEndpoints(ctx, cc, mux)
 
 	_ = browser.OpenURL(url)

@@ -303,7 +303,7 @@ func TestOperations(t *testing.T) {
 
 	dev := system.Devices["d"]
 	args.Args = dev.Config().Operations["on"]
-	if err := dev.Operations()["on"](ctx, args); err != nil {
+	if _, err := dev.Operations()["on"](ctx, args); err != nil {
 		t.Errorf("failed to perform operation: %v", err)
 	}
 
@@ -316,7 +316,7 @@ func TestOperations(t *testing.T) {
 	ctrl := system.Controllers["c"]
 	args.Args = ctrl.Config().Operations["enable"]
 
-	if err := ctrl.Operations()["enable"](ctx, args); err != nil {
+	if _, err := ctrl.Operations()["enable"](ctx, args); err != nil {
 		t.Errorf("failed to perform operation: %v", err)
 	}
 	if got, want := out.String(), "controller[c].Enable: [3] on--command--quoted with space\n"; got != want {
@@ -326,7 +326,7 @@ func TestOperations(t *testing.T) {
 	out.Reset()
 
 	args.Args = ctrl.Config().Operations["disable"]
-	if err := ctrl.Operations()["disable"](ctx, args); err != nil {
+	if _, err := ctrl.Operations()["disable"](ctx, args); err != nil {
 		t.Errorf("failed to perform operation: %v", err)
 	}
 	if got, want := out.String(), "controller[c].Disable: [2] off--command\n"; got != want {

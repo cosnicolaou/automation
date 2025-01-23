@@ -37,7 +37,7 @@ func NewMockDevice(operations ...string) *MockDevice {
 	for _, op := range operations {
 		kop := strings.ToLower(op)
 		nop := cases.Title(language.English).String(op)
-		d.operations[kop] = func(ctx context.Context, opts devices.OperationArgs) error {
+		d.operations[kop] = func(ctx context.Context, opts devices.OperationArgs) (any, error) {
 			return d.genericOp(ctx, nop, opts)
 		}
 		d.operationsHelp[kop] = fmt.Sprintf("%s operation", nop)
@@ -53,8 +53,8 @@ func (d *MockDevice) SetOutput(logger bool, writer bool) {
 }
 
 func (d *MockDevice) AddCondition(name string, outcome bool) {
-	d.conditions[name] = func(context.Context, devices.OperationArgs) (bool, error) {
-		return outcome, nil
+	d.conditions[name] = func(context.Context, devices.OperationArgs) (any, bool, error) {
+		return nil, outcome, nil
 	}
 	d.conditionsHelp[name] = fmt.Sprintf("%s condition: outcome %v", name, outcome)
 }
@@ -87,12 +87,15 @@ func (d *MockDevice) ConditionsHelp() map[string]string {
 	return d.conditionsHelp
 }
 
-func (d *MockDevice) genericOp(_ context.Context, opName string, opts devices.OperationArgs) error {
+func (d *MockDevice) genericOp(_ context.Context, opName string, opts devices.OperationArgs) (any, error) {
 	if d.useWriter {
 		fmt.Fprintf(opts.Writer, "device[%s].%s: [%d] %v\n", d.Name, opName, len(opts.Args), strings.Join(opts.Args, "--"))
 	}
 	if d.useLogger {
 		opts.Logger.Info("device", "name", d.Name, "op", opName)
 	}
-	return nil
+	return struct {
+		Name string
+		Args []string
+	}{Name: d.Name, Args: opts.Args}, nil
 }

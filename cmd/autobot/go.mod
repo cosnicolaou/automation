@@ -21,11 +21,13 @@ require (
 	cloudeng.io/algo v0.0.0-20250119024745-8a46e9bdda10 // indirect
 	cloudeng.io/errors v0.0.10 // indirect
 	cloudeng.io/file v0.0.0-20250119024745-8a46e9bdda10 // indirect
+	cloudeng.io/io v0.0.0-20241215221655-bd556f44d3de // indirect
 	cloudeng.io/net v0.0.0-20250119024745-8a46e9bdda10 // indirect
 	cloudeng.io/sync v0.0.8 // indirect
 	cloudeng.io/text v0.0.11 // indirect
 	cloudeng.io/webapi/clients/nws v0.0.0-20250116040431-a16229cf0935 // indirect
 	cloudeng.io/webapi/operations v0.0.0-20250116040431-a16229cf0935 // indirect
+	cloudeng.io/webapp v0.0.0-20250119024745-8a46e9bdda10 // indirect
 	github.com/keybase/go-keychain v0.0.0-20250107162724-3747e5bfbb71 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/mooncaker816/learnmeeus/v3 v3.0.0-20180601123323-8217f4131761 // indirect
