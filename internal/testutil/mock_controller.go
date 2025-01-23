@@ -21,14 +21,20 @@ type MockController struct {
 	devices.ControllerBase[ControllerDetail]
 }
 
-func (c *MockController) Enable(_ context.Context, opts devices.OperationArgs) error {
+func (c *MockController) Enable(_ context.Context, opts devices.OperationArgs) (any, error) {
 	fmt.Fprintf(opts.Writer, "controller[%s].Enable: [%d] %v\n", c.Name, len(opts.Args), strings.Join(opts.Args, "--"))
-	return nil
+	return struct {
+		Name string
+		Args []string
+	}{Name: c.Name, Args: opts.Args}, nil
 }
 
-func (c *MockController) Disable(_ context.Context, opts devices.OperationArgs) error {
+func (c *MockController) Disable(_ context.Context, opts devices.OperationArgs) (any, error) {
 	fmt.Fprintf(opts.Writer, "controller[%s].Disable: [%d] %v\n", c.Name, len(opts.Args), strings.Join(opts.Args, "--"))
-	return nil
+	return struct {
+		Name string
+		Args []string
+	}{Name: c.Name, Args: opts.Args}, nil
 }
 
 func (c *MockController) Operations() map[string]devices.Operation {

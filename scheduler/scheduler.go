@@ -32,7 +32,7 @@ func (s *Scheduler) invokeOp(ctx context.Context, action Action, opts devices.Op
 			Logger: s.logger,
 			Args:   pre.Args,
 		}
-		ok, err := pre.Condition(ctx, preOpts)
+		_, ok, err := pre.Condition(ctx, preOpts)
 		if err != nil {
 			return false, fmt.Errorf("failed to evaluate precondition: %v: %v", pre.Name, err)
 		}
@@ -41,7 +41,8 @@ func (s *Scheduler) invokeOp(ctx context.Context, action Action, opts devices.Op
 			return true, nil
 		}
 	}
-	return false, action.Op(ctx, opts)
+	_, err := action.Op(ctx, opts)
+	return false, err
 }
 
 func (s *Scheduler) runSingleOp(ctx context.Context, due time.Time, action schedule.Active[Action]) (aborted bool, err error) {
