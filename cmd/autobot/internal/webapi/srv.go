@@ -8,7 +8,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"html"
 	"io"
 	"log/slog"
 	"net/http"
@@ -171,19 +170,18 @@ func (c Control) ServeOperation(ctx context.Context, w http.ResponseWriter, r *h
 		c.httpError(ctx, w, r.URL, "op-end", "missing device or operation", http.StatusBadRequest)
 		return
 	}
-	if err := c.RunOperation(ctx, w, dev+"."+op, args); err != nil {
+	result, err := c.RunOperation(ctx, w, dev+"."+op, args)
+	if err != nil {
 		c.httpError(ctx, w, r.URL, "op-end", err.Error(), http.StatusInternalServerError)
 		return
 	}
 	c.serveJSON(ctx, w, r.URL, "op-end", OperationResult{
 		Device: dev,
-
 		Op:     op,
 		Args:   args,
-		Status: true,
-		Data:   nil,
+		Data:   result,
 	})
-	c.l.Log(ctx, slog.LevelInfo, "op-end", "request", r.URL.String(), "code", http.StatusOK)
+	//c.l.Log(ctx, slog.LevelInfo, "op-end", "request", r.URL.String(), "code", http.StatusOK)
 }
 
 func (c Control) ServeCondition(ctx context.Context, w http.ResponseWriter, r *http.Request) {
@@ -193,16 +191,25 @@ func (c Control) ServeCondition(ctx context.Context, w http.ResponseWriter, r *h
 		c.httpError(ctx, w, r.URL, "cond-end", "missing device or operation", http.StatusBadRequest)
 		return
 	}
-	result, err := c.RunCondition(ctx, w, dev+"."+op, args)
+	data, result, err := c.RunCondition(ctx, w, dev+"."+op, args)
 	if err != nil {
 		c.httpError(ctx, w, r.URL, "cond-end", err.Error(), http.StatusInternalServerError)
 		return
 	}
-	fmt.Fprintf(w, "%v.%v(%v) => %v", html.EscapeString(dev), html.EscapeString(op), html.EscapeString(strings.Join(args, ", ")), result)
-	c.l.Log(ctx, slog.LevelInfo, "cond-end", "request", r.URL.String(), "code", http.StatusOK)
+	// fmt.Fprintf(w, "%v.%v(%v) => %v", html.EscapeString(dev), html.EscapeString(op), html.EscapeString(strings.Join(args, ", ")), result)
+	c.serveJSON(ctx, w, r.URL, "cond-end", ConditionResult{
+		Device: dev,
+		Cond:   op,
+		Args:   args,
+		Result: result,
+		Data:   data,
+	})
+
+	// c.l.Log(ctx, slog.LevelInfo, "cond-end", "request", r.URL.String(), "code", http.StatusOK)
 }
 
 func (c Control) serveJSON(ctx context.Context, w http.ResponseWriter, u *url.URL, msg string, result any) {
+	c.l.Log(ctx, slog.LevelInfo, msg, "request", u.String(), "code", http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(result); err != nil {
 		c.httpError(ctx, w, u, msg, fmt.Sprintf("failed to encode json response: %v", err), http.StatusInternalServerError)
@@ -227,7 +234,6 @@ type OperationResult struct {
 	Device string   `json:"device"`
 	Op     string   `json:"operation"`
 	Args   []string `json:"args"`
-	Status bool     `json:"status"`
 	Data   any      `json:"data"`
 }
 
@@ -235,5 +241,6 @@ type ConditionResult struct {
 	Device string   `json:"device"`
 	Cond   string   `json:"condition"`
 	Args   []string `json:"args"`
-	Status bool     `json:"status"`
+	Result bool     `json:"status"`
+	Data   any      `json:"data"`
 }
