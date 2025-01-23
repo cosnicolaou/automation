@@ -41,9 +41,9 @@ func (st *slowDevice) SetConfig(cfg devices.DeviceConfigCommon) {
 	st.DeviceConfigCommon.Timeout = st.timeout
 }
 
-func (st *slowDevice) On(context.Context, devices.OperationArgs) error {
+func (st *slowDevice) On(context.Context, devices.OperationArgs) (any, error) {
 	time.Sleep(st.delay)
-	return nil
+	return nil, nil
 }
 
 type timesource struct {

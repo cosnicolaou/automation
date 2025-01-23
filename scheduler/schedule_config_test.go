@@ -468,7 +468,7 @@ func TestParseActionsPreCond(t *testing.T) {
 
 	// negation.
 	if got := precondition.DailyActions[1].T.Precondition.Condition; got != nil {
-		if ok, err := got(context.Background(), devices.OperationArgs{}); ok || err != nil {
+		if _, ok, err := got(context.Background(), devices.OperationArgs{}); ok || err != nil {
 			t.Errorf("expected precondition to be true and without error: %v", err)
 		}
 	}
@@ -481,7 +481,7 @@ func TestParseActionsPreCond(t *testing.T) {
 	}
 
 	if got := precondition.DailyActions[2].T.Precondition.Condition; got != nil {
-		if ok, err := got(context.Background(), devices.OperationArgs{}); !ok || err != nil {
+		if _, ok, err := got(context.Background(), devices.OperationArgs{}); !ok || err != nil {
 			t.Errorf("expected precondition to be true and without error: %v", err)
 		}
 	}

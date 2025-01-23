@@ -194,9 +194,9 @@ func (s System) DeviceCondition(name, op string) (Condition, []string, bool) {
 		if fn, ok := dev.Conditions()[op]; ok {
 			if pars, ok := cfg.Conditions[op]; ok {
 				if negation {
-					return func(ctx context.Context, opts OperationArgs) (bool, error) {
-						ok, err := fn(ctx, opts)
-						return !ok, err
+					return func(ctx context.Context, opts OperationArgs) (any, bool, error) {
+						data, ok, err := fn(ctx, opts)
+						return data, !ok, err
 					}, pars, true
 				}
 				return fn, pars, true
