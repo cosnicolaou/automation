@@ -7,7 +7,9 @@ package main
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -57,7 +59,17 @@ func (c *Control) Run(ctx context.Context, flags any, args []string) error {
 	cmd := args[0]
 	parameters := args[1:]
 	cc := webapi.NewControlClient(c.system, c.logger)
-	return cc.RunOperation(ctx, os.Stdout, cmd, parameters)
+	data, err := cc.RunOperation(ctx, os.Stdout, cmd, parameters)
+	if err != nil {
+		return err
+	}
+	return writeJSON(os.Stdout, data)
+}
+
+func writeJSON(w io.Writer, v interface{}) error {
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	return enc.Encode(v)
 }
 
 func (c *Control) Condition(ctx context.Context, flags any, args []string) error {
@@ -68,12 +80,11 @@ func (c *Control) Condition(ctx context.Context, flags any, args []string) error
 	cmd := args[0]
 	parameters := args[1:]
 	cc := webapi.NewControlClient(c.system, c.logger)
-	result, err := cc.RunCondition(ctx, os.Stdout, cmd, parameters)
+	cr, err := cc.RunCondition(ctx, os.Stdout, cmd, parameters)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("%v(%v): %v\n", cmd, strings.Join(parameters, ", "), result)
-	return nil
+	return writeJSON(os.Stdout, cr)
 }
 
 func (c *Control) RunScript(ctx context.Context, flags any, args []string) error {
@@ -100,7 +111,11 @@ func (c *Control) RunScript(ctx context.Context, flags any, args []string) error
 		}
 		cmd := parts[0]
 		parameters := parts[1:]
-		if err := cc.RunOperation(ctx, os.Stdout, cmd, parameters); err != nil {
+		or, err := cc.RunOperation(ctx, os.Stdout, cmd, parameters)
+		if err != nil {
+			return err
+		}
+		if err := writeJSON(os.Stdout, or); err != nil {
 			return err
 		}
 	}

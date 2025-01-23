@@ -77,7 +77,7 @@ func NewControlClient(system devices.System, l *slog.Logger) Control {
 	}
 }
 
-func (c Control) RunOperation(ctx context.Context, writer io.Writer, nameAndOp string, args []string) (any, error) {
+func (c Control) RunOperation(ctx context.Context, writer io.Writer, nameAndOp string, args []string) (*OperationResult, error) {
 	parts := strings.Split(nameAndOp, ".")
 	if len(parts) != 2 {
 		return nil, fmt.Errorf("invalid operation: %v, should be name.operation", nameAndOp)
@@ -87,6 +87,11 @@ func (c Control) RunOperation(ctx context.Context, writer io.Writer, nameAndOp s
 	_, dok := c.system.Devices[name]
 	if !cok && !dok {
 		return nil, fmt.Errorf("unknown controller or device: %v", name)
+	}
+
+	or := &OperationResult{
+		Device: name,
+		Op:     op,
 	}
 
 	if fn, pars, ok := c.system.ControllerOp(name, op); ok {
@@ -101,7 +106,9 @@ func (c Control) RunOperation(ctx context.Context, writer io.Writer, nameAndOp s
 		if err != nil {
 			return nil, fmt.Errorf("failed to run operation: %v: %v", op, err)
 		}
-		return result, nil
+		or.Args = args
+		or.Data = result
+		return or, nil
 	}
 
 	if fn, pars, ok := c.system.DeviceOp(name, op); ok {
@@ -116,22 +123,29 @@ func (c Control) RunOperation(ctx context.Context, writer io.Writer, nameAndOp s
 		if err != nil {
 			return nil, fmt.Errorf("failed to run operation: %v: %v", op, err)
 		}
-		return result, nil
+		or.Args = args
+		or.Data = result
+		return or, nil
 	}
 
 	return nil, fmt.Errorf("unknown or not configured operation: %v, %v", name, op)
 }
 
-func (c Control) RunCondition(ctx context.Context, writer io.Writer, nameAndOp string, args []string) (any, bool, error) {
+func (c Control) RunCondition(ctx context.Context, writer io.Writer, nameAndOp string, args []string) (*ConditionResult, error) {
 	parts := strings.Split(nameAndOp, ".")
 	if len(parts) != 2 {
-		return nil, false, fmt.Errorf("invalid condition: %v, should be name.condition", nameAndOp)
+		return nil, fmt.Errorf("invalid condition: %v, should be name.condition", nameAndOp)
 	}
 	name, op := parts[0], parts[1]
 	_, cok := c.system.Controllers[name]
 	_, dok := c.system.Devices[name]
 	if !cok && !dok {
-		return nil, false, fmt.Errorf("unknown controller or device: %v", name)
+		return nil, fmt.Errorf("unknown controller or device: %v", name)
+	}
+
+	cr := &ConditionResult{
+		Device: name,
+		Cond:   op,
 	}
 	if fn, pars, ok := c.system.DeviceCondition(name, op); ok {
 		if len(args) == 0 {
@@ -143,12 +157,15 @@ func (c Control) RunCondition(ctx context.Context, writer io.Writer, nameAndOp s
 		}
 		data, result, err := fn(ctx, opts)
 		if err != nil {
-			return nil, false, fmt.Errorf("failed to run condition: %v: %v", op, err)
+			return nil, fmt.Errorf("failed to run condition: %v: %v", op, err)
 		}
-		return data, result, nil
+		cr.Args = args
+		cr.Result = result
+		cr.Data = data
+		return cr, nil
 	}
 
-	return nil, false, fmt.Errorf("unknown or not configured condition: %v, %v", name, op)
+	return nil, fmt.Errorf("unknown or not configured condition: %v, %v", name, op)
 }
 
 func decodeArgs(r *http.Request) (string, string, []string) {
@@ -170,18 +187,13 @@ func (c Control) ServeOperation(ctx context.Context, w http.ResponseWriter, r *h
 		c.httpError(ctx, w, r.URL, "op-end", "missing device or operation", http.StatusBadRequest)
 		return
 	}
-	result, err := c.RunOperation(ctx, w, dev+"."+op, args)
+	or, err := c.RunOperation(ctx, w, dev+"."+op, args)
 	if err != nil {
 		c.httpError(ctx, w, r.URL, "op-end", err.Error(), http.StatusInternalServerError)
 		return
 	}
-	c.serveJSON(ctx, w, r.URL, "op-end", OperationResult{
-		Device: dev,
-		Op:     op,
-		Args:   args,
-		Data:   result,
-	})
-	//c.l.Log(ctx, slog.LevelInfo, "op-end", "request", r.URL.String(), "code", http.StatusOK)
+	c.serveJSON(ctx, w, r.URL, "op-end", or)
+
 }
 
 func (c Control) ServeCondition(ctx context.Context, w http.ResponseWriter, r *http.Request) {
@@ -191,21 +203,12 @@ func (c Control) ServeCondition(ctx context.Context, w http.ResponseWriter, r *h
 		c.httpError(ctx, w, r.URL, "cond-end", "missing device or operation", http.StatusBadRequest)
 		return
 	}
-	data, result, err := c.RunCondition(ctx, w, dev+"."+op, args)
+	cr, err := c.RunCondition(ctx, w, dev+"."+op, args)
 	if err != nil {
 		c.httpError(ctx, w, r.URL, "cond-end", err.Error(), http.StatusInternalServerError)
 		return
 	}
-	// fmt.Fprintf(w, "%v.%v(%v) => %v", html.EscapeString(dev), html.EscapeString(op), html.EscapeString(strings.Join(args, ", ")), result)
-	c.serveJSON(ctx, w, r.URL, "cond-end", ConditionResult{
-		Device: dev,
-		Cond:   op,
-		Args:   args,
-		Result: result,
-		Data:   data,
-	})
-
-	// c.l.Log(ctx, slog.LevelInfo, "cond-end", "request", r.URL.String(), "code", http.StatusOK)
+	c.serveJSON(ctx, w, r.URL, "cond-end", cr)
 }
 
 func (c Control) serveJSON(ctx context.Context, w http.ResponseWriter, u *url.URL, msg string, result any) {
@@ -233,14 +236,14 @@ func AppendControlAPIEndpoints(ctx context.Context, c Control, mux *http.ServeMu
 type OperationResult struct {
 	Device string   `json:"device"`
 	Op     string   `json:"operation"`
-	Args   []string `json:"args"`
-	Data   any      `json:"data"`
+	Args   []string `json:"args,omitempty"`
+	Data   any      `json:"data,omitempty"`
 }
 
 type ConditionResult struct {
 	Device string   `json:"device"`
 	Cond   string   `json:"condition"`
-	Args   []string `json:"args"`
+	Args   []string `json:"args,omitempty"`
 	Result bool     `json:"status"`
-	Data   any      `json:"data"`
+	Data   any      `json:"data,omitempty"`
 }
