@@ -8,22 +8,22 @@
     <script src="/static/api.js"></script>
     <script src="static/json-viewer.js"></script>
     <link href="static/json-viewer.css" type="text/css" rel="stylesheet">
-</head>
-
+    <link href="static/autobot.css" type="text/css" rel="stylesheet">
 </head>
 <body>
     <header>
         <h1>Testing System {{.Name}}</h1>
         <nav>
-          <a href="/">Home</a>
-          <a href="/controllers">Controllers</a>
-          <a href="/devices">Devices</a>
-          <a href="/conditions">Conditions</a>
+            <a href="/">Home</a>
+            <a href="/controllers">Controllers</a>
+            <a href="/devices">Devices</a>
+            <a href="/conditions">Conditions</a>
+            <a href="/api/reload" id="reload-config">Reload System Config</a> 
         </nav>
     </header>
     <main>
-        <pre id="result"></pre>
-     	{{.Table}}
+        <div class="content">{{.Table}}</div>
+        <pre id="resultBar"></pre>
     </main>
 </body>
 </html>

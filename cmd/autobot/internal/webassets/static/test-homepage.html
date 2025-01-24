@@ -4,6 +4,11 @@
     <meta charset="UTF-8">
     <link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css">
     <title>autobot device testing page</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.0/jquery.min.js"></script>
+    <script src="/static/api.js"></script>
+    <script src="static/json-viewer.js"></script>
+    <link href="static/json-viewer.css" type="text/css" rel="stylesheet">
+        <link href="static/autobot.css" type="text/css" rel="stylesheet">
 </head>
 <body>
     <header>
@@ -13,12 +18,15 @@
             <a href="/controllers">Controllers</a>
             <a href="/devices">Devices</a>
             <a href="/conditions">Conditions</a>
+            <a href="/api/reload" id="reload-config">Reload System Config</a> 
         </nav>
     </header>
     <main>
+        <div class="content-only">
      	{{.Controllers}}
         {{.Devices}}
         {{.Conditions}}
+        </div>
     </main>
   </body>
-</html>
+</html>`

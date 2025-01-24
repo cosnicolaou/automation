@@ -1,0 +1,49 @@
+.container {
+  position: relative;
+  height: 100vh;
+  overflow: hidden; /* Prevent scrolling on the container itself */
+}
+
+header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    background-color: white;
+    z-index: 100;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    padding: 10px;
+}
+
+nav {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 10px;
+}
+
+#resultBar {
+  position: fixed;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 400px;
+  padding: 10px;
+  z-index: 100;
+  box-shadow: 0 -2px 4px rgba(0,0,0,0.1);
+}
+
+.content {
+  position: absolute;
+  top: 200px; /* Height of nav */
+  bottom: 400px; /* Height of resultBar */
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.content-only {
+  position: absolute;
+  top: 200px; /* Height of nav */
+  padding: 20px;
+  overflow-y: auto;
+}

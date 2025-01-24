@@ -23,7 +23,7 @@ type WebUIFlags struct {
 	Assets   string `subcmd:"assets,,path to assets"`
 }
 
-func (fv WebUIFlags) Pages() webassets.Pages {
+func (fv WebUIFlags) Pages() *webassets.Pages {
 	rfs := wa.NewAssets("static", webassets.Static,
 		wa.EnableReloading(fv.Assets, time.Now(), true))
 	return webassets.NewPages(rfs)

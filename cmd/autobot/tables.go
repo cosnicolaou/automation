@@ -70,7 +70,11 @@ func (tm tableManager) withAPICall(device, op string, args []string, configured,
 		if len(args) > 0 {
 			argStr = fmt.Sprintf("['%v']", strings.Join(args, "', '"))
 		}
-		return fmt.Sprintf("<button id=\"%v.%v\" onclick=\"runOp('%v', '%v', %s)\">%v</button>", device, op, device, op, argStr, op)
+		jsop := "runOperation"
+		if cond {
+			jsop = "runCondition"
+		}
+		return fmt.Sprintf("<button id=\"%v.%v\" onclick=\"%s('%v', '%v', %s)\">%v</button>", device, op, jsop, device, op, argStr, op)
 	}
 
 	params := url.Values{}
@@ -154,6 +158,7 @@ func (tm tableManager) devicesOrConditions(sys devices.System, conditions bool) 
 		return rows
 	}
 	for _, d := range sys.Config.Devices {
+		fmt.Printf("ADDING %v\n", d.Name)
 		nr := tm.operationsRows(
 			d.Name,
 			opNames(sys.Devices[d.Name].Operations()),
