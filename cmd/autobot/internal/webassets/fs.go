@@ -6,25 +6,30 @@ package webassets
 
 import (
 	"embed"
-	"fmt"
-	"html/template"
 )
 
 //go:embed static/*
 var Static embed.FS
 
-func readContentsOrDie(path string) []byte {
-	b, err := Static.ReadFile(path)
+/*
+func readContents(cfs fs.FS, path string) ([]byte, error) {
+	f, err := cfs.Open(path)
 	if err != nil {
-		panic(fmt.Sprintf("failed to read embedded file %v: %v", path, err))
+		return nil, err
 	}
-	return b
+	defer f.Close()
+	return io.ReadAll(f)
 }
 
-func createTemplateOrDie(path string) *template.Template {
-	tpl, err := template.New("testServerIndex").Parse(string(readContentsOrDie(path)))
+func createTemplateOrDie(fs fs.FS, path string) (*template.Template, error) {
+	c, err := readContents(fs, path)
+	if err != nil {
+		return nil, err
+	}
+	tpl, err := template.New(path).Parse(string(c))
 	if err != nil {
 		panic(fmt.Sprintf("failed to create template from %v: %v", path, err))
 	}
-	return tpl
+	return tpl, nil
 }
+*/

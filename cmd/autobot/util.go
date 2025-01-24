@@ -37,6 +37,7 @@ func loadSystem(ctx context.Context, fv *ConfigFileFlags, opts ...devices.Option
 	if err != nil {
 		return nil, devices.System{}, fmt.Errorf("failed to parse system config file: %q: %w", fv.SystemFile, err)
 	}
+
 	return keystore.ContextWithAuth(ctx, keys), system, nil
 }
 

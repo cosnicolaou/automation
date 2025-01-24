@@ -7,13 +7,17 @@ package main
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
 	"strings"
 
+	"cloudeng.io/cmdutil/keystore"
 	"github.com/cosnicolaou/automation/cmd/autobot/internal/webapi"
+	"github.com/cosnicolaou/automation/cmd/autobot/internal/webassets"
 	"github.com/cosnicolaou/automation/devices"
 	"github.com/pkg/browser"
 )
@@ -32,51 +36,82 @@ type ControlTestPageFlags struct {
 }
 
 type Control struct {
-	system devices.System
+	logger *slog.Logger
 }
 
-func (c *Control) setup(ctx context.Context, fv *ControlFlags) (context.Context, error) {
-	logger := slog.New(slog.NewJSONHandler(os.Stderr, nil))
+func (c *Control) setup(ctx context.Context, fv *ControlFlags) (context.Context, func(ctx context.Context) (devices.System, error), error) {
+	c.logger = slog.New(slog.NewJSONHandler(os.Stderr, nil))
 	opts := []devices.Option{
-		devices.WithLogger(logger),
+		devices.WithLogger(c.logger),
 	}
-	ctx, sys, err := loadSystem(ctx, &fv.ConfigFileFlags, opts...)
+
+	keys, err := ReadKeysFile(ctx, fv.KeysFile)
 	if err != nil {
-		return nil, err
+		return nil, nil, fmt.Errorf("failed to read keys file: %q: %w", fv.KeysFile, err)
 	}
-	c.system = sys
-	return ctx, nil
+
+	zdb, err := loadZIPDatabase(fv.ZIPDatabase)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to load zip database: %q: %w", fv.ZIPDatabase, err)
+	}
+	opts = append(opts, devices.WithZIPCodeLookup(zdb))
+
+	ctx = keystore.ContextWithAuth(ctx, keys)
+
+	loader := func(ctx context.Context) (devices.System, error) {
+		system, err := devices.ParseSystemConfigFile(ctx, fv.SystemFile, opts...)
+		if err != nil {
+			return devices.System{}, fmt.Errorf("failed to parse system config file: %q: %w", fv.SystemFile, err)
+		}
+		return system, nil
+	}
+	return ctx, loader, nil
 }
 
 func (c *Control) Run(ctx context.Context, flags any, args []string) error {
-	ctx, err := c.setup(ctx, flags.(*ControlFlags))
+	ctx, loader, err := c.setup(ctx, flags.(*ControlFlags))
 	if err != nil {
 		return err
 	}
 	cmd := args[0]
 	parameters := args[1:]
-	cc := webapi.NewControlClient(c.system)
-	return cc.RunOperation(ctx, os.Stdout, cmd, parameters)
+	cc, err := webapi.NewControlClient(ctx, loader, c.logger)
+	if err != nil {
+		return err
+	}
+	data, err := cc.RunOperation(ctx, os.Stdout, cmd, parameters)
+	if err != nil {
+		return err
+	}
+	return writeJSON(os.Stdout, data)
+}
+
+func writeJSON(w io.Writer, v interface{}) error {
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	return enc.Encode(v)
 }
 
 func (c *Control) Condition(ctx context.Context, flags any, args []string) error {
-	ctx, err := c.setup(ctx, flags.(*ControlFlags))
+	ctx, loader, err := c.setup(ctx, flags.(*ControlFlags))
 	if err != nil {
 		return err
 	}
 	cmd := args[0]
 	parameters := args[1:]
-	cc := webapi.NewControlClient(c.system)
-	result, err := cc.RunCondition(ctx, os.Stdout, cmd, parameters)
+	cc, err := webapi.NewControlClient(ctx, loader, c.logger)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("%v(%v): %v\n", cmd, strings.Join(parameters, ", "), result)
-	return nil
+	cr, err := cc.RunCondition(ctx, os.Stdout, cmd, parameters)
+	if err != nil {
+		return err
+	}
+	return writeJSON(os.Stdout, cr)
 }
 
 func (c *Control) RunScript(ctx context.Context, flags any, args []string) error {
-	ctx, err := c.setup(ctx, &flags.(*ControlScriptFlags).ControlFlags)
+	ctx, loader, err := c.setup(ctx, &flags.(*ControlScriptFlags).ControlFlags)
 	if err != nil {
 		return err
 	}
@@ -87,7 +122,10 @@ func (c *Control) RunScript(ctx context.Context, flags any, args []string) error
 	}
 	defer f.Close()
 	scanner := bufio.NewScanner(f)
-	cc := webapi.NewControlClient(c.system)
+	cc, err := webapi.NewControlClient(ctx, loader, c.logger)
+	if err != nil {
+		return err
+	}
 	for scanner.Scan() {
 		line := scanner.Text()
 		if strings.HasPrefix(line, "#") {
@@ -99,7 +137,11 @@ func (c *Control) RunScript(ctx context.Context, flags any, args []string) error
 		}
 		cmd := parts[0]
 		parameters := parts[1:]
-		if err := cc.RunOperation(ctx, os.Stdout, cmd, parameters); err != nil {
+		or, err := cc.RunOperation(ctx, os.Stdout, cmd, parameters)
+		if err != nil {
+			return err
+		}
+		if err := writeJSON(os.Stdout, or); err != nil {
 			return err
 		}
 	}
@@ -108,7 +150,7 @@ func (c *Control) RunScript(ctx context.Context, flags any, args []string) error
 
 func (c *Control) ServeTestPage(ctx context.Context, flags any, _ []string) error {
 	fv := flags.(*ControlTestPageFlags)
-	ctx, err := c.setup(ctx, &fv.ControlFlags)
+	ctx, loader, err := c.setup(ctx, &fv.ControlFlags)
 	if err != nil {
 		return err
 	}
@@ -119,18 +161,35 @@ func (c *Control) ServeTestPage(ctx context.Context, flags any, _ []string) erro
 		return err
 	}
 
-	tm := tableManager{html: true}
+	tm := tableManager{html: true, js: true}
+	pages := fv.WebUIFlags.Pages()
+
+	rerender := func(ctx context.Context) (devices.System, error) {
+		system, err := loader(ctx)
+		if err != nil {
+			return devices.System{}, err
+		}
+		pages.SetPages(map[webassets.PageNames]string{
+			webassets.ControllersPage:          tm.RenderHTML(tm.Controllers(system)),
+			webassets.DevicesPage:              tm.RenderHTML(tm.Devices(system)),
+			webassets.ConditionsPage:           tm.RenderHTML(tm.Conditions(system)),
+			webassets.ControllerOperationsPage: tm.RenderHTML(tm.ControllerOperations(system)),
+			webassets.DeviceOperationsPage:     tm.RenderHTML(tm.DeviceOperations(system)),
+			webassets.DeviceConditionsPage:     tm.RenderHTML(tm.DeviceConditions(system)),
+		})
+
+		return system, nil
+	}
+
 	webapi.AppendTestServerEndpoints(mux,
 		fv.ConfigFileFlags.SystemFile,
-		tm.RenderHTML(tm.Controllers(c.system)),
-		tm.RenderHTML(tm.Devices(c.system)),
-		tm.RenderHTML(tm.Conditions(c.system)),
-		tm.RenderHTML(tm.ControllerOperations(c.system)),
-		tm.RenderHTML(tm.DeviceOperations(c.system)),
-		tm.RenderHTML(tm.DeviceConditions(c.system)),
+		pages,
 	)
 
-	cc := webapi.NewControlClient(c.system)
+	cc, err := webapi.NewControlClient(ctx, rerender, c.logger)
+	if err != nil {
+		return err
+	}
 	webapi.AppendControlAPIEndpoints(ctx, cc, mux)
 
 	_ = browser.OpenURL(url)

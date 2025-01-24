@@ -18,6 +18,7 @@ import (
 
 type tableManager struct {
 	html bool
+	js   bool
 }
 
 func (tm tableManager) Calendar(cal *scheduler.Calendar, dr datetime.CalendarDateRange) table.Writer {
@@ -64,8 +65,20 @@ func (tm tableManager) withAPICall(device, op string, args []string, configured,
 	if !tm.html || !configured {
 		return op
 	}
+	if tm.js {
+		argStr := "[]"
+		if len(args) > 0 {
+			argStr = fmt.Sprintf("['%v']", strings.Join(args, "', '"))
+		}
+		jsop := "runOperation"
+		if cond {
+			jsop = "runCondition"
+		}
+		return fmt.Sprintf("<button id=\"%v.%v\" onclick=\"%s('%v', '%v', %s)\">%v</button>", device, op, jsop, device, op, argStr, op)
+	}
+
 	params := url.Values{}
-	params.Add("device", device)
+	params.Add("dev", device)
 	params.Add("op", op)
 	for _, a := range args {
 		params.Add("arg", a)
@@ -145,6 +158,7 @@ func (tm tableManager) devicesOrConditions(sys devices.System, conditions bool) 
 		return rows
 	}
 	for _, d := range sys.Config.Devices {
+		fmt.Printf("ADDING %v\n", d.Name)
 		nr := tm.operationsRows(
 			d.Name,
 			opNames(sys.Devices[d.Name].Operations()),
