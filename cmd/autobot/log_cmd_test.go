@@ -6,6 +6,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"maps"
 	"os"
 	"path/filepath"
@@ -77,6 +78,9 @@ func TestSimulateAndLogs(t *testing.T) {
 	if err := schedule.Simulate(ctx, fl, []string{}); err != nil {
 		t.Fatalf("failed to display config: %v", err)
 	}
+
+	l, _ := os.ReadFile(tmpFile)
+	os.WriteFile("xxx", l, 0644)
 
 	counts, dates := countEvents(t, tmpFile)
 
@@ -173,6 +177,7 @@ func testSummaries(ctx context.Context, t *testing.T, logfile string) {
 		t.Fatalf("failed to display log: %v", err)
 	}
 	summary := out.String()
+	fmt.Println(summary)
 	out.Reset()
 
 	if got, want := strings.Count(summary, "Completed"), 1; got != want {

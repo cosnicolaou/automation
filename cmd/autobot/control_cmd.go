@@ -161,7 +161,7 @@ func (c *Control) ServeTestPage(ctx context.Context, flags any, _ []string) erro
 		return err
 	}
 
-	tm := tableManager{html: true, js: true}
+	tm := tableManager{html: true, jsapi: true}
 	pages := fv.WebUIFlags.Pages()
 
 	rerender := func(ctx context.Context) (devices.System, error) {

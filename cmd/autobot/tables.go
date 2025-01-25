@@ -6,19 +6,20 @@ package main
 
 import (
 	"fmt"
-	"net/url"
 	"slices"
 	"strings"
+	"time"
 
 	"cloudeng.io/datetime"
 	"github.com/cosnicolaou/automation/devices"
+	"github.com/cosnicolaou/automation/internal/logging"
 	"github.com/cosnicolaou/automation/scheduler"
 	"github.com/jedib0t/go-pretty/v6/table"
 )
 
 type tableManager struct {
-	html bool
-	js   bool
+	html  bool
+	jsapi bool
 }
 
 func (tm tableManager) Calendar(cal *scheduler.Calendar, dr datetime.CalendarDateRange) table.Writer {
@@ -62,31 +63,18 @@ func (tm tableManager) RenderHTML(tw table.Writer) string {
 }
 
 func (tm tableManager) withAPICall(device, op string, args []string, configured, cond bool) string {
-	if !tm.html || !configured {
+	if !tm.jsapi || !configured {
 		return op
 	}
-	if tm.js {
-		argStr := "[]"
-		if len(args) > 0 {
-			argStr = fmt.Sprintf("['%v']", strings.Join(args, "', '"))
-		}
-		jsop := "runOperation"
-		if cond {
-			jsop = "runCondition"
-		}
-		return fmt.Sprintf("<button id=\"%v.%v\" onclick=\"%s('%v', '%v', %s)\">%v</button>", device, op, jsop, device, op, argStr, op)
+	argStr := "[]"
+	if len(args) > 0 {
+		argStr = fmt.Sprintf("['%v']", strings.Join(args, "', '"))
 	}
-
-	params := url.Values{}
-	params.Add("dev", device)
-	params.Add("op", op)
-	for _, a := range args {
-		params.Add("arg", a)
-	}
+	jsop := "runOperation"
 	if cond {
-		return fmt.Sprintf("<a href=\"/api/condition?%v\">%v</a>", params.Encode(), op)
+		jsop = "runCondition"
 	}
-	return fmt.Sprintf("<a href=\"/api/operation?%v\">%v</a>", params.Encode(), op)
+	return fmt.Sprintf("<button id=\"%v.%v\" onclick=\"%s('%v', '%v', %s)\">%v</button>", device, op, jsop, device, op, argStr, op)
 }
 
 func (tm tableManager) withDivID(dev string, cond bool) string {
@@ -158,7 +146,6 @@ func (tm tableManager) devicesOrConditions(sys devices.System, conditions bool) 
 		return rows
 	}
 	for _, d := range sys.Config.Devices {
-		fmt.Printf("ADDING %v\n", d.Name)
 		nr := tm.operationsRows(
 			d.Name,
 			opNames(sys.Devices[d.Name].Operations()),
@@ -230,4 +217,40 @@ func (tm tableManager) Conditions(sys devices.System) table.Writer {
 	}
 	slices.Sort(devs)
 	return tm.newList("Conditions", devs, "/conditions", false)
+}
+
+func (tm tableManager) Completed(sr *logging.StatusRecorder) table.Writer {
+	tw := table.NewWriter()
+	tw.SetTitle("Completed")
+	tw.AppendHeader(table.Row{"Schedule", "Device", "Operation", "Due", "Completed", "Precondition", "Status", "Error"})
+
+	i := 0
+	for sr := range sr.Completed() {
+		status := "completed"
+		if sr.Aborted() {
+			status = "aborted"
+		}
+		pre := sr.PreCondition
+		if len(sr.PreConditionArgs) > 0 {
+			pre += "(" + strings.Join(sr.PreConditionArgs, ", ") + ")"
+		}
+		emsg := ""
+		if sr.Error != nil {
+			emsg = sr.Error.Error()
+		}
+		tw.AppendRow(table.Row{sr.Schedule, sr.Device, sr.Op, sr.Due, sr.Completed.Round(time.Second), pre, status, emsg})
+		//		fmt.Printf("% 3d: %+v %+v %+v %+v %+v %+v %+v %v\n", i, sr.Schedule, sr.Device, sr.Op, sr.Due, sr.Completed.Round(time.Second), pre, status, emsg)
+		i++
+	}
+	return tw
+}
+
+func (tm tableManager) Pending(sr *logging.StatusRecorder) table.Writer {
+	tw := table.NewWriter()
+	tw.SetTitle("Pending")
+	tw.AppendHeader(table.Row{"Schedule", "Device", "Operation", "Due", "Pending", "Delay"})
+	for sr := range sr.Pending() {
+		tw.AppendRow(table.Row{sr.Schedule, sr.Device, sr.Op, sr.Due, sr.Pending.Round(time.Second), sr.Delay.Round(time.Second)})
+	}
+	return tw
 }

@@ -9,8 +9,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
-	"time"
 
 	"github.com/cosnicolaou/automation/internal/logging"
 )
@@ -24,6 +22,7 @@ type LogStatusFlags struct {
 	LogFlags
 	StreamingSummary bool `subcmd:"streaming-summary,true,print a summary of the status of each log entry as it is completed"`
 	DailySummary     bool `subcmd:"daily-summary,true,print a summary of the status at the end of each day"`
+	FinalSummary     bool `subcmd:"final-summary,false,print a single summary of the entire log"`
 }
 
 type Log struct {
@@ -51,11 +50,10 @@ func (l *Log) processLog(rd io.Reader, fv *LogStatusFlags, lh logEntryHandler) e
 func (l *Log) Status(_ context.Context, flags any, args []string) error {
 	fv := flags.(*LogStatusFlags)
 	srh := statusRecoder{
-		StatusRecorder:   logging.NewStatusRecorder(),
-		pending:          make(map[int64]*logging.StatusRecord),
-		streamingSummary: fv.StreamingSummary,
-		dailySummary:     fv.DailySummary,
-		out:              l.out,
+		StatusRecorder: logging.NewStatusRecorder(),
+		pending:        make(map[int64]*logging.StatusRecord),
+		flags:          fv,
+		out:            l.out,
 	}
 	rd := os.Stdin
 	if len(args) == 1 {
@@ -75,47 +73,53 @@ func (l *Log) Status(_ context.Context, flags any, args []string) error {
 
 type statusRecoder struct {
 	*logging.StatusRecorder
-	pending          map[int64]*logging.StatusRecord
-	streamingSummary bool
-	dailySummary     bool
-	out              io.Writer
+	pending map[int64]*logging.StatusRecord
+	flags   *LogStatusFlags
+	out     io.Writer
 }
 
 func (sr *statusRecoder) print(out io.Writer) {
-	banner := false
-	for rec := range sr.Completed() {
-		if !banner {
-			fmt.Fprint(out, "Completed:\n")
-			banner = true
-		}
-		var o strings.Builder
-		fmt.Fprintf(&o, "% 70v: completed: %v, pending since: %v, due at: %v, delay: %v", rec.Name(), rec.Completed, rec.Pending.Truncate(time.Minute), rec.Due, rec.Delay)
-		if rec.PreCondition != "" {
-			pa := strings.Join(rec.PreConditionArgs, " ")
-			if rec.Aborted() {
-				o.WriteString(fmt.Sprintf(" (aborted due to %v %v)", rec.PreCondition, pa))
-			} else {
-				o.WriteString(fmt.Sprintf(" (completed after %v %v)", rec.PreCondition, pa))
+	/*
+		banner := false
+		for rec := range sr.Completed() {
+			if !banner {
+				fmt.Fprint(out, "Completed:\n")
+				banner = true
 			}
+			var o strings.Builder
+			fmt.Fprintf(&o, "% 70v: completed: %v, pending since: %v, due at: %v, delay: %v", rec.Name(), rec.Completed, rec.Pending.Truncate(time.Minute), rec.Due, rec.Delay)
+			if rec.PreCondition != "" {
+				pa := strings.Join(rec.PreConditionArgs, " ")
+				if rec.Aborted() {
+					o.WriteString(fmt.Sprintf(" (aborted due to %v %v)", rec.PreCondition, pa))
+				} else {
+					o.WriteString(fmt.Sprintf(" (completed after %v %v)", rec.PreCondition, pa))
+				}
+			}
+			o.WriteRune('\n')
+			_, _ = out.Write([]byte(o.String()))
 		}
-		o.WriteRune('\n')
-		_, _ = out.Write([]byte(o.String()))
-	}
-	banner = false
-	for rec := range sr.Pending() {
-		if !banner {
-			fmt.Fprint(out, "Pending:\n")
-			banner = true
-		}
-		fmt.Fprintf(out, "% 70v: pending: due: %v, in %v\n", rec.Name(), rec.Due, rec.Delay.Round(time.Second))
-	}
+		banner = false
+		for rec := range sr.Pending() {
+			if !banner {
+				fmt.Fprint(out, "Pending:\n")
+				banner = true
+			}
+			fmt.Fprintf(out, "% 70v: pending: due: %v, in %v\n", rec.Name(), rec.Due, rec.Delay.Round(time.Second))
+		}*/
+
+	tm := tableManager{}
+	_, _ = out.Write([]byte(tm.Completed(sr.StatusRecorder).Render()))
+	_, _ = out.Write([]byte("\n"))
+	_, _ = out.Write([]byte(tm.Pending(sr.StatusRecorder).Render()))
+	return
 }
 
 func (sr *statusRecoder) process(le logging.Entry) error {
 	if le.Mod != "scheduler" {
 		return nil
 	}
-	printSummary := sr.streamingSummary
+	printSummary := sr.flags.StreamingSummary
 	switch le.Msg {
 	case logging.LogPending:
 		rec := le.StatusRecord()
@@ -130,7 +134,7 @@ func (sr *statusRecoder) process(le logging.Entry) error {
 		}
 		sr.PendingDone(pending, le.PreCondResult, le.Err)
 	case logging.LogNewDay, logging.LogYearEnd:
-		if sr.dailySummary {
+		if sr.flags.DailySummary {
 			printSummary = true
 		}
 	case logging.LogTooLate:
@@ -138,7 +142,7 @@ func (sr *statusRecoder) process(le logging.Entry) error {
 	default: // ignore all other messages.
 		return nil
 	}
-	if printSummary {
+	if printSummary && !sr.flags.FinalSummary {
 		sr.print(sr.out)
 		sr.ResetCompleted()
 	}
