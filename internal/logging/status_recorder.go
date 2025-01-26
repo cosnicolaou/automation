@@ -7,6 +7,7 @@ package logging
 import (
 	"fmt"
 	"iter"
+	"strings"
 	"sync"
 	"time"
 
@@ -50,8 +51,33 @@ func (sr *StatusRecord) Aborted() bool {
 	return sr.PreCondition != "" && !sr.PreConditionResult
 }
 
+func (sr *StatusRecord) Status() string {
+	if sr.Completed.IsZero() {
+		return "pending"
+	}
+	if sr.Aborted() {
+		return "aborted"
+	}
+	return "completed"
+}
+
 func (sr *StatusRecord) Name() string {
 	return fmt.Sprintf("%v:%v.%v", sr.Schedule, sr.Device, sr.Op)
+}
+
+func (sr *StatusRecord) PreConditionCall() string {
+	pre := sr.PreCondition
+	if len(sr.PreConditionArgs) > 0 {
+		pre += "(" + strings.Join(sr.PreConditionArgs, ", ") + ")"
+	}
+	return pre
+}
+
+func (sr *StatusRecord) ErrorMessage() string {
+	if sr.Error == nil {
+		return ""
+	}
+	return sr.Error.Error()
 }
 
 func (s *StatusRecorder) PendingDone(sr *StatusRecord, precondition bool, err error) {

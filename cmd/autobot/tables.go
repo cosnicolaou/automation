@@ -219,38 +219,49 @@ func (tm tableManager) Conditions(sys devices.System) table.Writer {
 	return tm.newList("Conditions", devs, "/conditions", false)
 }
 
-func (tm tableManager) Completed(sr *logging.StatusRecorder) table.Writer {
-	tw := table.NewWriter()
-	tw.SetTitle("Completed")
-	tw.AppendHeader(table.Row{"Schedule", "Device", "Operation", "Due", "Completed", "Precondition", "Status", "Error"})
+func (tm tableManager) statusRecordRow(sr *logging.StatusRecord) table.Row {
+	return table.Row{sr.Schedule, sr.Device, sr.Op, sr.Due, sr.Pending.Round(time.Second), sr.Completed.Round(time.Second), sr.PreConditionCall(), sr.Status(), sr.ErrorMessage()}
+}
 
-	i := 0
+func (tm tableManager) statusRecordHeader() table.Row {
+	return table.Row{"Schedule", "Device", "Operation", "Due", "Pending Since", "Completed", "Precondition", "Status", "Error"}
+}
+
+func (tm tableManager) CompletedAndPending(sr *logging.StatusRecorder, when datetime.CalendarDate) table.Writer {
+	tw := table.NewWriter()
+	tw.SetTitle(fmt.Sprintf("Completed and Pending: %v", when))
+	n := 0
+	tw.AppendHeader(tm.statusRecordHeader())
 	for sr := range sr.Completed() {
-		status := "completed"
-		if sr.Aborted() {
-			status = "aborted"
-		}
-		pre := sr.PreCondition
-		if len(sr.PreConditionArgs) > 0 {
-			pre += "(" + strings.Join(sr.PreConditionArgs, ", ") + ")"
-		}
-		emsg := ""
-		if sr.Error != nil {
-			emsg = sr.Error.Error()
-		}
-		tw.AppendRow(table.Row{sr.Schedule, sr.Device, sr.Op, sr.Due, sr.Completed.Round(time.Second), pre, status, emsg})
-		//		fmt.Printf("% 3d: %+v %+v %+v %+v %+v %+v %+v %v\n", i, sr.Schedule, sr.Device, sr.Op, sr.Due, sr.Completed.Round(time.Second), pre, status, emsg)
-		i++
+		tw.AppendRow(tm.statusRecordRow(sr))
+		n++
+	}
+	for sr := range sr.Pending() {
+		tw.AppendRow(tm.statusRecordRow(sr))
+		n++
+	}
+	if n == 0 {
+		tw.SetTitle("No completed or pending operations")
 	}
 	return tw
 }
 
-func (tm tableManager) Pending(sr *logging.StatusRecorder) table.Writer {
+func (tm tableManager) Completed(sr *logging.StatusRecorder, when datetime.CalendarDate) table.Writer {
 	tw := table.NewWriter()
-	tw.SetTitle("Pending")
-	tw.AppendHeader(table.Row{"Schedule", "Device", "Operation", "Due", "Pending", "Delay"})
+	tw.SetTitle(fmt.Sprintf("Completed: %v", when))
+	tw.AppendHeader(tm.statusRecordHeader())
+	for sr := range sr.Completed() {
+		tm.statusRecordRow(sr)
+	}
+	return tw
+}
+
+func (tm tableManager) Pending(sr *logging.StatusRecorder, when datetime.CalendarDate) table.Writer {
+	tw := table.NewWriter()
+	tw.SetTitle(fmt.Sprintf("Pending: %v", when))
+	tw.AppendHeader(tm.statusRecordHeader())
 	for sr := range sr.Pending() {
-		tw.AppendRow(table.Row{sr.Schedule, sr.Device, sr.Op, sr.Due, sr.Pending.Round(time.Second), sr.Delay.Round(time.Second)})
+		tm.statusRecordRow(sr)
 	}
 	return tw
 }
