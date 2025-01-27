@@ -16,13 +16,14 @@ import (
 
 type StatusRecorder struct {
 	mu      sync.Mutex
-	done    []*StatusRecord
+	done    *list.Double[*StatusRecord]
 	waiting *list.Double[*StatusRecord]
 }
 
 func NewStatusRecorder() *StatusRecorder {
 	return &StatusRecorder{
-		done:    make([]*StatusRecord, 0, 1000),
+		//		done:    make([]*StatusRecord, 0, 1000),
+		done:    list.NewDouble[*StatusRecord](),
 		waiting: list.NewDouble[*StatusRecord](),
 	}
 }
@@ -89,7 +90,7 @@ func (s *StatusRecorder) PendingDone(sr *StatusRecord, precondition bool, err er
 	sr.Completed = time.Now().In(sr.Due.Location())
 	sr.PreConditionResult = precondition
 	sr.Error = err
-	s.done = append(s.done, sr)
+	s.done.Append(sr)
 	s.waiting.RemoveItem(sr.listID)
 }
 
@@ -108,7 +109,19 @@ func (s *StatusRecorder) Completed() iter.Seq[*StatusRecord] {
 	return func(yield func(*StatusRecord) bool) {
 		s.mu.Lock()
 		defer s.mu.Unlock()
-		for _, sr := range s.done {
+		for sr := range s.done.Forward() {
+			if !yield(sr) {
+				return
+			}
+		}
+	}
+}
+
+func (s *StatusRecorder) CompletedRecent() iter.Seq[*StatusRecord] {
+	return func(yield func(*StatusRecord) bool) {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		for sr := range s.done.Reverse() {
 			if !yield(sr) {
 				return
 			}
@@ -131,5 +144,5 @@ func (s *StatusRecorder) Pending() iter.Seq[*StatusRecord] {
 func (s *StatusRecorder) ResetCompleted() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.done = s.done[:0]
+	s.done.Reset()
 }

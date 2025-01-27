@@ -9,17 +9,22 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
 	"os"
 	"time"
 
 	"cloudeng.io/datetime"
+	"github.com/cosnicolaou/automation/cmd/autobot/internal/webapi"
+	"github.com/cosnicolaou/automation/cmd/autobot/internal/webassets"
 	"github.com/cosnicolaou/automation/devices"
 	"github.com/cosnicolaou/automation/internal/logging"
 	"github.com/cosnicolaou/automation/scheduler"
+	"github.com/pkg/browser"
 )
 
 type ScheduleFlags struct {
 	ConfigFileFlags
+	WebUIFlags
 	LogFile   string `subcmd:"log-file,,log file"`
 	StartDate string `subcmd:"start-date,,start date"`
 	DryRun    bool   `subcmd:"dry-run,,dry run"`
@@ -27,9 +32,11 @@ type ScheduleFlags struct {
 
 type SimulateFlags struct {
 	ConfigFileFlags
+	WebUIFlags
 	LogFile   string        `subcmd:"log-file,,log file"`
 	DateRange string        `subcmd:"date-range,,date range in <month>/<day>/<year>:<year>/<month>/<day> format"`
 	Delay     time.Duration `subcmd:"delay,10ms,delay between each simulated time step and the scheduled time"`
+	DryRun    bool          `subcmd:"dry-run,true,dry run"`
 }
 
 type SchedulePrintFlags struct {
@@ -68,6 +75,28 @@ func (s *Schedule) loadFiles(ctx context.Context, fv *ConfigFileFlags, deviceOpt
 	s.system = sys
 	s.schedules = scheds
 	return ctx, nil
+}
+
+func (s *Schedule) serveStatusUI(ctx context.Context, systemfile string, fv WebUIFlags, logger *slog.Logger, statusRecorder *logging.StatusRecorder) error {
+	if fv.Port == "0" {
+		return nil
+	}
+	mux := http.NewServeMux()
+	_, runner, url, err := fv.CreateWebServer(ctx, mux)
+	if err != nil {
+		return err
+	}
+	pages := fv.StatusPages()
+
+	cc := webapi.NewStatusServer(logger, statusRecorder)
+
+	webapi.AppendStatusAPIEndpoints(ctx, mux, cc)
+	webassets.AppendStatusPages(mux, systemfile, pages)
+	go func() {
+		_ = browser.OpenURL(url)
+		_ = runner()
+	}()
+	return nil
 }
 
 func (s *Schedule) Run(ctx context.Context, flags any, _ []string) error {
@@ -152,6 +181,7 @@ func (s *Schedule) Simulate(ctx context.Context, flags any, args []string) error
 		scheduler.WithOperationWriter(os.Stdout),
 		scheduler.WithStatusRecorder(sr),
 		scheduler.WithSimulationDelay(fv.Delay),
+		scheduler.WithDryRun(fv.DryRun),
 	}
 
 	ctx, err = s.loadFiles(ctx, &fv.ConfigFileFlags, deviceOpts)
@@ -167,8 +197,10 @@ func (s *Schedule) Simulate(ctx context.Context, flags any, args []string) error
 
 	logger.Info("starting simulated schedules", "period", period.String(), "loc", s.system.Location.TimeLocation.String(), "zip", s.system.Location.ZIPCode, "latitude", s.system.Location.Latitude, "longitude", s.system.Location.Longitude)
 
+	if err := s.serveStatusUI(ctx, fv.ConfigFileFlags.SystemFile, fv.WebUIFlags, logger, sr); err != nil {
+		return err
+	}
 	return scheduler.RunSimulation(ctx, s.schedules, s.system, period, schedulerOpts...)
-
 }
 
 func (s *Schedule) Print(ctx context.Context, flags any, args []string) error {

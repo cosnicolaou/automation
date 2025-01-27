@@ -70,7 +70,11 @@ func TestSimulateAndLogs(t *testing.T) {
 			ScheduleFile: filepath.Join("testdata", "schedule.yaml"),
 		},
 		DateRange: "12/01/2024:12/01/2025",
+		DryRun:    false, // this is safe since the test system has dummy devices
 		LogFile:   tmpFile,
+		WebUIFlags: WebUIFlags{
+			Port: "0",
+		},
 	}
 
 	schedule := &Schedule{}

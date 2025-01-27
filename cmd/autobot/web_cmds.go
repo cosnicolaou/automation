@@ -23,13 +23,22 @@ type WebUIFlags struct {
 	Assets   string `subcmd:"assets,,path to assets"`
 }
 
-func (fv WebUIFlags) Pages() *webassets.Pages {
+func (fv WebUIFlags) TestServerPages() *webassets.TestServerPages {
 	rfs := wa.NewAssets("static", webassets.Static,
 		wa.EnableReloading(fv.Assets, time.Now(), true))
-	return webassets.NewPages(rfs)
+	return webassets.NewTestServerPages(rfs)
+}
+
+func (fv WebUIFlags) StatusPages() *webassets.StatusPages {
+	rfs := wa.NewAssets("static", webassets.Static,
+		wa.EnableReloading(fv.Assets, time.Now(), true))
+	return webassets.NewStatusPages(rfs)
 }
 
 func (fv WebUIFlags) CreateWebServer(ctx context.Context, mux *http.ServeMux) (*http.Server, func() error, string, error) {
+	if fv.Port == "0" {
+		return nil, func() error { return nil }, "", nil
+	}
 	host := "127.0.0.1"
 	tls := fv.CertFile != "" && fv.KeyFile != ""
 	if tls {

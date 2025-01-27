@@ -1,0 +1,16 @@
+/* Option 1: Using auto margins */
+body {
+    display: block !important;
+    grid-template-columns: unset !important;
+    gap: unset !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+main > * {
+    grid-column: unset !important;
+    width: 100% !important; 
+    margin: 0 auto !important;  /* This centers the main block */
+    padding: 20px !important;
+}

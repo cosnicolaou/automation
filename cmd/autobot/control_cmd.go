@@ -75,7 +75,7 @@ func (c *Control) Run(ctx context.Context, flags any, args []string) error {
 	}
 	cmd := args[0]
 	parameters := args[1:]
-	cc, err := webapi.NewControlClient(ctx, loader, c.logger)
+	cc, err := webapi.NewDeviceControlServer(ctx, loader, c.logger)
 	if err != nil {
 		return err
 	}
@@ -99,7 +99,7 @@ func (c *Control) Condition(ctx context.Context, flags any, args []string) error
 	}
 	cmd := args[0]
 	parameters := args[1:]
-	cc, err := webapi.NewControlClient(ctx, loader, c.logger)
+	cc, err := webapi.NewDeviceControlServer(ctx, loader, c.logger)
 	if err != nil {
 		return err
 	}
@@ -122,7 +122,7 @@ func (c *Control) RunScript(ctx context.Context, flags any, args []string) error
 	}
 	defer f.Close()
 	scanner := bufio.NewScanner(f)
-	cc, err := webapi.NewControlClient(ctx, loader, c.logger)
+	cc, err := webapi.NewDeviceControlServer(ctx, loader, c.logger)
 	if err != nil {
 		return err
 	}
@@ -162,7 +162,7 @@ func (c *Control) ServeTestPage(ctx context.Context, flags any, _ []string) erro
 	}
 
 	tm := tableManager{html: true, jsapi: true}
-	pages := fv.WebUIFlags.Pages()
+	pages := fv.WebUIFlags.TestServerPages()
 
 	rerender := func(ctx context.Context) (devices.System, error) {
 		system, err := loader(ctx)
@@ -181,16 +181,16 @@ func (c *Control) ServeTestPage(ctx context.Context, flags any, _ []string) erro
 		return system, nil
 	}
 
-	webapi.AppendTestServerEndpoints(mux,
+	webassets.AppendTestServerPages(mux,
 		fv.ConfigFileFlags.SystemFile,
 		pages,
 	)
 
-	cc, err := webapi.NewControlClient(ctx, rerender, c.logger)
+	dc, err := webapi.NewDeviceControlServer(ctx, rerender, c.logger)
 	if err != nil {
 		return err
 	}
-	webapi.AppendControlAPIEndpoints(ctx, cc, mux)
+	dc.AppendEndpoints(ctx, mux)
 
 	_ = browser.OpenURL(url)
 	return runner()
