@@ -8,7 +8,7 @@ require (
 	cloudeng.io/geospatial v0.0.0-20250119024745-8a46e9bdda10
 	cloudeng.io/macos v0.0.0-20250119024745-8a46e9bdda10
 	cloudeng.io/webapp v0.0.0-20250119024745-8a46e9bdda10
-	github.com/cosnicolaou/automation v0.0.0-20250124224817-c6c212834b25
+	github.com/cosnicolaou/automation v0.0.0-20250127222910-ee83358883db
 	github.com/cosnicolaou/elk v0.0.0-20250124050704-c54abaf70e67
 	github.com/cosnicolaou/lutron v0.0.0-20250124000727-687038ce1569
 	github.com/cosnicolaou/pentair v0.0.0-20250124000709-61200e702101
