@@ -35,6 +35,10 @@ cloudeng.io/webapp v0.0.0-20250119024745-8a46e9bdda10 h1:NQbqYSuY1H0Sz82chEaduzA
 cloudeng.io/webapp v0.0.0-20250119024745-8a46e9bdda10/go.mod h1:IPGULnUD3umqwOCIS2Wh+wyGehzBjXcMHlrkdqyunmM=
 github.com/cosnicolaou/automation v0.0.0-20250123200349-f6cb99005da2 h1:RerzH4smpCO2tDqDGxfzvdEZZw2W4dUrhfuF+M/lZRo=
 github.com/cosnicolaou/automation v0.0.0-20250123200349-f6cb99005da2/go.mod h1:99GBZO996l8LCP6YWKQ3woKAEzHdqxamZ+LRQBElYmM=
+github.com/cosnicolaou/automation v0.0.0-20250124224817-c6c212834b25 h1:G7ThB6IDV18QJA7/SCygzCL2sPb8ZXHANkxkokok0B4=
+github.com/cosnicolaou/automation v0.0.0-20250124224817-c6c212834b25/go.mod h1:ul9wUCy+USwdD+Za5fwGlu2yjTiGmlHMA43sDOyinAk=
+github.com/cosnicolaou/automation v0.0.0-20250127222910-ee83358883db h1:r+TaM9o2VTjtduL0i5zh7Tx+z62Sc1rKW8GbgJjBkr4=
+github.com/cosnicolaou/automation v0.0.0-20250127222910-ee83358883db/go.mod h1:ul9wUCy+USwdD+Za5fwGlu2yjTiGmlHMA43sDOyinAk=
 github.com/cosnicolaou/elk v0.0.0-20250124000721-04a37c079bc2 h1:OS9RDRMg1isJFQzG4yQHomk7NnGi/dYkdMZRZXgNo8M=
 github.com/cosnicolaou/elk v0.0.0-20250124000721-04a37c079bc2/go.mod h1:NhXxAXGTor0uQCdMj4iRFM9UJaOkVrvCAErxsSBsjGE=
 github.com/cosnicolaou/elk v0.0.0-20250124050704-c54abaf70e67 h1:GWkonufiO8TFqlDKOJRAS8X2OjmfLr7J4tM5k2QMJ6E=

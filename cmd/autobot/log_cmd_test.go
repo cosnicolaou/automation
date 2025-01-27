@@ -70,7 +70,11 @@ func TestSimulateAndLogs(t *testing.T) {
 			ScheduleFile: filepath.Join("testdata", "schedule.yaml"),
 		},
 		DateRange: "12/01/2024:12/01/2025",
+		DryRun:    false, // this is safe since the test system has dummy devices
 		LogFile:   tmpFile,
+		WebUIFlags: WebUIFlags{
+			Port: "0",
+		},
 	}
 
 	schedule := &Schedule{}
@@ -153,10 +157,17 @@ func TestSimulateAndLogs(t *testing.T) {
 			nextDate++
 		}
 	}
-
 	testSummaries(ctx, t, tmpFile)
 	testSummaryFlags(ctx, t, tmpFile)
+}
 
+func removeHeader(summary string) string {
+	// skip the table header
+	idx := strings.Index(summary, "ERROR")
+	if idx > 0 {
+		summary = summary[idx:]
+	}
+	return summary
 }
 
 func testSummaries(ctx context.Context, t *testing.T, logfile string) {
@@ -165,47 +176,42 @@ func testSummaries(ctx context.Context, t *testing.T, logfile string) {
 	daysInSchedule := (31 + daysInSummer(2025))
 	opsPerDay := 5 + 5 + 5
 
-	totalOps := daysInSchedule*opsPerDay + (31 * 2)
+	totalOps := daysInSchedule*opsPerDay + (31 * 2) - (daysInSchedule * 3) // subtracted the aborted actions
 
 	// Summary at end, only completed entries will exist.
 	lc := Log{out: &out}
-	if err := lc.Status(ctx, &LogStatusFlags{}, []string{logfile}); err != nil {
+	if err := lc.Status(ctx, &LogStatusFlags{FinalSummary: true}, []string{logfile}); err != nil {
 		t.Fatalf("failed to display log: %v", err)
 	}
-	summary := out.String()
+	summary := removeHeader(out.String())
 	out.Reset()
 
-	if got, want := strings.Count(summary, "Completed"), 1; got != want {
+	if got, want := strings.Count(summary, "| completed"), totalOps; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
-	if got, want := strings.Count(summary, "Pending"), 0; got != want {
+	if got, want := strings.Count(summary, "| pending"), 0; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
-	if got, want := strings.Count(summary, "completed:"), totalOps; got != want {
-		t.Errorf("got %v, want %v", got, want)
-	}
-	if got, want := strings.Count(summary, "pending:"), 0; got != want {
+	if got, want := strings.Count(summary, "| aborted"), daysInSchedule*3; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
 
-	// Daily summary
-	if err := lc.Status(ctx, &LogStatusFlags{DailySummary: true}, []string{logfile}); err != nil {
+	// Streaming summary
+	if err := lc.Status(ctx, &LogStatusFlags{StreamingSummary: true}, []string{logfile}); err != nil {
 		t.Fatalf("failed to display log: %v", err)
 	}
 	summary = out.String()
 	out.Reset()
-
 	// Note the number of entries will vary depending on when the logs
 	// are printed across all of the active schedulers, the only constant
 	// is the total number of completions and aborted actions.
-
-	if got, want := strings.Count(summary, "completed:"), totalOps; got != want {
-		t.Errorf("got %v, want %v", got, want)
-	}
-	if got, want := strings.Count(summary, "aborted due"), daysInSchedule*3; got != want {
+	if got, want := strings.Count(summary, "| completed"), totalOps; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
 
+	if got, want := strings.Count(summary, "| aborted"), daysInSchedule*3; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
 }
 
 func testSummaryFlags(ctx context.Context, t *testing.T, logfile string) {
@@ -217,41 +223,35 @@ func testSummaryFlags(ctx context.Context, t *testing.T, logfile string) {
 
 	// Restrict to one device
 	if err := lc.Status(ctx, &LogStatusFlags{
-		DailySummary: true,
+		FinalSummary: true,
 		LogFlags:     LogFlags{Device: "other-device"},
 	}, []string{logfile}); err != nil {
 		t.Fatalf("failed to display log: %v", err)
 	}
-	summary := out.String()
+	summary := removeHeader(out.String())
 	out.Reset()
 
-	if got, want := strings.Count(summary, "completed:"), 31*2; got != want {
+	if got, want := strings.Count(summary, "| completed"), 31*2; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
-	if got, want := strings.Count(summary, "aborted due"), 0; got != want {
+	if got, want := strings.Count(summary, "| aborted"), 0; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
 
 	// Restrict to one schedule
 	if err := lc.Status(ctx, &LogStatusFlags{
-		DailySummary: true,
+		FinalSummary: true,
 		LogFlags:     LogFlags{Schedule: "precondition-not-sunny"},
 	}, []string{logfile}); err != nil {
 		t.Fatalf("failed to display log: %v", err)
 	}
-	summary = out.String()
+	summary = removeHeader(out.String())
 	out.Reset()
 
-	if got, want := strings.Count(summary, "Completed"), daysInSchedule; got != want {
+	if got, want := strings.Count(summary, "| completed"), daysInSchedule*2; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
-	if got, want := strings.Count(summary, "Pending"), 0; got != want {
-		t.Errorf("got %v, want %v", got, want)
-	}
-	if got, want := strings.Count(summary, "completed:"), daysInSchedule*5; got != want {
-		t.Errorf("got %v, want %v", got, want)
-	}
-	if got, want := strings.Count(summary, "pending:"), 0; got != want {
+	if got, want := strings.Count(summary, "| aborted"), daysInSchedule*3; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}
 

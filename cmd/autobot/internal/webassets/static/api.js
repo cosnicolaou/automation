@@ -40,23 +40,36 @@ function runCondition(dev, op, params) {
     });
 }
 
-$(document).ready(function () {
-    $("#reload-config").on("click", function (event) {
-        event.preventDefault(); // Prevent the default link behavior
-        $("#resultBar").empty();
-        console.log('reload');
-        $.ajax({
-            url: '/api/reload?',
-            method: 'GET',
-            success: function (data) {
-                $('#resultBar').jsonViewer(data);
-                window.location.reload(true);
-            },
-            error: function (jqXHR, textStatus, errorThrown) {
-                console.error('operation failed:', textStatus, errorThrown);
-                console.log(jqXHR);
-                $('#resultBar').jsonViewer({ "Error": jqXHR.responseText, "Status": textStatus, "ErrorThrown": errorThrown });
-            },
-        });
+function loadStatusRecords(title, tag, endpoint, limit) {
+    $.ajax({
+        url: '/api/' + endpoint + '?' + $.param({ num: limit }),
+        method: 'GET',
+        success: function (data) {
+            console.log(data);
+            if (data.length > 0) {
+                new gridjs.Grid({
+                    title: title,
+                    sort: true,
+                    search: true,
+                    columns: Object.keys(data[0]),
+                    data: data,
+                    pagination: {
+                        limit: 100,
+                    },
+                    style: {
+                        table: {
+                            'white-space': 'nowrap'
+                        }
+                    },
+                }).render(document.getElementById(tag));
+            }
+        }
     });
+}
+
+$('#reload-page').click(function (event) {
+    event.preventDefault();
+    location.reload();
+    return false;
 });
+

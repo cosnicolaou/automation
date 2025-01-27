@@ -152,6 +152,13 @@ func (s *Scheduler) RunDay(ctx context.Context, place datetime.Place, active sch
 			delay,
 		)
 		s.completed(rec, aborted, err)
+		if s.dryRun {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			default:
+			}
+		}
 	}
 	return nil
 }

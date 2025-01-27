@@ -7,7 +7,6 @@ package scheduler
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
 	"cloudeng.io/datetime"
@@ -53,15 +52,15 @@ func (t timesource) NowIn(loc *time.Location) time.Time {
 	return n.In(loc)
 }
 
-func (t timesource) run(ctx context.Context) {
+func (t timesource) run(ctx context.Context) error {
 	for _, tick := range t.ticks {
 		select {
+		case t.ch <- tick:
 		case <-ctx.Done():
-			return
-		default:
+			return ctx.Err()
 		}
-		t.ch <- tick
 	}
+	return nil
 }
 
 // RunSimulation runs the specified schedules against the specified system for the
@@ -93,11 +92,8 @@ func RunSimulation(ctx context.Context, schedules Schedules, system devices.Syst
 	}
 
 	var g errgroup.T
-	var wg sync.WaitGroup
-	wg.Add(len(schedulers) * 2)
 	for i, s := range schedulers {
 		g.Go(func() error {
-			defer wg.Done()
 			if err := s.RunYearEnd(ctx, period.From()); err != nil {
 				return err
 			}
@@ -110,11 +106,9 @@ func RunSimulation(ctx context.Context, schedules Schedules, system devices.Syst
 			return nil
 		})
 		g.Go(func() error {
-			timeSources[i].run(ctx)
-			wg.Done()
-			return nil
+			err := timeSources[i].run(ctx)
+			return err
 		})
 	}
-	wg.Wait()
 	return g.Wait()
 }
