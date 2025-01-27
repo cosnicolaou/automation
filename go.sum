@@ -14,6 +14,7 @@ cloudeng.io/geospatial v0.0.0-20250119024745-8a46e9bdda10 h1:QXrCvjtqWppYblWLVYF
 cloudeng.io/geospatial v0.0.0-20250119024745-8a46e9bdda10/go.mod h1:3PUOypnT3/76rwv/a21Z00NXeVpjQKaDNnt/A8ysVTY=
 cloudeng.io/net v0.0.0-20250115012004-c76cbf27f83d h1:X3y34oySlTWKgLrVsbme9eUVG5DJl1rURpIFQQ6vKfc=
 cloudeng.io/net v0.0.0-20250115012004-c76cbf27f83d/go.mod h1:ZYl4s5CXup8GPn+0R5P+T0eNDBXFGsTlLVjgokPZZuU=
+cloudeng.io/net v0.0.0-20250119024745-8a46e9bdda10 h1:xClg1NM7LjAu79jrEHtPILLzesyeQjuZSKV/Gz5juEM=
 cloudeng.io/net v0.0.0-20250119024745-8a46e9bdda10/go.mod h1:ZYl4s5CXup8GPn+0R5P+T0eNDBXFGsTlLVjgokPZZuU=
 cloudeng.io/sync v0.0.8 h1:N8o5Qo5sjxwDktWIW/7rfK14O74jGS3pprefjF3EFKA=
 cloudeng.io/sync v0.0.8/go.mod h1:76qdZzMQSN+iPeQxY9MSbnSELKQmcd9E6pnfRgWgN8s=
@@ -21,6 +22,7 @@ cloudeng.io/webapi/clients/nws v0.0.0-20250116040431-a16229cf0935 h1:qv2lkV8OndD
 cloudeng.io/webapi/clients/nws v0.0.0-20250116040431-a16229cf0935/go.mod h1:bjmaGE68MXZDriIUR4vVRXWlQLGq+32VK4J0ua1pr/0=
 cloudeng.io/webapi/operations v0.0.0-20250115163522-2e8054cafced h1:Y7V9wMeyuJwPs6vZN96/857lNhFdTFXVKYMq1FlgvlU=
 cloudeng.io/webapi/operations v0.0.0-20250115163522-2e8054cafced/go.mod h1:uGPvy9FlXotcdATf7+b2lZNGDVfRe1C7MqS3wBVGeq0=
+cloudeng.io/webapi/operations v0.0.0-20250116040431-a16229cf0935 h1:nBMi5vXrtWYkhifO1PpinT3pUCuodMou3A3HOl+D1Xc=
 cloudeng.io/webapi/operations v0.0.0-20250116040431-a16229cf0935/go.mod h1:uGPvy9FlXotcdATf7+b2lZNGDVfRe1C7MqS3wBVGeq0=
 github.com/cosnicolaou/elk v0.0.0-20250124050704-c54abaf70e67 h1:GWkonufiO8TFqlDKOJRAS8X2OjmfLr7J4tM5k2QMJ6E=
 github.com/cosnicolaou/elk v0.0.0-20250124050704-c54abaf70e67/go.mod h1:NhXxAXGTor0uQCdMj4iRFM9UJaOkVrvCAErxsSBsjGE=
