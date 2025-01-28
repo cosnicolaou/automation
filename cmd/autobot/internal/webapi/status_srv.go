@@ -12,20 +12,25 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 
 	"cloudeng.io/datetime"
 	"github.com/cosnicolaou/automation/internal/logging"
 )
 
+type CalenderGenerator func(schedules []string, dr datetime.CalendarDateRange) (CalendarResponse, error)
+
 type Status struct {
-	l  *slog.Logger
-	sr *logging.StatusRecorder
+	l      *slog.Logger
+	sr     *logging.StatusRecorder
+	calGen CalenderGenerator
 }
 
-func NewStatusServer(l *slog.Logger, sr *logging.StatusRecorder) *Status {
+func NewStatusServer(l *slog.Logger, sr *logging.StatusRecorder, calGen CalenderGenerator) *Status {
 	return &Status{
-		l:  l.With("component", "status"),
-		sr: sr,
+		l:      l.With("component", "status"),
+		sr:     sr,
+		calGen: calGen,
 	}
 }
 
@@ -131,13 +136,63 @@ func (s *Status) ServePending(ctx context.Context, w http.ResponseWriter, r *htt
 	}
 }
 
-func AppendStatusAPIEndpoints(ctx context.Context, mux *http.ServeMux, c *Status) {
+type CalendarResponse struct {
+	Range     string          `json:"range"`
+	Schedules []string        `json:"schedules"`
+	Entries   []CalendarEntry `json:"calendar"`
+}
 
+type CalendarEntry struct {
+	Date      string `json:"date"`
+	Time      string `json:"time"`
+	Schedule  string `json:"schedule"`
+	Device    string `json:"device"`
+	Operation string `json:"operation"`
+	Condition string `json:"condition"`
+}
+
+func decodeCalendarParameters(r *http.Request) (datetime.CalendarDateRange, []string, error) {
+	pars := r.URL.Query()
+	var from, to datetime.CalendarDate
+	if f := pars.Get("from"); f != "" {
+		if err := from.Parse(f); err != nil {
+			return datetime.CalendarDateRange(0), nil, err
+		}
+	}
+	if t := pars.Get("to"); t != "" {
+		if err := to.Parse(t); err != nil {
+			return datetime.CalendarDateRange(0), nil, err
+		}
+	}
+	cals := strings.Split(pars.Get("calendar"), ",")
+	return datetime.NewCalendarDateRange(from, to), cals, nil
+}
+
+func (s *Status) ServeCalendar(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+	dr, scheds, err := decodeCalendarParameters(r)
+	if err != nil {
+		s.httpError(ctx, w, r.URL, "calendar", err.Error(), http.StatusBadRequest)
+		return
+	}
+	cr, err := s.calGen(scheds, dr)
+	if err != nil {
+		s.httpError(ctx, w, r.URL, "calendar", err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(cr); err != nil {
+		s.httpError(ctx, w, r.URL, "calendar", err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (s *Status) AppendEndpoints(ctx context.Context, mux *http.ServeMux) {
 	mux.HandleFunc("/api/completed", func(w http.ResponseWriter, r *http.Request) {
-		c.ServeCompleted(ctx, w, r)
+		s.ServeCompleted(ctx, w, r)
 	})
 	mux.HandleFunc("/api/pending", func(w http.ResponseWriter, r *http.Request) {
-		c.ServePending(ctx, w, r)
+		s.ServePending(ctx, w, r)
 	})
-
+	mux.HandleFunc("/api/calendar", func(w http.ResponseWriter, r *http.Request) {
+		s.ServeCalendar(ctx, w, r)
+	})
 }

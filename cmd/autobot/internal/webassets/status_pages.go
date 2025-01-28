@@ -84,6 +84,27 @@ func (p *StatusPages) StatusPendingPage(w io.Writer, systemfile string) error {
 	return tpl.Execute(w, &d)
 }
 
+func (p *StatusPages) StatusCalendarPage(w io.Writer, systemfile string) error {
+	d := struct {
+		Name   string
+		Main   template.HTML
+		Script template.JS
+	}{
+		Name: systemfile,
+		Main: `
+		<h2>Calendar</h2>
+		<div id="daterange"></div>
+		<div id="schedules"></div>
+        <div id="calendar"></div>`,
+		Script: "static/status-calendar.js",
+	}
+	tpl, err := template.ParseFS(p.cfs, statusPage)
+	if err != nil {
+		return err
+	}
+	return tpl.Execute(w, &d)
+}
+
 func AppendStatusPages(mux *http.ServeMux, systemfile string, pages *StatusPages) {
 	mux.Handle("/static/",
 		http.StripPrefix("/static/", http.FileServer(pages.FS())))
@@ -104,6 +125,13 @@ func AppendStatusPages(mux *http.ServeMux, systemfile string, pages *StatusPages
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
 		err := pages.StatusHomePage(w, systemfile)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	})
+
+	mux.HandleFunc("/calendar", func(w http.ResponseWriter, _ *http.Request) {
+		err := pages.StatusCalendarPage(w, systemfile)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
