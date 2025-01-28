@@ -13,6 +13,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -97,14 +98,6 @@ func writeJSON(w io.Writer, v interface{}) error {
 	return enc.Encode(v)
 }
 
-func splitCommand(cmd, typ string) (string, string, error) {
-	parts := strings.Split(cmd, ".")
-	if len(parts) != 2 {
-		return "", "", fmt.Errorf("invalid %v: %v, should be name.operation", typ, cmd)
-	}
-	return parts[0], parts[1], nil
-}
-
 func (c *Control) Condition(ctx context.Context, flags any, args []string) error {
 	ctx, loader, err := c.setup(ctx, flags.(*ControlFlags))
 	if err != nil {
@@ -165,11 +158,6 @@ func (c *Control) RunScript(ctx context.Context, flags any, args []string) error
 	return nil
 }
 
-type precondition struct {
-	cond    webapi.Action
-	Actions map[string]webapi.Action
-}
-
 type conditionalOps struct {
 	op   webapi.Action
 	cond webapi.Action
@@ -217,6 +205,9 @@ func findPreconditions(ctx context.Context, system devices.System, fv *ControlTe
 
 		}
 	}
+	sort.Slice(cops, func(i, j int) bool {
+		return cops[i].op.Device < cops[j].op.Device
+	})
 	return cops, nil
 }
 
