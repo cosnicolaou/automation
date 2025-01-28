@@ -22,6 +22,25 @@ type tableManager struct {
 	jsapi bool
 }
 
+func formatOperationWithArgs(a scheduler.Action) string {
+	op := a.Name
+	if len(a.Args) > 0 {
+		op += "(" + strings.Join(a.Args, ", ") + ")"
+	}
+	return op
+}
+
+func formatConditionWithArgs(a scheduler.Action) string {
+	pre := ""
+	if a.Precondition.Condition != nil {
+		pre = fmt.Sprintf("if %v.%v", a.Precondition.Device, a.Precondition.Name)
+		if a.Precondition.Args != nil {
+			pre += "(" + strings.Join(a.Precondition.Args, ", ") + ")"
+		}
+	}
+	return pre
+}
+
 func (tm tableManager) Calendar(cal *scheduler.Calendar, dr datetime.CalendarDateRange) table.Writer {
 	tw := table.NewWriter()
 	tw.SetColumnConfigs([]table.ColumnConfig{
@@ -32,17 +51,8 @@ func (tm tableManager) Calendar(cal *scheduler.Calendar, dr datetime.CalendarDat
 	for day := range dr.Dates() {
 		actions := cal.Scheduled(day)
 		for _, a := range actions {
-			op := a.T.Name
-			if len(a.T.Args) > 0 {
-				op += "(" + strings.Join(a.T.Args, ", ") + ")"
-			}
-			pre := ""
-			if a.T.Precondition.Condition != nil {
-				pre = fmt.Sprintf("if %v.%v", a.T.Precondition.Device, a.T.Precondition.Name)
-				if a.T.Precondition.Args != nil {
-					pre += "(" + strings.Join(a.T.Precondition.Args, ", ") + ")"
-				}
-			}
+			op := formatOperationWithArgs(a.T)
+			pre := formatConditionWithArgs(a.T)
 			tod := datetime.NewTimeOfDay(a.When.Hour(), a.When.Minute(), a.When.Second())
 			tw.AppendRow(table.Row{day, tod, a.Schedule, a.T.DeviceName, op, pre})
 		}

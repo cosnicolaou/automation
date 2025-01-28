@@ -88,15 +88,44 @@ func (s *Schedule) serveStatusUI(ctx context.Context, systemfile string, fv WebU
 	}
 	pages := fv.StatusPages()
 
-	cc := webapi.NewStatusServer(logger, statusRecorder)
+	cc := webapi.NewStatusServer(logger, statusRecorder, s.calendar)
 
-	webapi.AppendStatusAPIEndpoints(ctx, mux, cc)
+	cc.AppendEndpoints(ctx, mux)
 	webassets.AppendStatusPages(mux, systemfile, pages)
 	go func() {
 		_ = browser.OpenURL(url)
 		_ = runner()
 	}()
 	return nil
+}
+
+func (s *Schedule) calendar(schedules []string, dr datetime.CalendarDateRange) (webapi.CalendarResponse, error) {
+	s.schedules.Schedules = filterSchedules(s.schedules.Schedules, schedules)
+	cal, err := scheduler.NewCalendar(s.schedules, s.system)
+	if err != nil {
+		return webapi.CalendarResponse{}, err
+	}
+	entries := []webapi.CalendarEntry{}
+	for day := range dr.Dates() {
+		for _, a := range cal.Scheduled(day) {
+			op := formatOperationWithArgs(a.T)
+			pre := formatConditionWithArgs(a.T)
+			when := datetime.NewTimeOfDay(a.When.Hour(), a.When.Minute(), a.When.Second())
+			entries = append(entries, webapi.CalendarEntry{
+				Date:      day.String(),
+				Time:      when.String(),
+				Schedule:  a.Schedule,
+				Device:    a.T.DeviceName,
+				Operation: op,
+				Condition: pre,
+			})
+		}
+	}
+	return webapi.CalendarResponse{
+		Range:     dr.String(),
+		Schedules: schedules,
+		Entries:   entries,
+	}, nil
 }
 
 func (s *Schedule) Run(ctx context.Context, flags any, _ []string) error {
@@ -143,8 +172,8 @@ func (s *Schedule) Run(ctx context.Context, flags any, _ []string) error {
 
 }
 
-func (s *Schedule) filterSchedules(schedules []scheduler.Annual, allowed []string) []scheduler.Annual {
-	if len(allowed) == 0 {
+func filterSchedules(schedules []scheduler.Annual, allowed []string) []scheduler.Annual {
+	if len(allowed) == 0 || (len(allowed) == 1 && len(allowed[0]) == 0) {
 		return schedules
 	}
 	filtered := []scheduler.Annual{}
@@ -189,7 +218,7 @@ func (s *Schedule) Simulate(ctx context.Context, flags any, args []string) error
 		return err
 	}
 
-	s.schedules.Schedules = s.filterSchedules(s.schedules.Schedules, args)
+	s.schedules.Schedules = filterSchedules(s.schedules.Schedules, args)
 
 	if s.system.Location.Latitude == 0 && s.system.Location.Longitude == 0 {
 		return fmt.Errorf("latitude and longitude must be specified either directly or via a zip code")
@@ -229,13 +258,11 @@ func (s *Schedule) Print(ctx context.Context, flags any, args []string) error {
 		return err
 	}
 
-	s.schedules.Schedules = s.filterSchedules(s.schedules.Schedules, args)
-
+	s.schedules.Schedules = filterSchedules(s.schedules.Schedules, args)
 	cal, err := scheduler.NewCalendar(s.schedules, s.system)
 	if err != nil {
 		return err
 	}
-
 	tw := tableManager{}.Calendar(cal, dr)
 	fmt.Println(tw.Render())
 	return nil

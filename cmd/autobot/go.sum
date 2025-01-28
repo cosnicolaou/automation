@@ -33,14 +33,8 @@ cloudeng.io/webapi/webapitestutil v0.0.0-20250115163522-2e8054cafced h1:EMd0bCqO
 cloudeng.io/webapi/webapitestutil v0.0.0-20250115163522-2e8054cafced/go.mod h1:cMF03lbZy2+oWkCUD3CPtKzxClTGjqbIyk2E/IMVQtA=
 cloudeng.io/webapp v0.0.0-20250119024745-8a46e9bdda10 h1:NQbqYSuY1H0Sz82chEaduzALTTygETFw3zVGt6bgWPE=
 cloudeng.io/webapp v0.0.0-20250119024745-8a46e9bdda10/go.mod h1:IPGULnUD3umqwOCIS2Wh+wyGehzBjXcMHlrkdqyunmM=
-github.com/cosnicolaou/automation v0.0.0-20250123200349-f6cb99005da2 h1:RerzH4smpCO2tDqDGxfzvdEZZw2W4dUrhfuF+M/lZRo=
-github.com/cosnicolaou/automation v0.0.0-20250123200349-f6cb99005da2/go.mod h1:99GBZO996l8LCP6YWKQ3woKAEzHdqxamZ+LRQBElYmM=
-github.com/cosnicolaou/automation v0.0.0-20250124224817-c6c212834b25 h1:G7ThB6IDV18QJA7/SCygzCL2sPb8ZXHANkxkokok0B4=
-github.com/cosnicolaou/automation v0.0.0-20250124224817-c6c212834b25/go.mod h1:ul9wUCy+USwdD+Za5fwGlu2yjTiGmlHMA43sDOyinAk=
-github.com/cosnicolaou/automation v0.0.0-20250127222910-ee83358883db h1:r+TaM9o2VTjtduL0i5zh7Tx+z62Sc1rKW8GbgJjBkr4=
-github.com/cosnicolaou/automation v0.0.0-20250127222910-ee83358883db/go.mod h1:ul9wUCy+USwdD+Za5fwGlu2yjTiGmlHMA43sDOyinAk=
-github.com/cosnicolaou/elk v0.0.0-20250124000721-04a37c079bc2 h1:OS9RDRMg1isJFQzG4yQHomk7NnGi/dYkdMZRZXgNo8M=
-github.com/cosnicolaou/elk v0.0.0-20250124000721-04a37c079bc2/go.mod h1:NhXxAXGTor0uQCdMj4iRFM9UJaOkVrvCAErxsSBsjGE=
+github.com/cosnicolaou/automation v0.0.0-20250127224624-31dcaa02ceaa h1:kgpn12gF4rdy1CLB6PNX/ivSie5qv+/bAIUdw/j+Qfs=
+github.com/cosnicolaou/automation v0.0.0-20250127224624-31dcaa02ceaa/go.mod h1:ul9wUCy+USwdD+Za5fwGlu2yjTiGmlHMA43sDOyinAk=
 github.com/cosnicolaou/elk v0.0.0-20250124050704-c54abaf70e67 h1:GWkonufiO8TFqlDKOJRAS8X2OjmfLr7J4tM5k2QMJ6E=
 github.com/cosnicolaou/elk v0.0.0-20250124050704-c54abaf70e67/go.mod h1:NhXxAXGTor0uQCdMj4iRFM9UJaOkVrvCAErxsSBsjGE=
 github.com/cosnicolaou/lutron v0.0.0-20250124000727-687038ce1569 h1:V4s43pEba0Z2nnoHs5RNI2+vI7URKsZ9AYBebOCsn0w=
@@ -49,6 +43,7 @@ github.com/cosnicolaou/pentair v0.0.0-20250124000709-61200e702101 h1:NmkBwwOoj2W
 github.com/cosnicolaou/pentair v0.0.0-20250124000709-61200e702101/go.mod h1:tgSkDTWqES0wTGmImPLnCH4iLQJ7SxnOmncpSZIxPHQ=
 github.com/cosnicolaou/weather v0.0.0-20250124000705-01bcf0b01061 h1:gw6nXZyM1Uv1XeYYeY3gI6DcHKOMucfT9nkCWWpCyW4=
 github.com/cosnicolaou/weather v0.0.0-20250124000705-01bcf0b01061/go.mod h1:Y+tUDhNzBw8ANGy2gjqtHq8Goa/h8rMfSmV3ugWpqoE=
+github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/jedib0t/go-pretty/v6 v6.6.5 h1:9PgMJOVBedpgYLI56jQRJYqngxYAAzfEUua+3NgSqAo=

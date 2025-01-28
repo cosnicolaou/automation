@@ -15,5 +15,6 @@ $(document).ready(function () {
                 $('#resultBar').jsonViewer({ "Error": jqXHR.responseText, "Status": textStatus, "ErrorThrown": errorThrown });
             },
         });
+        return false;
     });
 });

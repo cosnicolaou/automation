@@ -45,7 +45,6 @@ function loadStatusRecords(title, tag, endpoint, limit) {
         url: '/api/' + endpoint + '?' + $.param({ num: limit }),
         method: 'GET',
         success: function (data) {
-            console.log(data);
             if (data.length > 0) {
                 new gridjs.Grid({
                     title: title,
@@ -73,3 +72,41 @@ $('#reload-page').click(function (event) {
     return false;
 });
 
+
+function loadCalendarRecords(from, to, schedules) {
+    console.log('loadCalendarRecords', from, to, schedules);
+    $.ajax({
+        url: '/api/calendar?' + $.param({ from: from, to: to, schedules: schedules }),
+        method: 'GET',
+        success: function (data) {
+            document.getElementById('daterange').innerHTML = `From: ${from} To: ${to}`;
+            if (schedules.length > 0) {
+                document.getElementById('schedules').innerHTML = `Schedules: ${schedules}`;
+            } else {
+                document.getElementById('schedules').innerHTML = `Schedules: All`;
+            }
+            if (data.calendar.length > 0) {
+                new gridjs.Grid({
+                    title: `From: ${from} To: ${to}`,
+                    sort: true,
+                    search: true,
+                    columns: Object.keys(data.calendar[0]),
+                    data: data.calendar,
+                    pagination: {
+                        limit: 100,
+                    },
+                    style: {
+                        table: {
+                            'white-space': 'nowrap'
+                        }
+                    },
+                }).render(document.getElementById('calendar'));
+            }
+        },
+        error: function (jqXHR, textStatus, errorThrown) {
+            console.error('operation failed:', textStatus, errorThrown);
+            console.log(jqXHR);
+            $('#calendar').jsonViewer({ "Error": jqXHR.responseText, "Status": textStatus, "ErrorThrown": errorThrown });
+        },
+    });
+}
