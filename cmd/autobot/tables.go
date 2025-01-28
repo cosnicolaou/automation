@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"cloudeng.io/datetime"
+	"github.com/cosnicolaou/automation/cmd/autobot/internal/webapi"
 	"github.com/cosnicolaou/automation/devices"
 	"github.com/cosnicolaou/automation/internal/logging"
 	"github.com/cosnicolaou/automation/scheduler"
@@ -72,19 +73,32 @@ func (tm tableManager) RenderHTML(tw table.Writer) string {
 	return tw.RenderHTML()
 }
 
-func (tm tableManager) withAPICall(device, op string, args []string, configured, cond bool) string {
+func argsAsJSON(args []string) string {
+	if len(args) == 0 {
+		return "[]"
+	}
+	return fmt.Sprintf("['%v']", strings.Join(args, "', '"))
+}
+
+func (tm tableManager) withAPICall(device, op, jsonOp string, args []string, configured bool) string {
 	if !tm.jsapi || !configured {
 		return op
 	}
-	argStr := "[]"
-	if len(args) > 0 {
-		argStr = fmt.Sprintf("['%v']", strings.Join(args, "', '"))
+	return fmt.Sprintf("<button id=\"%v.%v\" onclick=\"%s('%v', '%v', %s)\">%v</button>", device, op, jsonOp, device, op, argsAsJSON(args), op)
+}
+
+func (tm tableManager) withAPIConditionalCall(
+	op, cond webapi.Action) string {
+	if !tm.jsapi {
+		return op.Op
 	}
-	jsop := "runOperation"
-	if cond {
-		jsop = "runCondition"
-	}
-	return fmt.Sprintf("<button id=\"%v.%v\" onclick=\"%s('%v', '%v', %s)\">%v</button>", device, op, jsop, device, op, argStr, op)
+	opArgs := argsAsJSON(op.Args)
+	condArgs := argsAsJSON(cond.Args)
+	return fmt.Sprintf("<button id=\"%v.%v\" onclick=\"runConditionally('%v', '%v', %s, '%v', '%v', %s)\">%v</button>",
+		op.Device, op.Op,
+		op.Device, op.Op, opArgs,
+		cond.Device, cond.Op, condArgs,
+		op.Device)
 }
 
 func (tm tableManager) withDivID(dev string, cond bool) string {
@@ -99,12 +113,16 @@ func (tm tableManager) withDivID(dev string, cond bool) string {
 
 func (tm tableManager) operationsRows(device string, ops []string, args map[string][]string, opsHelp map[string]string, condition bool) []table.Row {
 	rows := []table.Row{}
+	jsonOp := "runOperation"
+	if condition {
+		jsonOp = "runCondition"
+	}
 	for _, op := range ops {
 		pars, configured := args[op]
 		help := opsHelp[op]
 		row := table.Row{
 			tm.withDivID(device, condition),
-			tm.withAPICall(device, op, pars, configured, condition),
+			tm.withAPICall(device, op, jsonOp, pars, configured),
 			strings.Join(pars, ", "),
 			help,
 			configured,
@@ -180,6 +198,25 @@ func (tm tableManager) DeviceConditions(sys devices.System) table.Writer {
 	tw := tm.newOperationsTableHeader("Device Conditions", "Conditions")
 	rows := tm.devicesOrConditions(sys, true)
 	for _, row := range rows {
+		tw.AppendRow(row)
+	}
+	return tw
+}
+
+func (tm tableManager) ConditionalOperations(cops []conditionalOps) table.Writer {
+	tw := table.NewWriter()
+	tw.SetTitle("Conditional Operations")
+	tw.AppendHeader(table.Row{"Device", "Op Conditional", "Op", "Args", "Device", "Condition", "Condition Args"})
+	for _, cop := range cops {
+		row := table.Row{
+			cop.op.Device,
+			tm.withAPIConditionalCall(cop.op, cop.cond),
+			tm.withAPICall(cop.op.Device, cop.op.Op, "runOperation", cop.op.Args, true),
+			strings.Join(cop.op.Args, ", "),
+			cop.cond.Device,
+			tm.withAPICall(cop.cond.Device, cop.cond.Op, "runCondition", cop.cond.Args, true),
+			strings.Join(cop.cond.Args, ", "),
+		}
 		tw.AppendRow(row)
 	}
 	return tw

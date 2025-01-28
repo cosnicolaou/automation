@@ -63,102 +63,155 @@ func NewDeviceControlServer(ctx context.Context, systemLoader func(context.Conte
 	}, nil
 }
 
-func (dc *DeviceControlServer) RunOperation(ctx context.Context, writer io.Writer, nameAndOp string, args []string) (*OperationResult, error) {
-	parts := strings.Split(nameAndOp, ".")
+// NewActionFromArgs creates a new Action from a
+// device.{operation,condition} string and optional arguments.
+func NewActionFromArgs(devOp string, args ...string) (Action, error) {
+	parts := strings.Split(devOp, ".")
 	if len(parts) != 2 {
-		return nil, fmt.Errorf("invalid operation: %v, should be name.operation", nameAndOp)
+		return Action{}, fmt.Errorf("invalid: %q, should be device.operation/condition", devOp)
 	}
-	name, op := parts[0], parts[1]
-	_, cok := dc.system().Controllers[name]
-	_, dok := dc.system().Devices[name]
+	return Action{
+		Device: parts[0],
+		Op:     parts[1],
+		Args:   args,
+	}, nil
+}
+
+// Action is a device.{operation,condition} string and optional
+// arguments and is used to represent an operation or condition
+type Action struct {
+	Device string
+	Op     string
+	Args   []string
+}
+
+func (a Action) String() string {
+	return fmt.Sprintf("%v.%v(%v)", a.Device, a.Op, strings.Join(a.Args, ", "))
+}
+
+// RunOperationConditionally runs an operation iff the condition
+// is true.
+func (dc *DeviceControlServer) RunOperationConditionally(ctx context.Context, writer io.Writer, action, condition Action) (*OperationResult, error) {
+
+	cr, err := dc.RunCondition(ctx, io.Discard, condition)
+	if err != nil {
+		return nil, fmt.Errorf("failed to run condition: %v: %v", condition.Op, err)
+	}
+	if !cr.Result {
+		return nil, fmt.Errorf("condition not met: %v", condition.Op)
+	}
+	or, err := dc.RunOperation(ctx, writer, action)
+	if err != nil {
+		return nil, fmt.Errorf("failed to run operation: %v: %v", action.Op, err)
+	}
+	return or, nil
+}
+
+func (dc *DeviceControlServer) RunOperation(ctx context.Context, writer io.Writer, action Action) (*OperationResult, error) {
+
+	_, cok := dc.system().Controllers[action.Device]
+	_, dok := dc.system().Devices[action.Device]
 	if !cok && !dok {
-		return nil, fmt.Errorf("unknown controller or device: %v", name)
+		return nil, fmt.Errorf("unknown controller or device: %v", action.Device)
 	}
 
 	or := &OperationResult{
-		Device: name,
-		Op:     op,
+		Device: action.Device,
+		Op:     action.Op,
 	}
 
-	if fn, pars, ok := dc.system().ControllerOp(name, op); ok {
-		if len(args) == 0 {
-			args = pars
+	if fn, pars, ok := dc.system().ControllerOp(action.Device, action.Op); ok {
+		if len(action.Args) == 0 {
+			action.Args = pars
 		}
 		opts := devices.OperationArgs{
 			Writer: writer,
-			Args:   args,
+			Args:   action.Args,
 		}
 		result, err := fn(ctx, opts)
 		if err != nil {
-			return nil, fmt.Errorf("failed to run operation: %v: %v", op, err)
+			return nil, fmt.Errorf("failed to run operation: %v: %v", action.Op, err)
 		}
-		or.Args = args
+		or.Args = action.Args
 		or.Data = result
 		return or, nil
 	}
 
-	if fn, pars, ok := dc.system().DeviceOp(name, op); ok {
-		if len(args) == 0 {
-			args = pars
+	if fn, pars, ok := dc.system().DeviceOp(action.Device, action.Op); ok {
+		if len(action.Args) == 0 {
+			action.Args = pars
 		}
 		opts := devices.OperationArgs{
 			Writer: writer,
-			Args:   args,
+			Args:   action.Args,
 		}
 		result, err := fn(ctx, opts)
 		if err != nil {
-			return nil, fmt.Errorf("failed to run operation: %v: %v", op, err)
+			return nil, fmt.Errorf("failed to run operation: %v: %v", action.Op, err)
 		}
-		or.Args = args
+		or.Args = action.Args
 		or.Data = result
 		return or, nil
 	}
 
-	return nil, fmt.Errorf("unknown or not configured operation: %v, %v", name, op)
+	return nil, fmt.Errorf("unknown or not configured operation: %v, %v", action.Device, action.Op)
 }
 
-func (dc *DeviceControlServer) RunCondition(ctx context.Context, writer io.Writer, nameAndOp string, args []string) (*ConditionResult, error) {
-	parts := strings.Split(nameAndOp, ".")
-	if len(parts) != 2 {
-		return nil, fmt.Errorf("invalid condition: %v, should be name.condition", nameAndOp)
-	}
-	name, op := parts[0], parts[1]
-	_, cok := dc.system().Controllers[name]
-	_, dok := dc.system().Devices[name]
+func (dc *DeviceControlServer) RunCondition(ctx context.Context, writer io.Writer, action Action) (*ConditionResult, error) {
+	_, cok := dc.system().Controllers[action.Device]
+	_, dok := dc.system().Devices[action.Device]
 	if !cok && !dok {
-		return nil, fmt.Errorf("unknown controller or device: %v", name)
+		return nil, fmt.Errorf("unknown controller or device: %v", action.Device)
 	}
-
 	cr := &ConditionResult{
-		Device: name,
-		Cond:   op,
+		Device: action.Device,
+		Cond:   action.Op,
 	}
-	if fn, pars, ok := dc.system().DeviceCondition(name, op); ok {
-		if len(args) == 0 {
-			args = pars
+	if fn, pars, ok := dc.system().DeviceCondition(action.Device, action.Op); ok {
+		if len(action.Args) == 0 {
+			action.Args = pars
 		}
 		opts := devices.OperationArgs{
 			Writer: writer,
-			Args:   args,
+			Args:   action.Args,
 		}
 		data, result, err := fn(ctx, opts)
 		if err != nil {
-			return nil, fmt.Errorf("failed to run condition: %v: %v", op, err)
+			return nil, fmt.Errorf("failed to run condition: %v: %v", action.Op, err)
 		}
-		cr.Args = args
+		cr.Args = action.Args
 		cr.Result = result
 		cr.Data = data
 		return cr, nil
 	}
 
-	return nil, fmt.Errorf("unknown or not configured condition: %v, %v", name, op)
+	return nil, fmt.Errorf("unknown or not configured condition: %v, %v", action.Device, action.Op)
 }
 
-func decodeArgs(r *http.Request) (string, string, []string) {
+func decodeOperationArgs(r *http.Request) (Action, error) {
 	pars := r.URL.Query()
-	dev := pars.Get("dev")
-	op := pars.Get("op")
-	return dev, op, pars["arg"]
+	a := Action{
+		Device: pars.Get("odev"),
+		Op:     pars.Get("op"),
+		Args:   pars["oarg"],
+	}
+	if a.Device == "" || a.Op == "" {
+		return Action{}, fmt.Errorf("missing device or operation")
+	}
+	return a, nil
+}
+
+func decodeConditionArgs(r *http.Request) (Action, error) {
+	pars := r.URL.Query()
+	a := Action{
+		Device: pars.Get("cdev"),
+		Op:     pars.Get("cond"),
+		Args:   pars["carg"],
+	}
+	if a.Device == "" || a.Op == "" {
+		return Action{}, fmt.Errorf("missing device or condition")
+	}
+	return a, nil
 }
 
 func (dc *DeviceControlServer) httpError(ctx context.Context, w http.ResponseWriter, u *url.URL, msg, err string, statusCode int) {
@@ -168,12 +221,13 @@ func (dc *DeviceControlServer) httpError(ctx context.Context, w http.ResponseWri
 
 func (dc *DeviceControlServer) ServeOperation(ctx context.Context, w http.ResponseWriter, r *http.Request) {
 	dc.l.Log(ctx, slog.LevelInfo, "op-start", "request", r.URL.String(), "code", http.StatusOK)
-	dev, op, args := decodeArgs(r)
-	if dev == "" || op == "" {
-		dc.httpError(ctx, w, r.URL, "op-end", "missing device or operation", http.StatusBadRequest)
+	action, err := decodeOperationArgs(r)
+	if err != nil {
+		dc.httpError(ctx, w, r.URL, "op-end", err.Error(), http.StatusBadRequest)
 		return
 	}
-	or, err := dc.RunOperation(ctx, io.Discard, dev+"."+op, args)
+
+	or, err := dc.RunOperation(ctx, io.Discard, action)
 	if err != nil {
 		dc.httpError(ctx, w, r.URL, "op-end", err.Error(), http.StatusInternalServerError)
 		return
@@ -181,14 +235,45 @@ func (dc *DeviceControlServer) ServeOperation(ctx context.Context, w http.Respon
 	dc.serveJSON(ctx, w, r.URL, "op-end", or)
 }
 
-func (dc *DeviceControlServer) ServeCondition(ctx context.Context, w http.ResponseWriter, r *http.Request) {
-	dc.l.Log(ctx, slog.LevelInfo, "cond-start", "request", r.URL.String())
-	dev, op, args := decodeArgs(r)
-	if dev == "" || op == "" {
-		dc.httpError(ctx, w, r.URL, "cond-end", "missing device or operation", http.StatusBadRequest)
+func (dc *DeviceControlServer) ServeOperationConditionally(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+	dc.l.Log(ctx, slog.LevelInfo, "op-start", "request", r.URL.String(), "code", http.StatusOK)
+	opAction, err := decodeOperationArgs(r)
+	if err != nil {
+		dc.httpError(ctx, w, r.URL, "op-end", err.Error(), http.StatusBadRequest)
 		return
 	}
-	cr, err := dc.RunCondition(ctx, io.Discard, dev+"."+op, args)
+	condAction, err := decodeConditionArgs(r)
+	if err != nil {
+		dc.httpError(ctx, w, r.URL, "op-end", err.Error(), http.StatusBadRequest)
+		return
+	}
+	cr, err := dc.RunCondition(ctx, io.Discard, condAction)
+	if err != nil {
+		dc.httpError(ctx, w, r.URL, "op-end", err.Error(), http.StatusInternalServerError)
+	}
+	if !cr.Result {
+		dc.serveJSON(ctx, w, r.URL, "op-end", ConditionalOperationResult{Condition: cr})
+		return
+	}
+	or, err := dc.RunOperation(ctx, io.Discard, opAction)
+	if err != nil {
+		dc.httpError(ctx, w, r.URL, "op-end", err.Error(), http.StatusInternalServerError)
+		return
+	}
+	dc.serveJSON(ctx, w, r.URL, "op-end", ConditionalOperationResult{
+		Condition: cr,
+		Operation: or,
+	})
+}
+
+func (dc *DeviceControlServer) ServeCondition(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+	dc.l.Log(ctx, slog.LevelInfo, "cond-start", "request", r.URL.String())
+	action, err := decodeConditionArgs(r)
+	if err != nil {
+		dc.httpError(ctx, w, r.URL, "cond-end", err.Error(), http.StatusBadRequest)
+		return
+	}
+	cr, err := dc.RunCondition(ctx, io.Discard, action)
 	if err != nil {
 		dc.httpError(ctx, w, r.URL, "cond-end", err.Error(), http.StatusInternalServerError)
 		return
@@ -226,6 +311,10 @@ func (dc *DeviceControlServer) AppendEndpoints(ctx context.Context, mux *http.Se
 		dc.ServeCondition(ctx, w, r)
 	})
 
+	mux.HandleFunc("/api/conditionally", func(w http.ResponseWriter, r *http.Request) {
+		dc.ServeOperationConditionally(ctx, w, r)
+	})
+
 	mux.HandleFunc("/api/reload", func(w http.ResponseWriter, r *http.Request) {
 		dc.Reload(ctx, w, r)
 		sys := dc.system()
@@ -253,4 +342,9 @@ type ConditionResult struct {
 	Args   []string `json:"args,omitempty"`
 	Result bool     `json:"status"`
 	Data   any      `json:"data,omitempty"`
+}
+
+type ConditionalOperationResult struct {
+	Condition *ConditionResult `json:"condition"`
+	Operation *OperationResult `json:"operation,omitempty"`
 }

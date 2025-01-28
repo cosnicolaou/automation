@@ -13,12 +13,16 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"sort"
 	"strings"
+	"time"
 
 	"cloudeng.io/cmdutil/keystore"
+	"cloudeng.io/datetime"
 	"github.com/cosnicolaou/automation/cmd/autobot/internal/webapi"
 	"github.com/cosnicolaou/automation/cmd/autobot/internal/webassets"
 	"github.com/cosnicolaou/automation/devices"
+	"github.com/cosnicolaou/automation/scheduler"
 	"github.com/pkg/browser"
 )
 
@@ -73,13 +77,15 @@ func (c *Control) Run(ctx context.Context, flags any, args []string) error {
 	if err != nil {
 		return err
 	}
-	cmd := args[0]
-	parameters := args[1:]
+	action, err := webapi.NewActionFromArgs(args[0], args[1:]...)
+	if err != nil {
+		return err
+	}
 	cc, err := webapi.NewDeviceControlServer(ctx, loader, c.logger)
 	if err != nil {
 		return err
 	}
-	data, err := cc.RunOperation(ctx, os.Stdout, cmd, parameters)
+	data, err := cc.RunOperation(ctx, os.Stdout, action)
 	if err != nil {
 		return err
 	}
@@ -97,13 +103,15 @@ func (c *Control) Condition(ctx context.Context, flags any, args []string) error
 	if err != nil {
 		return err
 	}
-	cmd := args[0]
-	parameters := args[1:]
+	action, err := webapi.NewActionFromArgs(args[0], args[1:]...)
+	if err != nil {
+		return err
+	}
 	cc, err := webapi.NewDeviceControlServer(ctx, loader, c.logger)
 	if err != nil {
 		return err
 	}
-	cr, err := cc.RunCondition(ctx, os.Stdout, cmd, parameters)
+	cr, err := cc.RunCondition(ctx, os.Stdout, action)
 	if err != nil {
 		return err
 	}
@@ -135,9 +143,11 @@ func (c *Control) RunScript(ctx context.Context, flags any, args []string) error
 		if len(parts) == 0 {
 			continue
 		}
-		cmd := parts[0]
-		parameters := parts[1:]
-		or, err := cc.RunOperation(ctx, os.Stdout, cmd, parameters)
+		action, err := webapi.NewActionFromArgs(parts[0], parts[1:]...)
+		if err != nil {
+			return err
+		}
+		or, err := cc.RunOperation(ctx, os.Stdout, action)
 		if err != nil {
 			return err
 		}
@@ -146,6 +156,59 @@ func (c *Control) RunScript(ctx context.Context, flags any, args []string) error
 		}
 	}
 	return nil
+}
+
+type conditionalOps struct {
+	op   webapi.Action
+	cond webapi.Action
+}
+
+func findPreconditions(ctx context.Context, system devices.System, fv *ControlTestPageFlags) ([]conditionalOps, error) {
+	dedup := map[string]bool{}
+	cops := make([]conditionalOps, 0, 10)
+
+	scheds, err := loadSchedules(ctx, &fv.ConfigFileFlags, system)
+	if err != nil {
+		return nil, err
+	}
+	cal, err := scheduler.NewCalendar(scheds, system)
+	if err != nil {
+		return nil, err
+	}
+	year := time.Now().Year()
+	first := datetime.NewCalendarDate(year, 1, 1)
+	last := datetime.NewCalendarDate(year, 12, 31)
+	for today := first; today <= last; today = today.Tomorrow() {
+		for _, ce := range cal.Scheduled(today) {
+			if ce.T.Precondition.Name == "" {
+				continue
+			}
+			cond := webapi.Action{
+				Device: ce.T.Precondition.Device,
+				Op:     ce.T.Precondition.Name,
+				Args:   ce.T.Precondition.Args,
+			}
+			op := webapi.Action{
+				Device: ce.T.DeviceName,
+				Op:     ce.T.Name,
+				Args:   ce.T.Args,
+			}
+			key := op.String() + "_" + cond.String()
+			if dedup[key] {
+				continue
+			}
+			cops = append(cops, conditionalOps{
+				op:   op,
+				cond: cond,
+			})
+			dedup[key] = true
+
+		}
+	}
+	sort.Slice(cops, func(i, j int) bool {
+		return cops[i].op.Device < cops[j].op.Device
+	})
+	return cops, nil
 }
 
 func (c *Control) ServeTestPage(ctx context.Context, flags any, _ []string) error {
@@ -169,13 +232,19 @@ func (c *Control) ServeTestPage(ctx context.Context, flags any, _ []string) erro
 		if err != nil {
 			return devices.System{}, err
 		}
+		cops, err := findPreconditions(ctx, system, fv)
+		if err != nil {
+			return devices.System{}, err
+		}
+
 		pages.SetPages(map[webassets.PageNames]string{
-			webassets.ControllersPage:          tm.RenderHTML(tm.Controllers(system)),
-			webassets.DevicesPage:              tm.RenderHTML(tm.Devices(system)),
-			webassets.ConditionsPage:           tm.RenderHTML(tm.Conditions(system)),
-			webassets.ControllerOperationsPage: tm.RenderHTML(tm.ControllerOperations(system)),
-			webassets.DeviceOperationsPage:     tm.RenderHTML(tm.DeviceOperations(system)),
-			webassets.DeviceConditionsPage:     tm.RenderHTML(tm.DeviceConditions(system)),
+			webassets.ControllersPage:           tm.RenderHTML(tm.Controllers(system)),
+			webassets.DevicesPage:               tm.RenderHTML(tm.Devices(system)),
+			webassets.ConditionsPage:            tm.RenderHTML(tm.Conditions(system)),
+			webassets.ControllerOperationsPage:  tm.RenderHTML(tm.ControllerOperations(system)),
+			webassets.DeviceOperationsPage:      tm.RenderHTML(tm.DeviceOperations(system)),
+			webassets.DeviceConditionsPage:      tm.RenderHTML(tm.DeviceConditions(system)),
+			webassets.ConditionalOperationsPage: tm.RenderHTML(tm.ConditionalOperations(cops)),
 		})
 
 		return system, nil
