@@ -17,14 +17,15 @@ import (
 )
 
 type Action struct {
-	DeviceName string
-	Device     Device
-	Name       string
-	Op         Operation
+	Name       string    // Name of the operation
+	DeviceName string    // Name of the device that is being controlled
+	Device     Device    // The device instance
+	Op         Operation // Operation to perform
+	Args       []string  // Arguments to the operation
 	Writer     io.Writer
-	Args       []string
 }
 
+// OperationArgs are the arguments to an operation.
 type OperationArgs struct {
 	Due    time.Time
 	Place  datetime.Place
@@ -33,6 +34,8 @@ type OperationArgs struct {
 	Args   []string
 }
 
+// Controller represents a controller that can control devices.
+// All devices are associated with a controller.
 type Controller interface {
 	SetConfig(ControllerConfigCommon)
 	Config() ControllerConfigCommon
@@ -52,6 +55,8 @@ type Operation func(ctx context.Context, opts OperationArgs) (any, error)
 // operation should be performed.
 type Condition func(ctx context.Context, opts OperationArgs) (any, bool, error)
 
+// Device represents a device that can be controlled, eg.
+// a light fixturer, alarm zone etc.
 type Device interface {
 	SetConfig(DeviceConfigCommon)
 	Config() DeviceConfigCommon

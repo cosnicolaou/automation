@@ -1,10 +1,10 @@
 function runOperation(dev, op, params) {
     $("#resultBar").empty();
     let cgipars = params.map(function (value) {
-        return { name: 'arg', value: value };
+        return { name: 'oarg', value: value };
     });
     console.log('runOp', dev, op, cgipars);
-    let cgiArgs = $.param([{ name: 'dev', value: dev }, { name: 'op', value: op }].concat(cgipars));
+    let cgiArgs = $.param([{ name: 'odev', value: dev }, { name: 'op', value: op }].concat(cgipars));
     $.ajax({
         url: '/api/operation?' + cgiArgs,
         method: 'GET',
@@ -22,10 +22,10 @@ function runOperation(dev, op, params) {
 function runCondition(dev, op, params) {
     $("#resultBar").empty();
     let cgipars = params.map(function (value) {
-        return { name: 'arg', value: value };
+        return { name: 'carg', value: value };
     });
     console.log('runOp', dev, op, cgipars);
-    let cgiArgs = $.param([{ name: 'dev', value: dev }, { name: 'op', value: op }].concat(cgipars));
+    let cgiArgs = $.param([{ name: 'cdev', value: dev }, { name: 'cond', value: op }].concat(cgipars));
     $.ajax({
         url: '/api/condition?' + cgiArgs,
         method: 'GET',
@@ -34,6 +34,35 @@ function runCondition(dev, op, params) {
         },
         error: function (jqXHR, textStatus, errorThrown) {
             console.error('operation failed:', textStatus, errorThrown);
+            console.log(jqXHR);
+            $('#resultBar').jsonViewer({ "Error": jqXHR.responseText, "Status": textStatus, "ErrorThrown": errorThrown });
+        },
+    });
+}
+
+function runConditionally(opDev, op, op_args, condDev, cond, cond_args) {
+    $("#resultBar").empty();
+    let oargs = op_args.map(function (value) {
+        return { name: 'oarg', value: value };
+    });
+    let cargs = cond_args.map(function (value) {
+        return { name: 'carg', value: value };
+    });
+    console.log('runConditiolnall', opDev, op, op_args, condDev, cond, cond_args);
+    let cgiArgs = $.param([
+        { name: 'odev', value: opDev },
+        { name: 'op', value: op },
+        { name: 'cdev', value: condDev },
+        { name: 'cond', value: cond }].concat(oargs).concat(cargs));
+
+    $.ajax({
+        url: '/api/conditionally?' + cgiArgs,
+        method: 'GET',
+        success: function (data) {
+            $('#resultBar').jsonViewer(data);
+        },
+        error: function (jqXHR, textStatus, errorThrown) {
+            console.error('conditionaloperation failed:', textStatus, errorThrown);
             console.log(jqXHR);
             $('#resultBar').jsonViewer({ "Error": jqXHR.responseText, "Status": textStatus, "ErrorThrown": errorThrown });
         },

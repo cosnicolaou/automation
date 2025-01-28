@@ -28,6 +28,7 @@ const (
 	ControllerOperationsPage
 	DeviceOperationsPage
 	DeviceConditionsPage
+	ConditionalOperationsPage
 )
 
 func (p *TestServerPages) SetPages(contents map[PageNames]string) {
@@ -122,6 +123,13 @@ func AppendTestServerPages(mux *http.ServeMux,
 
 	mux.HandleFunc("/conditions", func(w http.ResponseWriter, _ *http.Request) {
 		err := pages.RunOpsPage(w, systemfile, "device conditions", DeviceConditionsPage)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	})
+
+	mux.HandleFunc("/conditionally", func(w http.ResponseWriter, _ *http.Request) {
+		err := pages.RunOpsPage(w, systemfile, "conditional device operations", ConditionalOperationsPage)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
