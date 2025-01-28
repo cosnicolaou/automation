@@ -25,6 +25,14 @@ func NewStatusPages(cfs fs.FS) *StatusPages {
 	return &StatusPages{cfs: cfs}
 }
 
+const (
+	statusPage                    = "status.html"
+	statusHomeJS      template.JS = "static/status-home.js"
+	statusCompletedJS template.JS = "static/status-completed.js"
+	statusPendingJS   template.JS = "static/status-pending.js"
+	statusCalendarJS  template.JS = "static/status-calendar.js"
+)
+
 func (p *StatusPages) StatusHomePage(w io.Writer, systemfile string) error {
 	d := struct {
 		Name   string
@@ -37,7 +45,7 @@ func (p *StatusPages) StatusHomePage(w io.Writer, systemfile string) error {
         <div id="completed"></div>
         <h2>Pending</h2>
         <div id="pending"></div>`,
-		Script: "static/status-home.js",
+		Script: statusHomeJS,
 	}
 	tpl, err := template.ParseFS(p.cfs, statusPage)
 	if err != nil {
@@ -56,7 +64,7 @@ func (p *StatusPages) StatusCompletedPage(w io.Writer, systemfile string) error 
 		Main: `
 		<h2>Completed</h2>
         <div id="completed"></div>`,
-		Script: "static/status-completed.js",
+		Script: statusCompletedJS,
 	}
 	tpl, err := template.ParseFS(p.cfs, statusPage)
 	if err != nil {
@@ -75,7 +83,7 @@ func (p *StatusPages) StatusPendingPage(w io.Writer, systemfile string) error {
 		Main: `
 		<h2>Pending</h2>
         <div id="pending"></div>`,
-		Script: "static/status-pending.js",
+		Script: statusPendingJS,
 	}
 	tpl, err := template.ParseFS(p.cfs, statusPage)
 	if err != nil {
@@ -96,7 +104,7 @@ func (p *StatusPages) StatusCalendarPage(w io.Writer, systemfile string) error {
 		<div id="daterange"></div>
 		<div id="schedules"></div>
         <div id="calendar"></div>`,
-		Script: "static/status-calendar.js",
+		Script: statusCalendarJS,
 	}
 	tpl, err := template.ParseFS(p.cfs, statusPage)
 	if err != nil {

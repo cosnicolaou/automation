@@ -47,16 +47,17 @@ func NewTestServerPages(cfs fs.FS) *TestServerPages {
 }
 
 var (
-	testPage   = "test-server-home.html"
-	opsPage    = "test-server-ops.html"
-	statusPage = "status.html"
+	testServerHomePage = "test-server-home.html"
+	testServerOpsPage  = "test-server-ops.html"
+
+	testServerHomeJS template.JS = "static/test-server-home.js"
 )
 
 func (p *TestServerPages) FS() http.FileSystem {
 	return http.FS(p.cfs)
 }
 
-func (p *TestServerPages) TestPageHome(w io.Writer, systemfile string) error {
+func (p *TestServerPages) TestServerHomePage(w io.Writer, systemfile string) error {
 	d := struct {
 		Name        string
 		Controllers template.HTML
@@ -68,10 +69,10 @@ func (p *TestServerPages) TestPageHome(w io.Writer, systemfile string) error {
 		Controllers: template.HTML(p.GetPage(ControllersPage)), //nolint: gosec
 		Devices:     template.HTML(p.GetPage(DevicesPage)),     //nolint: gosec
 		Conditions:  template.HTML(p.GetPage(ConditionsPage)),  //nolint: gosec
-		Script:      "static/test-homepage.js",
+		Script:      testServerHomeJS,
 	}
 
-	tpl, err := template.ParseFS(p.cfs, testPage)
+	tpl, err := template.ParseFS(p.cfs, testServerHomePage)
 	if err != nil {
 		return err
 	}
@@ -80,15 +81,17 @@ func (p *TestServerPages) TestPageHome(w io.Writer, systemfile string) error {
 
 func (p *TestServerPages) RunOpsPage(w io.Writer, system, title string, page PageNames) error {
 	d := struct {
-		Name  string
-		Title string
-		Table template.HTML
+		Name   string
+		Title  string
+		Table  template.HTML
+		Script template.JS
 	}{
-		Name:  system,
-		Title: title,
-		Table: template.HTML(p.GetPage(page)), //nolint: gosec
+		Name:   system,
+		Title:  title,
+		Table:  template.HTML(p.GetPage(page)), //nolint: gosec
+		Script: testServerHomeJS,
 	}
-	tpl, err := template.ParseFS(p.cfs, opsPage)
+	tpl, err := template.ParseFS(p.cfs, testServerOpsPage)
 	if err != nil {
 		return err
 	}
@@ -125,7 +128,7 @@ func AppendTestServerPages(mux *http.ServeMux,
 	})
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
-		err := pages.TestPageHome(w, systemfile)
+		err := pages.TestServerHomePage(w, systemfile)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
