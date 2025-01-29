@@ -18,9 +18,9 @@ import (
 
 type WebUIFlags struct {
 	Port     string `subcmd:"port,8080,port to listen on"`
-	CertFile string `subcmd:"cert,,certificate file"`
-	KeyFile  string `subcmd:"key,,key file"`
-	Assets   string `subcmd:"assets,,path to assets"`
+	CertFile string `subcmd:"ssl-cert,,certificate file"`
+	KeyFile  string `subcmd:"ssl-key,,key file"`
+	Assets   string `subcmd:"web-assets,,path to assets"`
 }
 
 func (fv WebUIFlags) TestServerPages() *webassets.TestServerPages {
