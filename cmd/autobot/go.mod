@@ -11,7 +11,7 @@ require (
 	github.com/cosnicolaou/automation v0.0.0-20250127224624-31dcaa02ceaa
 	github.com/cosnicolaou/elk v0.0.0-20250124050704-c54abaf70e67
 	github.com/cosnicolaou/lutron v0.0.0-20250124000727-687038ce1569
-	github.com/cosnicolaou/pentair v0.0.0-20250124000709-61200e702101
+	github.com/cosnicolaou/pentair v0.0.0-20250211200921-d53e065f1fd7
 	github.com/cosnicolaou/weather v0.0.0-20250124000705-01bcf0b01061
 	github.com/jedib0t/go-pretty/v6 v6.6.5
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c

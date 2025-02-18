@@ -219,7 +219,7 @@ func (c *Control) ServeTestPage(ctx context.Context, flags any, _ []string) erro
 	}
 
 	mux := http.NewServeMux()
-	_, runner, url, err := fv.WebUIFlags.CreateWebServer(ctx, mux)
+	runner, url, err := fv.WebUIFlags.CreateWebServer(ctx, mux, c.logger)
 	if err != nil {
 		return err
 	}
@@ -257,7 +257,6 @@ func (c *Control) ServeTestPage(ctx context.Context, flags any, _ []string) erro
 
 	dc, err := webapi.NewDeviceControlServer(ctx, rerender, c.logger)
 	if err != nil {
-		return err
 	}
 	dc.AppendEndpoints(ctx, mux)
 
