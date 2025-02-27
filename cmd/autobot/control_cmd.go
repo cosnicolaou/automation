@@ -257,6 +257,7 @@ func (c *Control) ServeTestPage(ctx context.Context, flags any, _ []string) erro
 
 	dc, err := webapi.NewDeviceControlServer(ctx, rerender, c.logger)
 	if err != nil {
+		return err
 	}
 	dc.AppendEndpoints(ctx, mux)
 

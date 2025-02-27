@@ -107,7 +107,7 @@ func (fv WebUIFlags) CreateWebServer(ctx context.Context, mux *http.ServeMux, lo
 
 	tls := fv.HTTPSAddr != ""
 	if tls && (fv.CertFile == "" || fv.KeyFile == "") {
-		return func() error { return nil }, "", fmt.Errorf("ssl-cert and ssl-key are required for tls")
+		return func() error { return nil }, "", fmt.Errorf("ssl-cert and ssl-key flags are required for tls")
 	}
 
 	var start func() error
