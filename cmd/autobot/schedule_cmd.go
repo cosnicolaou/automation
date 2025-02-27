@@ -78,11 +78,8 @@ func (s *Schedule) loadFiles(ctx context.Context, fv *ConfigFileFlags, deviceOpt
 }
 
 func (s *Schedule) serveStatusUI(ctx context.Context, systemfile string, fv WebUIFlags, logger *slog.Logger, statusRecorder *logging.StatusRecorder) error {
-	if fv.Port == "0" {
-		return nil
-	}
 	mux := http.NewServeMux()
-	_, runner, url, err := fv.CreateWebServer(ctx, mux)
+	runner, url, err := fv.CreateWebServer(ctx, mux, logger)
 	if err != nil {
 		return err
 	}
@@ -167,6 +164,10 @@ func (s *Schedule) Run(ctx context.Context, flags any, _ []string) error {
 	}
 
 	logger.Info("starting schedules", "start", start.String(), "loc", s.system.Location.TimeLocation.String(), "zip", s.system.Location.ZIPCode, "latitude", s.system.Location.Latitude, "longitude", s.system.Location.Longitude)
+
+	if err := s.serveStatusUI(ctx, fv.ConfigFileFlags.SystemFile, fv.WebUIFlags, logger, sr); err != nil {
+		return err
+	}
 
 	return scheduler.RunSchedulers(ctx, s.schedules, s.system, start, schedulerOpts...)
 

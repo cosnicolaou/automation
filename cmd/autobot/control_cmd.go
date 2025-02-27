@@ -219,7 +219,7 @@ func (c *Control) ServeTestPage(ctx context.Context, flags any, _ []string) erro
 	}
 
 	mux := http.NewServeMux()
-	_, runner, url, err := fv.WebUIFlags.CreateWebServer(ctx, mux)
+	runner, url, err := fv.WebUIFlags.CreateWebServer(ctx, mux, c.logger)
 	if err != nil {
 		return err
 	}

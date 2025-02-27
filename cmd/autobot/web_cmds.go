@@ -7,20 +7,24 @@ package main
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"time"
 
 	"cloudeng.io/cmdutil"
+	"cloudeng.io/sync/errgroup"
 	wa "cloudeng.io/webapp/webassets"
 	"github.com/cosnicolaou/automation/cmd/autobot/internal/webassets"
 )
 
 type WebUIFlags struct {
-	Port     string `subcmd:"port,8080,port to listen on"`
-	CertFile string `subcmd:"cert,,certificate file"`
-	KeyFile  string `subcmd:"key,,key file"`
-	Assets   string `subcmd:"assets,,path to assets"`
+	HTTPSRedirectAddr string `subcmd:"https-redirect,127.0.0.1:8083,redirect from http to this https address"`
+	HTTPSAddr         string `subcmd:"https-addr,127.0.0.1:8083,https address to listen on"`
+	HTTPAddr          string `subcmd:"http-addr,127.0.0.1:8080,http address to listen on"`
+	CertFile          string `subcmd:"ssl-cert,,certificate file"`
+	KeyFile           string `subcmd:"ssl-key,,key file"`
+	Assets            string `subcmd:"web-assets,,path to assets"`
 }
 
 func (fv WebUIFlags) TestServerPages() *webassets.TestServerPages {
@@ -35,35 +39,93 @@ func (fv WebUIFlags) StatusPages() *webassets.StatusPages {
 	return webassets.NewStatusPages(rfs)
 }
 
-func (fv WebUIFlags) CreateWebServer(ctx context.Context, mux *http.ServeMux) (*http.Server, func() error, string, error) {
-	if fv.Port == "0" {
-		return nil, func() error { return nil }, "", nil
-	}
-	host := "127.0.0.1"
-	tls := fv.CertFile != "" && fv.KeyFile != ""
-	if tls {
-		host = ""
+func (fv WebUIFlags) createTLSServer(ctx context.Context, mux *http.ServeMux, logger *slog.Logger) (start func() error, stop func(), url string, err error) {
+
+	redirectURL := "https://" + fv.HTTPSRedirectAddr
+	redirectMux := http.NewServeMux()
+	redirectMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		logger.Info("redirecting to", "url", redirectURL)
+		http.Redirect(w, r, redirectURL, http.StatusMovedPermanently)
+	})
+	redirectServer := &http.Server{
+		Addr:              fv.HTTPAddr,
+		Handler:           redirectMux,
+		ReadHeaderTimeout: 5 * time.Second,
 	}
 	server := &http.Server{
-		Addr:              fmt.Sprintf("%s:%v", host, fv.Port),
+		Addr:              fv.HTTPSAddr,
 		Handler:           mux,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
-
-	runner := func() error {
-		return server.ListenAndServe()
-	}
-	url := fmt.Sprintf("http://127.0.0.1:%v", fv.Port)
-	if tls {
-		runner = func() error {
+	start = func() error {
+		var g errgroup.T
+		g.Go(func() error {
+			logger.Info("starting web server", "url", url)
 			return server.ListenAndServeTLS(fv.CertFile, fv.KeyFile)
-		}
-		url = fmt.Sprintf("https://127.0.0.1:%v", fv.Port)
+		})
+		g.Go(func() error {
+			logger.Info("starting redirect server", "url", url, "redirect", fv.HTTPSRedirectAddr)
+			return redirectServer.ListenAndServe()
+		})
+		return g.Wait()
+	}
+	stop = func() {
+		var g errgroup.T
+		g.Go(func() error {
+			return server.Shutdown(ctx)
+		})
+		g.Go(func() error {
+			return redirectServer.Shutdown(ctx)
+		})
+		_ = g.Wait()
+	}
+	url = "https://" + fv.HTTPSAddr
+	return
+}
+
+func (fv WebUIFlags) createHTTPServer(ctx context.Context, mux *http.ServeMux, logger *slog.Logger) (start func() error, stop func(), url string, err error) {
+	server := &http.Server{
+		Addr:              fv.HTTPAddr,
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+	start = func() error {
+		logger.Info("starting web server", "url", url)
+		return server.ListenAndServeTLS(fv.CertFile, fv.KeyFile)
+	}
+	stop = func() {
+		_ = server.Shutdown(ctx)
+	}
+	url = "http://" + fv.HTTPAddr
+	return
+}
+
+func (fv WebUIFlags) CreateWebServer(ctx context.Context, mux *http.ServeMux, logger *slog.Logger) (func() error, string, error) {
+	if fv.HTTPSAddr == "" && fv.HTTPAddr == "" {
+		return func() error { return nil }, "", nil
+	}
+
+	tls := fv.HTTPSAddr != ""
+	if tls && (fv.CertFile == "" || fv.KeyFile == "") {
+		return func() error { return nil }, "", fmt.Errorf("ssl-cert and ssl-key flags are required for tls")
+	}
+
+	var start func() error
+	var stop func()
+	var url string
+	var err error
+	if fv.HTTPSAddr != "" {
+		start, stop, url, err = fv.createTLSServer(ctx, mux, logger)
+	} else {
+		start, stop, url, err = fv.createHTTPServer(ctx, mux, logger)
+	}
+	if err != nil {
+		return func() error { return nil }, "", err
 	}
 
 	cmdutil.HandleSignals(func() {
-		_ = server.Shutdown(ctx)
+		stop()
 	}, os.Interrupt)
 
-	return server, runner, url, nil
+	return start, url, nil
 }
