@@ -73,7 +73,7 @@ func TestSimulateAndLogs(t *testing.T) {
 		DryRun:    false, // this is safe since the test system has dummy devices
 		LogFile:   tmpFile,
 		WebUIFlags: WebUIFlags{
-			Port: "0",
+			HTTPAddr: "0.0.0.0:0",
 		},
 	}
 
