@@ -77,7 +77,7 @@ func (fv WebUIFlags) createTLSServer(ctx context.Context, mux *http.ServeMux, lo
 		g.Go(func() error {
 			return redirectServer.Shutdown(ctx)
 		})
-		g.Wait()
+		_ = g.Wait()
 	}
 	url = "https://" + fv.HTTPSAddr
 	return
@@ -94,7 +94,7 @@ func (fv WebUIFlags) createHTTPServer(ctx context.Context, mux *http.ServeMux, l
 		return server.ListenAndServeTLS(fv.CertFile, fv.KeyFile)
 	}
 	stop = func() {
-		server.Shutdown(ctx)
+		_ = server.Shutdown(ctx)
 	}
 	url = "http://" + fv.HTTPAddr
 	return
