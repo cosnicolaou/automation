@@ -219,13 +219,13 @@ func (c *Control) ServeTestPage(ctx context.Context, flags any, _ []string) erro
 	}
 
 	mux := http.NewServeMux()
-	runner, url, err := fv.WebUIFlags.CreateWebServer(ctx, mux, c.logger)
+	runner, url, err := fv.CreateWebServer(ctx, mux, c.logger)
 	if err != nil {
 		return err
 	}
 
 	tm := tableManager{html: true, jsapi: true}
-	pages := fv.WebUIFlags.TestServerPages()
+	pages := fv.TestServerPages()
 
 	rerender := func(ctx context.Context) (devices.System, error) {
 		system, err := loader(ctx)
@@ -251,7 +251,7 @@ func (c *Control) ServeTestPage(ctx context.Context, flags any, _ []string) erro
 	}
 
 	webassets.AppendTestServerPages(mux,
-		fv.ConfigFileFlags.SystemFile,
+		fv.SystemFile,
 		pages,
 	)
 
