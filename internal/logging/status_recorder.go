@@ -22,7 +22,6 @@ type StatusRecorder struct {
 
 func NewStatusRecorder() *StatusRecorder {
 	return &StatusRecorder{
-		//		done:    make([]*StatusRecord, 0, 1000),
 		done:    list.NewDouble[*StatusRecord](),
 		waiting: list.NewDouble[*StatusRecord](),
 	}
