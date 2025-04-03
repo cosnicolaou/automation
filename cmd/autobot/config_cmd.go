@@ -78,7 +78,11 @@ func formatAction(a schedule.ActionSpec[scheduler.Action]) string {
 func (c *Config) Display(ctx context.Context, flags any, _ []string) error {
 	fv := flags.(*ConfigFlags)
 
-	ctx, system, err := loadSystem(ctx, &fv.ConfigFileFlags)
+	deviceOpts := []devices.Option{
+		devices.WithLogger(slog.New(slog.NewTextHandler(os.Stderr, nil))),
+	}
+
+	ctx, system, err := loadSystem(ctx, &fv.ConfigFileFlags, deviceOpts...)
 	if err != nil {
 		return err
 	}

@@ -38,7 +38,7 @@ func (st *slowDevice) Operations() map[string]devices.Operation {
 
 func (st *slowDevice) SetConfig(cfg devices.DeviceConfigCommon) {
 	st.MockDevice.SetConfig(cfg)
-	st.DeviceConfigCommon.Timeout = st.timeout
+	st.Timeout = st.timeout
 }
 
 func (st *slowDevice) On(context.Context, devices.OperationArgs) (any, error) {

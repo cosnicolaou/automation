@@ -318,7 +318,7 @@ func New(sched Annual, system devices.System, opts ...Option) (*Scheduler, error
 			return nil, fmt.Errorf("unknown operation: %s for device: %v", a.T.Name, a.T.DeviceName)
 		}
 		sched.DailyActions[i].T.Device = dev
-		sched.DailyActions[i].T.Action.Op = op
+		sched.DailyActions[i].T.Op = op
 	}
 	scheduler.logger = scheduler.logger.With("mod", "scheduler", "schedule", sched.Name)
 	scheduler.scheduler = schedule.NewAnnualScheduler(sched.DailyActions)

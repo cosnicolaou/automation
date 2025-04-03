@@ -46,8 +46,8 @@ func (lp *ControllerConfig) UnmarshalYAML(node *yaml.Node) error {
 	if err := node.Decode(&lp.ControllerConfigCommon); err != nil {
 		return err
 	}
-	if lp.ControllerConfigCommon.Timeout == 0 {
-		lp.ControllerConfigCommon.Timeout = time.Minute
+	if lp.Timeout == 0 {
+		lp.Timeout = time.Minute
 	}
 	return node.Decode(&lp.Config)
 }
@@ -73,8 +73,8 @@ func (lp *DeviceConfig) UnmarshalYAML(node *yaml.Node) error {
 	if err := node.Decode(&lp.DeviceConfigCommon); err != nil {
 		return err
 	}
-	if lp.DeviceConfigCommon.Timeout == 0 {
-		lp.DeviceConfigCommon.Timeout = time.Minute
+	if lp.Timeout == 0 {
+		lp.Timeout = time.Minute
 	}
 	return node.Decode(&lp.Config)
 }
