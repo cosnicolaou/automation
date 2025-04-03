@@ -130,7 +130,6 @@ func (s *Schedule) Run(ctx context.Context, flags any, _ []string) error {
 	var start datetime.CalendarDate
 	if sd := fv.StartDate; sd != "" {
 		if err := start.Parse(sd); err != nil {
-			``
 			return err
 		}
 	} else {
