@@ -165,7 +165,7 @@ func (s *Schedule) Run(ctx context.Context, flags any, _ []string) error {
 
 	logger.Info("starting schedules", "start", start.String(), "loc", s.system.Location.TimeLocation.String(), "zip", s.system.Location.ZIPCode, "latitude", s.system.Location.Latitude, "longitude", s.system.Location.Longitude)
 
-	if err := s.serveStatusUI(ctx, fv.ConfigFileFlags.SystemFile, fv.WebUIFlags, logger, sr); err != nil {
+	if err := s.serveStatusUI(ctx, fv.SystemFile, fv.WebUIFlags, logger, sr); err != nil {
 		return err
 	}
 
