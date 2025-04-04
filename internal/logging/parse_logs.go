@@ -57,7 +57,7 @@ func ParseLogLine(line string) (Entry, error) {
 	var le Entry
 	le.LogEntry = line
 	if err := json.Unmarshal([]byte(line), &le.logEntry); err != nil {
-		return le, fmt.Errorf("error in line: %q: %w", line, err)
+		return le, fmt.Errorf("error in line: %q: [%02x] %w", line, line, err)
 	}
 	loc, err := time.LoadLocation(le.Location)
 	if err != nil {
