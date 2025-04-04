@@ -54,7 +54,9 @@ func countEvents(t *testing.T, logfile string) (counts map[string]map[string]int
 		}
 	}
 	if err := sc.Err(); err != nil {
-		t.Fatalf("failed to read log file: %v", err)
+		lf, err := os.ReadFile(logfile)
+		t.Logf("log file: %v", string(lf))
+		t.Fatalf("failed to process log file: %v, %v", logfile, err)
 	}
 	return counts, dates
 }
