@@ -37,6 +37,8 @@ github.com/cosnicolaou/automation v0.0.0-20250127224624-31dcaa02ceaa h1:kgpn12gF
 github.com/cosnicolaou/automation v0.0.0-20250127224624-31dcaa02ceaa/go.mod h1:ul9wUCy+USwdD+Za5fwGlu2yjTiGmlHMA43sDOyinAk=
 github.com/cosnicolaou/elk v0.0.0-20250124050704-c54abaf70e67 h1:GWkonufiO8TFqlDKOJRAS8X2OjmfLr7J4tM5k2QMJ6E=
 github.com/cosnicolaou/elk v0.0.0-20250124050704-c54abaf70e67/go.mod h1:NhXxAXGTor0uQCdMj4iRFM9UJaOkVrvCAErxsSBsjGE=
+github.com/cosnicolaou/elk v0.0.0-20250404001554-3961929308ad h1:pb107H/t9fBfDwfGC9bbL481xqlDbSTbrOwzXMU+NeA=
+github.com/cosnicolaou/elk v0.0.0-20250404001554-3961929308ad/go.mod h1:NhXxAXGTor0uQCdMj4iRFM9UJaOkVrvCAErxsSBsjGE=
 github.com/cosnicolaou/lutron v0.0.0-20250124000727-687038ce1569 h1:V4s43pEba0Z2nnoHs5RNI2+vI7URKsZ9AYBebOCsn0w=
 github.com/cosnicolaou/lutron v0.0.0-20250124000727-687038ce1569/go.mod h1:F6tSGfxWuhTy4+YJw0icCk5JGn1lOl5lEtK0/D8KYAY=
 github.com/cosnicolaou/pentair v0.0.0-20250124000709-61200e702101 h1:NmkBwwOoj2W5BA8W/uIFAGH+qG1YmxgDXOT1qSAF/Tk=
@@ -47,6 +49,8 @@ github.com/cosnicolaou/pentair v0.0.0-20250403001743-8f75e97476f9 h1:zp3TOerMLkw
 github.com/cosnicolaou/pentair v0.0.0-20250403001743-8f75e97476f9/go.mod h1:tgSkDTWqES0wTGmImPLnCH4iLQJ7SxnOmncpSZIxPHQ=
 github.com/cosnicolaou/weather v0.0.0-20250124000705-01bcf0b01061 h1:gw6nXZyM1Uv1XeYYeY3gI6DcHKOMucfT9nkCWWpCyW4=
 github.com/cosnicolaou/weather v0.0.0-20250124000705-01bcf0b01061/go.mod h1:Y+tUDhNzBw8ANGy2gjqtHq8Goa/h8rMfSmV3ugWpqoE=
+github.com/cosnicolaou/weather v0.0.0-20250404002659-fd6e71276b3d h1:KPbBkVblKEx7yAdVTsr6xRyXJWTkjKkZBttlF1WSuWQ=
+github.com/cosnicolaou/weather v0.0.0-20250404002659-fd6e71276b3d/go.mod h1:Y+tUDhNzBw8ANGy2gjqtHq8Goa/h8rMfSmV3ugWpqoE=
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=

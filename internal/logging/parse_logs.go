@@ -134,5 +134,5 @@ func (ls *Scanner) Entries(accumulateErrors bool) iter.Seq[Entry] {
 }
 
 func (ls *Scanner) Err() error {
-	return ls.errs
+	return ls.errs.Err()
 }

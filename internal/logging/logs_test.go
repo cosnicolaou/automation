@@ -38,7 +38,7 @@ func TestLogs(t *testing.T) {
 
 	var logs []logging.Entry
 	sc := logging.NewScanner(out)
-	for le := range sc.Entries() {
+	for le := range sc.Entries(false) {
 		logs = append(logs, le)
 	}
 	if sc.Err() != nil {
