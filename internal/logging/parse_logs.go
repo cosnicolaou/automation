@@ -115,7 +115,6 @@ func (ls *Scanner) Entries(accumulateErrors bool) iter.Seq[Entry] {
 	return func(yield func(Entry) bool) {
 		for {
 			if !ls.sc.Scan() {
-				fmt.Printf("error: %v\n", ls.sc.Err())
 				ls.errs.Append(ls.sc.Err())
 				return
 			}
