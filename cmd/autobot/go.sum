@@ -37,6 +37,8 @@ github.com/cosnicolaou/automation v0.0.0-20250127224624-31dcaa02ceaa h1:kgpn12gF
 github.com/cosnicolaou/automation v0.0.0-20250127224624-31dcaa02ceaa/go.mod h1:ul9wUCy+USwdD+Za5fwGlu2yjTiGmlHMA43sDOyinAk=
 github.com/cosnicolaou/automation v0.0.0-20250403042419-0d1ee9e8ec5e h1:MMJYKWuPx55LLAbf67RrnXBY/sBXx2GfLQP2Ylib8OM=
 github.com/cosnicolaou/automation v0.0.0-20250403042419-0d1ee9e8ec5e/go.mod h1:oT7LLuamW3iUZm0NxaZlS9qF9p6Jbnhkf+ItJQMM4hc=
+github.com/cosnicolaou/automation v0.0.0-20250404001634-3ee89233b193 h1:AOq3Ukd4tOnwnfh+EkXeK5IqPI6RIwWROXoNHiupZnM=
+github.com/cosnicolaou/automation v0.0.0-20250404001634-3ee89233b193/go.mod h1:oT7LLuamW3iUZm0NxaZlS9qF9p6Jbnhkf+ItJQMM4hc=
 github.com/cosnicolaou/elk v0.0.0-20250124050704-c54abaf70e67 h1:GWkonufiO8TFqlDKOJRAS8X2OjmfLr7J4tM5k2QMJ6E=
 github.com/cosnicolaou/elk v0.0.0-20250124050704-c54abaf70e67/go.mod h1:NhXxAXGTor0uQCdMj4iRFM9UJaOkVrvCAErxsSBsjGE=
 github.com/cosnicolaou/elk v0.0.0-20250404001554-3961929308ad h1:pb107H/t9fBfDwfGC9bbL481xqlDbSTbrOwzXMU+NeA=

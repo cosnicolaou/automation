@@ -9,11 +9,11 @@ require (
 	cloudeng.io/macos v0.0.0-20250119024745-8a46e9bdda10
 	cloudeng.io/sync v0.0.8
 	cloudeng.io/webapp v0.0.0-20250119024745-8a46e9bdda10
-	github.com/cosnicolaou/automation v0.0.0-20250403042419-0d1ee9e8ec5e
-	github.com/cosnicolaou/elk v0.0.0-20250404001554-3961929308ad
+	github.com/cosnicolaou/automation v0.0.0-20250404001634-3ee89233b193
+	github.com/cosnicolaou/elk v0.0.0-20250404002040-391222906ce8
 	github.com/cosnicolaou/lutron v0.0.0-20250124000727-687038ce1569
 	github.com/cosnicolaou/pentair v0.0.0-20250403001743-8f75e97476f9
-	github.com/cosnicolaou/weather v0.0.0-20250404002659-fd6e71276b3d
+	github.com/cosnicolaou/weather v0.0.0-20250404002848-0469b072f215
 	github.com/jedib0t/go-pretty/v6 v6.6.7
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
 	gopkg.in/yaml.v3 v3.0.1
