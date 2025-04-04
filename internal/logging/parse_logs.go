@@ -7,13 +7,13 @@ package logging
 import (
 	"bufio"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"iter"
 	"time"
 
 	"cloudeng.io/datetime"
+	"cloudeng.io/errors"
 )
 
 type logEntry struct {
@@ -57,11 +57,11 @@ func ParseLogLine(line string) (Entry, error) {
 	var le Entry
 	le.LogEntry = line
 	if err := json.Unmarshal([]byte(line), &le.logEntry); err != nil {
-		return le, err
+		return le, fmt.Errorf("error in line: %q: %w", line, err)
 	}
 	loc, err := time.LoadLocation(le.Location)
 	if err != nil {
-		return le, err
+		return le, fmt.Errorf("error in location: %q: %w", le.Location, err)
 	}
 	le.Date = datetime.CalendarDate(le.logEntry.Date)
 	le.Now = le.logEntry.Now.In(loc)
@@ -100,29 +100,31 @@ func (le Entry) StatusRecord() *StatusRecord {
 }
 
 type Scanner struct {
-	sc  *bufio.Scanner
-	err error
+	sc   *bufio.Scanner
+	errs *errors.M
 }
 
 func NewScanner(rd io.Reader) *Scanner {
-	return &Scanner{sc: bufio.NewScanner(rd)}
+	return &Scanner{sc: bufio.NewScanner(rd), errs: &errors.M{}}
 }
 
 // Entries returns an iterator for over the LogScanner's LogEntry's. Note
 // that the iterator will stop if an error is encountered and that the
 // Scanner's Err method should be checked after the iterator has completed.
-func (ls *Scanner) Entries() iter.Seq[Entry] {
+func (ls *Scanner) Entries(accumulateErrors bool) iter.Seq[Entry] {
 	return func(yield func(Entry) bool) {
 		for {
 			if !ls.sc.Scan() {
-				ls.err = ls.sc.Err()
+				ls.errs.Append(ls.sc.Err())
 				return
 			}
 			line := ls.sc.Text()
 			le, err := ParseLogLine(line)
 			if err != nil {
-				ls.err = err
-				return
+				ls.errs.Append(err)
+				if !accumulateErrors {
+					return
+				}
 			}
 			if !yield(le) {
 				return
@@ -132,5 +134,5 @@ func (ls *Scanner) Entries() iter.Seq[Entry] {
 }
 
 func (ls *Scanner) Err() error {
-	return ls.err
+	return ls.errs
 }

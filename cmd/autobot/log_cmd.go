@@ -35,7 +35,7 @@ type logEntryHandler func(logging.Entry) error
 
 func (l *Log) processLog(rd io.Reader, fv *LogStatusFlags, lh logEntryHandler) error {
 	sc := logging.NewScanner(rd)
-	for le := range sc.Entries() {
+	for le := range sc.Entries(true) {
 		if len(fv.Device) > 0 && le.Device != fv.Device {
 			continue
 		}
@@ -66,11 +66,9 @@ func (l *Log) Status(_ context.Context, flags any, args []string) error {
 		defer fi.Close()
 		rd = fi
 	}
-	if err := l.processLog(rd, fv, srh.process); err != nil {
-		return err
-	}
+	err := l.processLog(rd, fv, srh.process)
 	srh.print(l.out, datetime.CalendarDateFromTime(srh.last))
-	return nil
+	return err
 }
 
 type statusRecoder struct {
@@ -117,7 +115,7 @@ func (sr *statusRecoder) process(le logging.Entry) error {
 	case logging.LogNewDay:
 	case logging.LogYearEnd:
 	case logging.LogTooLate:
-		fmt.Fprintf(sr.out, "% 70v: too late: due at: %v, delay: %v", le.Name(), le.Due, le.Delay)
+		fmt.Fprintf(sr.out, "% 70v: too late: due at: %v, delay: %v\n", le.Name(), le.Due, le.Delay)
 	default: // ignore all other messages.
 		return nil
 	}

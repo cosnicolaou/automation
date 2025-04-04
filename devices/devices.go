@@ -27,11 +27,12 @@ type Action struct {
 
 // OperationArgs are the arguments to an operation.
 type OperationArgs struct {
-	Due    time.Time
-	Place  datetime.Place
-	Writer io.Writer
-	Logger *slog.Logger
-	Args   []string
+	Due         time.Time
+	Place       datetime.Place
+	Interactive bool
+	Writer      io.Writer
+	Logger      *slog.Logger
+	Args        []string
 }
 
 // Controller represents a controller that can control devices.

@@ -149,7 +149,7 @@ func (s *Schedule) Run(ctx context.Context, flags any, _ []string) error {
 	sr := logging.NewStatusRecorder()
 	schedulerOpts := []scheduler.Option{
 		scheduler.WithLogger(logger),
-		scheduler.WithOperationWriter(os.Stdout),
+		scheduler.WithOperationWriter(io.Discard),
 		scheduler.WithDryRun(fv.DryRun),
 		scheduler.WithStatusRecorder(sr),
 	}
@@ -208,7 +208,7 @@ func (s *Schedule) Simulate(ctx context.Context, flags any, args []string) error
 	sr := logging.NewStatusRecorder()
 	schedulerOpts := []scheduler.Option{
 		scheduler.WithLogger(logger),
-		scheduler.WithOperationWriter(os.Stdout),
+		scheduler.WithOperationWriter(io.Discard),
 		scheduler.WithStatusRecorder(sr),
 		scheduler.WithSimulationDelay(fv.Delay),
 		scheduler.WithDryRun(fv.DryRun),
