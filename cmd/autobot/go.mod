@@ -9,7 +9,7 @@ require (
 	cloudeng.io/macos v0.0.0-20250119024745-8a46e9bdda10
 	cloudeng.io/sync v0.0.8
 	cloudeng.io/webapp v0.0.0-20250119024745-8a46e9bdda10
-	github.com/cosnicolaou/automation v0.0.0-20250404050916-40dda5ca26fc
+	github.com/cosnicolaou/automation v0.0.0-20250404051552-1dcd9d39ae57
 	github.com/cosnicolaou/elk v0.0.0-20250404002040-391222906ce8
 	github.com/cosnicolaou/lutron v0.0.0-20250124000727-687038ce1569
 	github.com/cosnicolaou/pentair v0.0.0-20250404033534-56c5c0eb3a9d
