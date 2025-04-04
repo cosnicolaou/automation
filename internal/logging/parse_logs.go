@@ -140,5 +140,6 @@ func (ls *Scanner) Entries(accumulateErrors bool) iter.Seq[Entry] {
 }
 
 func (ls *Scanner) Err() error {
+	fmt.Printf("errs: %v .. %v\n", ls.errs, ls.errs.Err())
 	return ls.errs.Err()
 }
