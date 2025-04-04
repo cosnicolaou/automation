@@ -108,9 +108,9 @@ func NewScanner(rd io.Reader) *Scanner {
 	return &Scanner{sc: bufio.NewScanner(rd), errs: &errors.M{}}
 }
 
-// Entries returns an iterator for over the LogScanner's LogEntry's. Note
-// that the iterator will stop if an error is encountered and that the
-// Scanner's Err method should be checked after the iterator has completed.
+// Entries returns an iterator for over the LogScanner's LogEntry's. Set
+// accumulateErrors to true to accumulate errors and continue processing the
+// log file, or to false to stop on the first error.
 func (ls *Scanner) Entries(accumulateErrors bool) iter.Seq[Entry] {
 	return func(yield func(Entry) bool) {
 		for {
