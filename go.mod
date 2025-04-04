@@ -22,7 +22,7 @@ require (
 	cloudeng.io/webapi/operations v0.0.0-20250116040431-a16229cf0935 // indirect
 	github.com/cosnicolaou/elk v0.0.0-20250404001554-3961929308ad // indirect
 	github.com/cosnicolaou/lutron v0.0.0-20250124000727-687038ce1569 // indirect
-	github.com/cosnicolaou/pentair v0.0.0-20250403001743-8f75e97476f9 // indirect
+	github.com/cosnicolaou/pentair v0.0.0-20250404033534-56c5c0eb3a9d // indirect
 	github.com/cosnicolaou/weather v0.0.0-20250404002659-fd6e71276b3d // indirect
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/mooncaker816/learnmeeus/v3 v3.0.0-20180601123323-8217f4131761 // indirect

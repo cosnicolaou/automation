@@ -34,6 +34,8 @@ github.com/cosnicolaou/pentair v0.0.0-20250211200921-d53e065f1fd7 h1:kM2Pcebtxtn
 github.com/cosnicolaou/pentair v0.0.0-20250211200921-d53e065f1fd7/go.mod h1:tgSkDTWqES0wTGmImPLnCH4iLQJ7SxnOmncpSZIxPHQ=
 github.com/cosnicolaou/pentair v0.0.0-20250403001743-8f75e97476f9 h1:zp3TOerMLkw/3djMkgKKfO47RPyKs0cFKeONVFZ4jR8=
 github.com/cosnicolaou/pentair v0.0.0-20250403001743-8f75e97476f9/go.mod h1:tgSkDTWqES0wTGmImPLnCH4iLQJ7SxnOmncpSZIxPHQ=
+github.com/cosnicolaou/pentair v0.0.0-20250404033534-56c5c0eb3a9d h1:0XX4bHI/6Zjf/ddfi8LVk+Pz0PwG/WPkXqLA0u1K90M=
+github.com/cosnicolaou/pentair v0.0.0-20250404033534-56c5c0eb3a9d/go.mod h1:tgSkDTWqES0wTGmImPLnCH4iLQJ7SxnOmncpSZIxPHQ=
 github.com/cosnicolaou/weather v0.0.0-20250124000705-01bcf0b01061 h1:gw6nXZyM1Uv1XeYYeY3gI6DcHKOMucfT9nkCWWpCyW4=
 github.com/cosnicolaou/weather v0.0.0-20250124000705-01bcf0b01061/go.mod h1:Y+tUDhNzBw8ANGy2gjqtHq8Goa/h8rMfSmV3ugWpqoE=
 github.com/cosnicolaou/weather v0.0.0-20250404002659-fd6e71276b3d h1:KPbBkVblKEx7yAdVTsr6xRyXJWTkjKkZBttlF1WSuWQ=
