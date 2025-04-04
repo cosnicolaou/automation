@@ -27,7 +27,7 @@ func countEvents(t *testing.T, logfile string) (counts map[string]map[string]int
 	counts = map[string]map[string]int{}
 	counts["aborted"] = map[string]int{}
 	dates = map[string][]datetime.CalendarDate{}
-	for le := range sc.Entries(false) {
+	for le := range sc.Entries(true) {
 		if _, ok := counts[le.Msg]; !ok {
 			counts[le.Msg] = map[string]int{}
 		}

@@ -115,6 +115,11 @@ func (ls *Scanner) Entries(accumulateErrors bool) iter.Seq[Entry] {
 	return func(yield func(Entry) bool) {
 		for {
 			if !ls.sc.Scan() {
+				if ls.sc.Err() == nil {
+					fmt.Printf("scan done\n")
+					return
+				}
+				fmt.Printf("scan error: %v\n", ls.sc.Err())
 				ls.errs.Append(ls.sc.Err())
 				return
 			}
@@ -122,6 +127,7 @@ func (ls *Scanner) Entries(accumulateErrors bool) iter.Seq[Entry] {
 			le, err := ParseLogLine(line)
 			if err != nil {
 				ls.errs.Append(err)
+				fmt.Printf("parse error: %v\n", ls.sc.Err())
 				if !accumulateErrors {
 					return
 				}
