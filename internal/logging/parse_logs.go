@@ -113,8 +113,10 @@ func NewScanner(rd io.Reader) *Scanner {
 // log file, or to false to stop on the first error.
 func (ls *Scanner) Entries(accumulateErrors bool) iter.Seq[Entry] {
 	return func(yield func(Entry) bool) {
+		fmt.Printf("entries\n")
 		for {
 			if !ls.sc.Scan() {
+				fmt.Printf("scan done\n")
 				if ls.sc.Err() == nil {
 					fmt.Printf("scan done\n")
 					return
@@ -131,6 +133,7 @@ func (ls *Scanner) Entries(accumulateErrors bool) iter.Seq[Entry] {
 				if !accumulateErrors {
 					return
 				}
+				continue
 			}
 			if !yield(le) {
 				return
