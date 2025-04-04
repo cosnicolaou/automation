@@ -27,7 +27,7 @@ func countEvents(t *testing.T, logfile string) (counts map[string]map[string]int
 	counts = map[string]map[string]int{}
 	counts["aborted"] = map[string]int{}
 	dates = map[string][]datetime.CalendarDate{}
-	for le := range sc.Entries() {
+	for le := range sc.Entries(true) {
 		if _, ok := counts[le.Msg]; !ok {
 			counts[le.Msg] = map[string]int{}
 		}
@@ -54,7 +54,7 @@ func countEvents(t *testing.T, logfile string) (counts map[string]map[string]int
 		}
 	}
 	if err := sc.Err(); err != nil {
-		t.Fatalf("failed to read log file: %v", err)
+		t.Fatalf("failed to process log file: %v: err: %v", logfile, err)
 	}
 	return counts, dates
 }
@@ -73,7 +73,9 @@ func TestSimulateAndLogs(t *testing.T) {
 		DryRun:    false, // this is safe since the test system has dummy devices
 		LogFile:   tmpFile,
 		WebUIFlags: WebUIFlags{
-			HTTPAddr: "0.0.0.0:0",
+			HTTPAddr:          "",
+			HTTPSRedirectAddr: "",
+			HTTPSAddr:         "",
 		},
 	}
 

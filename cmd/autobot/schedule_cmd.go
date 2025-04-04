@@ -78,6 +78,9 @@ func (s *Schedule) loadFiles(ctx context.Context, fv *ConfigFileFlags, deviceOpt
 }
 
 func (s *Schedule) serveStatusUI(ctx context.Context, systemfile string, fv WebUIFlags, logger *slog.Logger, statusRecorder *logging.StatusRecorder) error {
+	if len(fv.HTTPAddr) == 0 && len(fv.HTTPSAddr) == 0 {
+		return nil
+	}
 	mux := http.NewServeMux()
 	runner, url, err := fv.CreateWebServer(ctx, mux, logger)
 	if err != nil {
@@ -149,7 +152,7 @@ func (s *Schedule) Run(ctx context.Context, flags any, _ []string) error {
 	sr := logging.NewStatusRecorder()
 	schedulerOpts := []scheduler.Option{
 		scheduler.WithLogger(logger),
-		scheduler.WithOperationWriter(os.Stdout),
+		scheduler.WithOperationWriter(io.Discard),
 		scheduler.WithDryRun(fv.DryRun),
 		scheduler.WithStatusRecorder(sr),
 	}
@@ -208,7 +211,7 @@ func (s *Schedule) Simulate(ctx context.Context, flags any, args []string) error
 	sr := logging.NewStatusRecorder()
 	schedulerOpts := []scheduler.Option{
 		scheduler.WithLogger(logger),
-		scheduler.WithOperationWriter(os.Stdout),
+		scheduler.WithOperationWriter(io.Discard),
 		scheduler.WithStatusRecorder(sr),
 		scheduler.WithSimulationDelay(fv.Delay),
 		scheduler.WithDryRun(fv.DryRun),

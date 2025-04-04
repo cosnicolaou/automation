@@ -67,6 +67,7 @@ commands:
     summary: query/inspect the log files
     commands:
       - name: status
+        summary: run the log file through the status recorder to view completed, pending etc events.
         arguments:
           - <log-files>...
 `
