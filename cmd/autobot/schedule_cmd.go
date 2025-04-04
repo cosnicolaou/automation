@@ -78,6 +78,9 @@ func (s *Schedule) loadFiles(ctx context.Context, fv *ConfigFileFlags, deviceOpt
 }
 
 func (s *Schedule) serveStatusUI(ctx context.Context, systemfile string, fv WebUIFlags, logger *slog.Logger, statusRecorder *logging.StatusRecorder) error {
+	if len(fv.HTTPAddr) == 0 && len(fv.HTTPSAddr) == 0 {
+		return nil
+	}
 	mux := http.NewServeMux()
 	runner, url, err := fv.CreateWebServer(ctx, mux, logger)
 	if err != nil {
