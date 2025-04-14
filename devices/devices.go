@@ -16,6 +16,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Action represents an action to be performed.
 type Action struct {
 	Name       string    // Name of the operation
 	DeviceName string    // Name of the device that is being controlled
