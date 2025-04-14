@@ -35,7 +35,9 @@ func WritePending(l *slog.Logger, overdue, dryRun bool, device, op string, args 
 		"loc", dueAt.Location().String(),
 		"now", now,
 		"due", dueAt,
-		"delay", delay.String())
+		"delay", delay,
+		"delay-str", delay.String(),
+	)
 	return id
 }
 
@@ -59,8 +61,10 @@ func WriteCompletion(l *slog.Logger, id int64, err error,
 		"loc", dueAt.Location().String(),
 		"now", now,
 		"due", dueAt,
-		"delay", delay.String(),
-		"err", err)
+		"delay", delay,
+		"delay-str", delay.String(),
+		"err", err,
+	)
 }
 
 const (
