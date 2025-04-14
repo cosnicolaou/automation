@@ -42,7 +42,7 @@ func (p *StatusPages) StatusHomePage(w io.Writer, systemfile string) error {
 		Script   template.JS
 	}{
 		Name:     systemfile,
-		DateTime: time.Now().Format(time.RFC3339),
+		DateTime: time.Now().Format(time.RFC1123),
 		Main: `
 		<h2>Completed</h2>
         <div id="completed"></div>

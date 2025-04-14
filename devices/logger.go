@@ -10,11 +10,11 @@ import (
 	"log/slog"
 )
 
-type ctxKey string
+type ctxKey struct{}
 
 // ContextWithLogger returns a new context with the given logger.
 func ContextWithLogger(ctx context.Context, logger *slog.Logger) context.Context {
-	return context.WithValue(ctx, ctxKey("logger"), logger)
+	return context.WithValue(ctx, ctxKey(struct{}{}), logger)
 }
 
 var discardLogger = slog.New(slog.NewJSONHandler(io.Discard, nil))
@@ -22,7 +22,7 @@ var discardLogger = slog.New(slog.NewJSONHandler(io.Discard, nil))
 // LoggerFromContext returns the logger from the given context.
 // If no logger is set, it returns a discard logger.
 func LoggerFromContext(ctx context.Context) *slog.Logger {
-	l := ctx.Value(ctxKey("logger"))
+	l := ctx.Value(ctxKey(struct{}{}))
 	if l == nil {
 		return discardLogger
 	}
