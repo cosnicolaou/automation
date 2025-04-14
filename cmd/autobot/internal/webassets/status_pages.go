@@ -10,6 +10,7 @@ import (
 	"io/fs"
 	"net/http"
 	"sync"
+	"time"
 )
 
 type StatusPages struct {
@@ -35,11 +36,13 @@ const (
 
 func (p *StatusPages) StatusHomePage(w io.Writer, systemfile string) error {
 	d := struct {
-		Name   string
-		Main   template.HTML
-		Script template.JS
+		Name     string
+		DateTime string
+		Main     template.HTML
+		Script   template.JS
 	}{
-		Name: systemfile,
+		Name:     systemfile,
+		DateTime: time.Now().Format(time.RFC1123),
 		Main: `
 		<h2>Completed</h2>
         <div id="completed"></div>

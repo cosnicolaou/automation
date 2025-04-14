@@ -43,6 +43,8 @@ github.com/cosnicolaou/automation v0.0.0-20250404050916-40dda5ca26fc h1:33ugLowE
 github.com/cosnicolaou/automation v0.0.0-20250404050916-40dda5ca26fc/go.mod h1:I2eK17iIJjWj1vBIPSrPXvXNEvAYXLmjk5sO9pdPuBU=
 github.com/cosnicolaou/automation v0.0.0-20250404051552-1dcd9d39ae57 h1:ChDs+86PGkO9nVvFgTPNTS9elxargG0dKupgvH24VwQ=
 github.com/cosnicolaou/automation v0.0.0-20250404051552-1dcd9d39ae57/go.mod h1:ADeOYit0xJaRqaP/DTqBof1/gFXBXeMyiNl+OZTXyiU=
+github.com/cosnicolaou/automation v0.0.0-20250404054448-97cd7156f8c6 h1:zcQF9MEUjcTOKkGrSdwRy8BGIAn24qnl8FI6LOi7Yd4=
+github.com/cosnicolaou/automation v0.0.0-20250404054448-97cd7156f8c6/go.mod h1:ADeOYit0xJaRqaP/DTqBof1/gFXBXeMyiNl+OZTXyiU=
 github.com/cosnicolaou/elk v0.0.0-20250124050704-c54abaf70e67 h1:GWkonufiO8TFqlDKOJRAS8X2OjmfLr7J4tM5k2QMJ6E=
 github.com/cosnicolaou/elk v0.0.0-20250124050704-c54abaf70e67/go.mod h1:NhXxAXGTor0uQCdMj4iRFM9UJaOkVrvCAErxsSBsjGE=
 github.com/cosnicolaou/elk v0.0.0-20250404001554-3961929308ad h1:pb107H/t9fBfDwfGC9bbL481xqlDbSTbrOwzXMU+NeA=
@@ -59,6 +61,8 @@ github.com/cosnicolaou/pentair v0.0.0-20250403001743-8f75e97476f9 h1:zp3TOerMLkw
 github.com/cosnicolaou/pentair v0.0.0-20250403001743-8f75e97476f9/go.mod h1:tgSkDTWqES0wTGmImPLnCH4iLQJ7SxnOmncpSZIxPHQ=
 github.com/cosnicolaou/pentair v0.0.0-20250404033534-56c5c0eb3a9d h1:0XX4bHI/6Zjf/ddfi8LVk+Pz0PwG/WPkXqLA0u1K90M=
 github.com/cosnicolaou/pentair v0.0.0-20250404033534-56c5c0eb3a9d/go.mod h1:tgSkDTWqES0wTGmImPLnCH4iLQJ7SxnOmncpSZIxPHQ=
+github.com/cosnicolaou/pentair v0.0.0-20250405060513-cb1f5440109f h1:lAYXxirzc5DYp49s4wrUFHnMvLAb5yB6xWVcARVzupI=
+github.com/cosnicolaou/pentair v0.0.0-20250405060513-cb1f5440109f/go.mod h1:tgSkDTWqES0wTGmImPLnCH4iLQJ7SxnOmncpSZIxPHQ=
 github.com/cosnicolaou/weather v0.0.0-20250124000705-01bcf0b01061 h1:gw6nXZyM1Uv1XeYYeY3gI6DcHKOMucfT9nkCWWpCyW4=
 github.com/cosnicolaou/weather v0.0.0-20250124000705-01bcf0b01061/go.mod h1:Y+tUDhNzBw8ANGy2gjqtHq8Goa/h8rMfSmV3ugWpqoE=
 github.com/cosnicolaou/weather v0.0.0-20250404002659-fd6e71276b3d h1:KPbBkVblKEx7yAdVTsr6xRyXJWTkjKkZBttlF1WSuWQ=

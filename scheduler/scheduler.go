@@ -151,7 +151,7 @@ func (s *Scheduler) RunDay(ctx context.Context, place datetime.Place, active sch
 			dueAt,
 			delay,
 		)
-		s.completed(rec, aborted, err)
+		s.completed(rec, !aborted, err)
 		if s.dryRun {
 			select {
 			case <-ctx.Done():
