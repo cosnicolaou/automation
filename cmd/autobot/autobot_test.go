@@ -26,7 +26,7 @@ var (
 		"mock-device": func(string, devices.Options) (devices.Device, error) {
 			md := testutil.NewMockDevice("On", "Off", "Another")
 			md.AddCondition("weather", true)
-			md.SetOutput(true, false)
+			md.SetOutput(false)
 			return md, nil
 		}}
 )

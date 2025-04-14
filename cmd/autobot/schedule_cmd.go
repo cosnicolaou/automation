@@ -149,14 +149,6 @@ func (s *Schedule) Run(ctx context.Context, flags any, _ []string) error {
 		devices.WithLogger(logger),
 	}
 
-	sr := logging.NewStatusRecorder()
-	schedulerOpts := []scheduler.Option{
-		scheduler.WithLogger(logger),
-		scheduler.WithOperationWriter(io.Discard),
-		scheduler.WithDryRun(fv.DryRun),
-		scheduler.WithStatusRecorder(sr),
-	}
-
 	ctx, err = s.loadFiles(ctx, &fv.ConfigFileFlags, deviceOpts)
 	if err != nil {
 		return err
@@ -167,6 +159,14 @@ func (s *Schedule) Run(ctx context.Context, flags any, _ []string) error {
 	}
 
 	logger.Info("starting schedules", "start", start.String(), "loc", s.system.Location.TimeLocation.String(), "zip", s.system.Location.ZIPCode, "latitude", s.system.Location.Latitude, "longitude", s.system.Location.Longitude)
+
+	sr := logging.NewStatusRecorder()
+	schedulerOpts := []scheduler.Option{
+		scheduler.WithLogger(logger),
+		scheduler.WithOperationWriter(io.Discard),
+		scheduler.WithDryRun(fv.DryRun),
+		scheduler.WithStatusRecorder(sr),
+	}
 
 	if err := s.serveStatusUI(ctx, fv.SystemFile, fv.WebUIFlags, logger, sr); err != nil {
 		return err

@@ -28,3 +28,13 @@ func LoggerFromContext(ctx context.Context) *slog.Logger {
 	}
 	return l.(*slog.Logger)
 }
+
+// ContextWithLoggerAttributes returns a new context with the embedded logger
+// updated with the given logger attributes.
+func ContextWithLoggerAttributes(ctx context.Context, attributes ...any) context.Context {
+	l := ctx.Value(ctxKey(struct{}{}))
+	if l == nil {
+		return ctx
+	}
+	return ContextWithLogger(ctx, l.(*slog.Logger).With(attributes...))
+}

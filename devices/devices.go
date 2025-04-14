@@ -31,7 +31,6 @@ type OperationArgs struct {
 	Due    time.Time
 	Place  datetime.Place
 	Writer io.Writer
-	Logger *slog.Logger
 	Args   []string
 }
 

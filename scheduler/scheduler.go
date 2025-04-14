@@ -29,7 +29,6 @@ func (s *Scheduler) invokeOp(ctx context.Context, action Action, opts devices.Op
 			Due:    opts.Due,
 			Place:  opts.Place,
 			Writer: opts.Writer,
-			Logger: s.logger,
 			Args:   pre.Args,
 		}
 		_, ok, err := pre.Condition(ctx, preOpts)
@@ -54,7 +53,6 @@ func (s *Scheduler) runSingleOp(ctx context.Context, due time.Time, action sched
 		Due:    due,
 		Place:  s.place,
 		Writer: s.opWriter,
-		Logger: s.logger,
 		Args:   op.Args,
 	}
 	errCh := make(chan error)
@@ -135,6 +133,7 @@ func (s *Scheduler) RunDay(ctx context.Context, place datetime.Place, active sch
 		var aborted bool
 		var err error
 		if !s.dryRun {
+			ctx = devices.ContextWithLogger(ctx, s.logger)
 			aborted, err = s.runSingleOp(ctx, dueAt, active)
 		}
 		logging.WriteCompletion(
