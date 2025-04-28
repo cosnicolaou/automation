@@ -32,7 +32,7 @@ func (s *Scheduler) invokeOp(ctx context.Context, action Action, opts devices.Op
 			Writer: opts.Writer,
 			Args:   pre.Args,
 		}
-		ctx = ctxlog.ContextWith(ctx, slog.Group("precondition", "name", pre.Name, "args", opts.Args))
+		ctx = ctxlog.WithAttributes(ctx, slog.Group("precondition", "name", pre.Name, "args", opts.Args))
 		_, ok, err := pre.Condition(ctx, preOpts)
 		if err != nil {
 			s.logger.Error("precondition", "op", action.Name, "err", err)
