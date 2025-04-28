@@ -149,7 +149,7 @@ func (s *Scheduler) RunDay(ctx context.Context, place datetime.Place, active sch
 		var aborted bool
 		var err error
 		if !s.dryRun {
-			ctx = ctxlog.Context(ctx, s.logger.With("device", active.T.DeviceName, "op", active.T.Name))
+			ctx = ctxlog.WithAttributes(ctx, "device", active.T.DeviceName, "op", active.T.Name)
 			aborted, err = s.runSingleOpWithRetries(ctx, dueAt, active)
 		}
 		logging.WriteCompletion(
