@@ -8,7 +8,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log/slog"
 	"time"
 
 	"cloudeng.io/datetime"
@@ -16,6 +15,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Action represents an action to be performed.
 type Action struct {
 	Name       string    // Name of the operation
 	DeviceName string    // Name of the device that is being controlled
@@ -30,7 +30,6 @@ type OperationArgs struct {
 	Due    time.Time
 	Place  datetime.Place
 	Writer io.Writer
-	Logger *slog.Logger
 	Args   []string
 }
 
@@ -78,7 +77,7 @@ type ZIPCodeLookup interface {
 type Option func(*Options)
 
 type Options struct {
-	Logger        *slog.Logger
+	//Logger        *slog.Logger
 	Interactive   io.Writer
 	Session       streamconn.Session
 	Devices       SupportedDevices
@@ -113,12 +112,6 @@ func WithLatLong(lat, long float64) Option {
 func WithZIPCode(zip string) Option {
 	return func(o *Options) {
 		o.zipCode = zip
-	}
-}
-
-func WithLogger(l *slog.Logger) Option {
-	return func(o *Options) {
-		o.Logger = l
 	}
 }
 
