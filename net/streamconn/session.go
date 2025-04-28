@@ -11,6 +11,7 @@ import (
 	"github.com/cosnicolaou/automation/net/netutil"
 )
 
+// Transport is the interface for a transport layer.
 type Transport interface {
 	Send(ctx context.Context, buf []byte) (int, error)
 	// SendSensitive avoids logging the contents of the buffer, use
@@ -20,6 +21,7 @@ type Transport interface {
 	Close(ctx context.Context) error
 }
 
+// Redesign this to support exclusivity.
 type Session interface {
 	Send(ctx context.Context, buf []byte)
 	// SendSensitive avoids logging the contents of the buffer, use
@@ -31,14 +33,23 @@ type Session interface {
 }
 
 type session struct {
-	mu   sync.Mutex
-	err  error
-	conn Transport
-	idle netutil.IdleReset
+	session_lock sync.Mutex
+	mu           sync.Mutex
+	err          error
+	conn         Transport
+	idle         netutil.IdleReset
 }
 
 func NewSession(t Transport, idle netutil.IdleReset) Session {
 	return &session{conn: t, idle: idle}
+}
+
+func (s *session) Reserve() {
+	s.session_lock.Lock()
+}
+
+func (s *session) Release() {
+	s.session_lock.Unlock()
 }
 
 func (s *session) Err() error {
@@ -53,7 +64,7 @@ func (s *session) Send(ctx context.Context, buf []byte) {
 	if s.err != nil {
 		return
 	}
-	s.idle.Reset()
+	s.idle.Reset(ctx)
 	_, s.err = s.conn.Send(ctx, buf)
 }
 
@@ -63,7 +74,7 @@ func (s *session) SendSensitive(ctx context.Context, buf []byte) {
 	if s.err != nil {
 		return
 	}
-	s.idle.Reset()
+	s.idle.Reset(ctx)
 	_, s.err = s.conn.SendSensitive(ctx, buf)
 }
 
@@ -73,7 +84,7 @@ func (s *session) ReadUntil(ctx context.Context, expected ...string) []byte {
 	if s.err != nil {
 		return nil
 	}
-	s.idle.Reset()
+	s.idle.Reset(ctx)
 	out, err := s.conn.ReadUntil(ctx, expected)
 	if err != nil {
 		s.err = err

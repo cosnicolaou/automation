@@ -80,10 +80,10 @@ func TestIdleManagerReset(t *testing.T) {
 	numResets := 500
 	resetDelay := time.Millisecond
 	go func() {
-		idle.Reset()
+		idle.Reset(ctx)
 		for i := 0; i < numResets; i++ {
 			time.Sleep(resetDelay)
-			idle.Reset()
+			idle.Reset(ctx)
 			if _, err := mc.Connection(ctx); err != nil {
 				panic(err)
 			}

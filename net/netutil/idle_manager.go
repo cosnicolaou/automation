@@ -8,10 +8,12 @@ import (
 	"context"
 	"sync"
 	"time"
+
+	"cloudeng.io/logging/ctxlog"
 )
 
 type IdleReset interface {
-	Reset()
+	Reset(context.Context)
 }
 
 // Managed is the interface used by Manager[T] to manage a connection.
@@ -49,6 +51,7 @@ func (m *IdleManager[T, F]) Connection(ctx context.Context) (T, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.connected {
+		ctxlog.Info(ctx, "idlemanager: returning existing connection")
 		return m.conn, nil
 	}
 	conn, err := m.connector.Connect(ctx, m.idle)
@@ -58,7 +61,8 @@ func (m *IdleManager[T, F]) Connection(ctx context.Context) (T, error) {
 	}
 	m.conn = conn
 	m.connected = true
-	go m.idle.Wait(ctx, m.expired)
+	go m.idle.Wait(context.WithoutCancel(ctx), m.expired)
+	ctxlog.Info(ctx, "idlemanager: returning new connection")
 	return conn, nil
 }
 
@@ -68,12 +72,14 @@ func (m *IdleManager[T, F]) closeUnderlyingUnlocked(ctx context.Context) error {
 		conn := m.conn
 		m.conn = empty
 		m.connected = false
+		ctxlog.Info(ctx, "idlemanager: disconnecting connection")
 		return m.connector.Disconnect(ctx, conn)
 	}
 	return nil
 }
 
 func (m *IdleManager[T, F]) expired(ctx context.Context) {
+	ctxlog.Info(ctx, "idlemanager: expired")
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	_ = m.closeUnderlyingUnlocked(ctx)
@@ -83,6 +89,7 @@ func (m *IdleManager[T, F]) expired(ctx context.Context) {
 func (m *IdleManager[T, F]) Stop(ctx context.Context, timeout time.Duration) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	ctxlog.Info(ctx, "idlemanager: stopping")
 	err := m.closeUnderlyingUnlocked(ctx)
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()

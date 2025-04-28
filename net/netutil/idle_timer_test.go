@@ -26,7 +26,7 @@ func TestIdleWait(t *testing.T) {
 	startTimes := make([]time.Time, iterations)
 
 	// Run the idle timer iteration times.
-	for i := 0; i < iterations; i++ {
+	for i := range iterations {
 		wg.Add(1)
 		startTimes[i] = time.Now()
 		go func() {
@@ -91,10 +91,10 @@ func TestIdleReset(t *testing.T) {
 	numResets := 500
 	resetDelay := time.Millisecond
 	go func() {
-		timer.Reset()
-		for i := 0; i < numResets; i++ {
+		timer.Reset(ctx)
+		for range numResets {
 			time.Sleep(resetDelay)
-			timer.Reset()
+			timer.Reset(ctx)
 		}
 	}()
 
