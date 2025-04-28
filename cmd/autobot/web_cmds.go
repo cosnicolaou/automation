@@ -7,12 +7,12 @@ package main
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"os"
 	"time"
 
 	"cloudeng.io/cmdutil"
+	"cloudeng.io/logging/ctxlog"
 	"cloudeng.io/sync/errgroup"
 	wa "cloudeng.io/webapp/webassets"
 	"github.com/cosnicolaou/automation/cmd/autobot/internal/webassets"
@@ -39,8 +39,8 @@ func (fv WebUIFlags) StatusPages() *webassets.StatusPages {
 	return webassets.NewStatusPages(rfs)
 }
 
-func (fv WebUIFlags) createTLSServer(ctx context.Context, mux *http.ServeMux, logger *slog.Logger) (start func() error, stop func(), url string, err error) {
-
+func (fv WebUIFlags) createTLSServer(ctx context.Context, mux *http.ServeMux) (start func() error, stop func(), url string, err error) {
+	logger := ctxlog.Logger(ctx)
 	redirectURL := "https://" + fv.HTTPSRedirectAddr
 	redirectMux := http.NewServeMux()
 	redirectMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -83,14 +83,14 @@ func (fv WebUIFlags) createTLSServer(ctx context.Context, mux *http.ServeMux, lo
 	return
 }
 
-func (fv WebUIFlags) createHTTPServer(ctx context.Context, mux *http.ServeMux, logger *slog.Logger) (start func() error, stop func(), url string, err error) {
+func (fv WebUIFlags) createHTTPServer(ctx context.Context, mux *http.ServeMux) (start func() error, stop func(), url string, err error) {
 	server := &http.Server{
 		Addr:              fv.HTTPAddr,
 		Handler:           mux,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 	start = func() error {
-		logger.Info("starting web server", "url", url)
+		ctxlog.Info(ctx, "starting web server", "url", url)
 		return server.ListenAndServeTLS(fv.CertFile, fv.KeyFile)
 	}
 	stop = func() {
@@ -100,7 +100,7 @@ func (fv WebUIFlags) createHTTPServer(ctx context.Context, mux *http.ServeMux, l
 	return
 }
 
-func (fv WebUIFlags) CreateWebServer(ctx context.Context, mux *http.ServeMux, logger *slog.Logger) (func() error, string, error) {
+func (fv WebUIFlags) CreateWebServer(ctx context.Context, mux *http.ServeMux) (func() error, string, error) {
 	if fv.HTTPSAddr == "" && fv.HTTPAddr == "" {
 		return func() error { return nil }, "", nil
 	}
@@ -115,9 +115,9 @@ func (fv WebUIFlags) CreateWebServer(ctx context.Context, mux *http.ServeMux, lo
 	var url string
 	var err error
 	if fv.HTTPSAddr != "" {
-		start, stop, url, err = fv.createTLSServer(ctx, mux, logger)
+		start, stop, url, err = fv.createTLSServer(ctx, mux)
 	} else {
-		start, stop, url, err = fv.createHTTPServer(ctx, mux, logger)
+		start, stop, url, err = fv.createHTTPServer(ctx, mux)
 	}
 	if err != nil {
 		return func() error { return nil }, "", err

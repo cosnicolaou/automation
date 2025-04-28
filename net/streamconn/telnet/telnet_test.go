@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cosnicolaou/automation/devices"
+	"cloudeng.io/logging/ctxlog"
 	"github.com/cosnicolaou/automation/net/netutil"
 	"github.com/cosnicolaou/automation/net/streamconn"
 	"github.com/cosnicolaou/automation/net/streamconn/telnet"
@@ -47,7 +47,7 @@ func TestClient(t *testing.T) {
 
 	logRecorder := bytes.NewBuffer(nil)
 	logger := slog.New(slog.NewJSONHandler(logRecorder, nil))
-	ctx = devices.ContextWithLogger(ctx, logger)
+	ctx = ctxlog.Context(ctx, logger)
 	addr := server.Addr().String()
 
 	transport, err := telnet.Dial(ctx, addr, time.Minute)

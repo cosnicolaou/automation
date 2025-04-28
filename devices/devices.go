@@ -8,7 +8,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log/slog"
 	"time"
 
 	"cloudeng.io/datetime"
@@ -78,7 +77,7 @@ type ZIPCodeLookup interface {
 type Option func(*Options)
 
 type Options struct {
-	Logger        *slog.Logger
+	//Logger        *slog.Logger
 	Interactive   io.Writer
 	Session       streamconn.Session
 	Devices       SupportedDevices
@@ -113,12 +112,6 @@ func WithLatLong(lat, long float64) Option {
 func WithZIPCode(zip string) Option {
 	return func(o *Options) {
 		o.zipCode = zip
-	}
-}
-
-func WithLogger(l *slog.Logger) Option {
-	return func(o *Options) {
-		o.Logger = l
 	}
 }
 

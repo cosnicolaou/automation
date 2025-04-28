@@ -4,12 +4,7 @@
 
 package devices
 
-import (
-	"context"
-	"io"
-	"log/slog"
-)
-
+/*
 type ctxKey struct{}
 
 // ContextWithLogger returns a new context with the given logger.
@@ -38,3 +33,4 @@ func ContextWithLoggerAttributes(ctx context.Context, attributes ...any) context
 	}
 	return ContextWithLogger(ctx, l.(*slog.Logger).With(attributes...))
 }
+*/

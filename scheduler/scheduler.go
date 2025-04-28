@@ -16,6 +16,7 @@ import (
 
 	"cloudeng.io/datetime"
 	"cloudeng.io/datetime/schedule"
+	"cloudeng.io/logging/ctxlog"
 	"cloudeng.io/sync/errgroup"
 	"github.com/cosnicolaou/automation/devices"
 	"github.com/cosnicolaou/automation/internal/logging"
@@ -31,9 +32,11 @@ func (s *Scheduler) invokeOp(ctx context.Context, action Action, opts devices.Op
 			Writer: opts.Writer,
 			Args:   pre.Args,
 		}
+		ctx = ctxlog.ContextWith(ctx, slog.Group("precondition", "name", pre.Name, "args", opts.Args))
 		_, ok, err := pre.Condition(ctx, preOpts)
 		if err != nil {
-			return false, fmt.Errorf("failed to evaluate precondition: %v: %v", pre.Name, err)
+			s.logger.Error("precondition", "op", action.Name, "err", err)
+			return true, fmt.Errorf("failed to evaluate precondition: %v: %v", pre.Name, err)
 		}
 		s.logger.Info("precondition", "op", action.Name, "passed", ok)
 		if !ok {
@@ -46,7 +49,6 @@ func (s *Scheduler) invokeOp(ctx context.Context, action Action, opts devices.Op
 
 func (s *Scheduler) runSingleOp(ctx context.Context, due time.Time, action schedule.Active[Action]) (aborted bool, err error) {
 	op := action.T.Action
-	// TODO(cnicolaou): implement retries.
 	ctx, cancel := context.WithTimeoutCause(ctx, op.Device.Config().Timeout, ErrOpTimeout)
 	defer cancel()
 	opts := devices.OperationArgs{
@@ -69,6 +71,20 @@ func (s *Scheduler) runSingleOp(ctx context.Context, due time.Time, action sched
 		err = ctx.Err()
 	}
 	return preconditionAbort, err
+}
+
+func (s *Scheduler) runSingleOpWithRetries(ctx context.Context, due time.Time, action schedule.Active[Action]) (aborted bool, err error) {
+	max_retries := max(action.T.Device.Config().RetryConfig.Retries, 1)
+	for i := range max_retries {
+		aborted, err = s.runSingleOp(ctx, due, action)
+		if err == nil || aborted || errors.Is(err, context.Canceled) {
+			return
+		}
+		timeout := action.T.Device.Config().RetryConfig.Timeout
+		ctxlog.Info(ctx, "scheduler: retrying", "op", action.T.Name, "device", action.T.DeviceName, "retries", i, "max_retries", max_retries, "timeout", timeout, "err", err)
+		time.Sleep(timeout)
+	}
+	return
 }
 
 func (s *Scheduler) newStatusRecord(delay time.Duration, a schedule.Active[Action]) *logging.StatusRecord {
@@ -133,8 +149,8 @@ func (s *Scheduler) RunDay(ctx context.Context, place datetime.Place, active sch
 		var aborted bool
 		var err error
 		if !s.dryRun {
-			ctx = devices.ContextWithLogger(ctx, s.logger)
-			aborted, err = s.runSingleOp(ctx, dueAt, active)
+			ctx = ctxlog.Context(ctx, s.logger.With("device", active.T.DeviceName, "op", active.T.Name))
+			aborted, err = s.runSingleOpWithRetries(ctx, dueAt, active)
 		}
 		logging.WriteCompletion(
 			s.logger,

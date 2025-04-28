@@ -8,27 +8,25 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 
 	"cloudeng.io/datetime"
+	"cloudeng.io/logging/ctxlog"
 	"github.com/cosnicolaou/automation/internal/logging"
 )
 
 type CalenderGenerator func(schedules []string, dr datetime.CalendarDateRange) (CalendarResponse, error)
 
 type Status struct {
-	l      *slog.Logger
 	sr     *logging.StatusRecorder
 	calGen CalenderGenerator
 }
 
-func NewStatusServer(l *slog.Logger, sr *logging.StatusRecorder, calGen CalenderGenerator) *Status {
+func NewStatusServer(sr *logging.StatusRecorder, calGen CalenderGenerator) *Status {
 	return &Status{
-		l:      l.With("component", "status"),
 		sr:     sr,
 		calGen: calGen,
 	}
@@ -74,7 +72,7 @@ func (s *Status) completed(num int64, recent bool) []CompletionResponse {
 }
 
 func (s *Status) httpError(ctx context.Context, w http.ResponseWriter, u *url.URL, msg, err string, statusCode int) {
-	s.l.Log(ctx, slog.LevelInfo, msg, "request", u.String(), "code", statusCode, "error", err)
+	ctxlog.Info(ctx, msg, "component", "status", "request", u.String(), "code", statusCode, "error", err)
 	http.Error(w, err, http.StatusBadRequest)
 }
 

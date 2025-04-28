@@ -10,7 +10,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 	"os"
 	"sort"
@@ -19,6 +18,7 @@ import (
 
 	"cloudeng.io/cmdutil/keystore"
 	"cloudeng.io/datetime"
+	"cloudeng.io/logging/ctxlog"
 	"github.com/cosnicolaou/automation/cmd/autobot/internal/webapi"
 	"github.com/cosnicolaou/automation/cmd/autobot/internal/webassets"
 	"github.com/cosnicolaou/automation/devices"
@@ -40,14 +40,13 @@ type ControlTestPageFlags struct {
 }
 
 type Control struct {
-	logger *slog.Logger
+	//logger *slog.Logger
 }
 
 func (c *Control) setup(ctx context.Context, fv *ControlFlags) (context.Context, func(ctx context.Context) (devices.System, error), error) {
-	c.logger = slog.New(slog.NewJSONHandler(os.Stderr, nil))
-	opts := []devices.Option{
-		devices.WithLogger(c.logger),
-	}
+	ctx = ctxlog.NewJSONLogger(ctx, os.Stderr, nil)
+
+	opts := []devices.Option{}
 
 	keys, err := ReadKeysFile(ctx, fv.KeysFile)
 	if err != nil {
@@ -81,7 +80,7 @@ func (c *Control) Run(ctx context.Context, flags any, args []string) error {
 	if err != nil {
 		return err
 	}
-	cc, err := webapi.NewDeviceControlServer(ctx, loader, c.logger)
+	cc, err := webapi.NewDeviceControlServer(ctx, loader)
 	if err != nil {
 		return err
 	}
@@ -107,7 +106,7 @@ func (c *Control) Condition(ctx context.Context, flags any, args []string) error
 	if err != nil {
 		return err
 	}
-	cc, err := webapi.NewDeviceControlServer(ctx, loader, c.logger)
+	cc, err := webapi.NewDeviceControlServer(ctx, loader)
 	if err != nil {
 		return err
 	}
@@ -130,7 +129,7 @@ func (c *Control) RunScript(ctx context.Context, flags any, args []string) error
 	}
 	defer f.Close()
 	scanner := bufio.NewScanner(f)
-	cc, err := webapi.NewDeviceControlServer(ctx, loader, c.logger)
+	cc, err := webapi.NewDeviceControlServer(ctx, loader)
 	if err != nil {
 		return err
 	}
@@ -163,11 +162,42 @@ type conditionalOps struct {
 	cond webapi.Action
 }
 
-func findPreconditions(ctx context.Context, system devices.System, fv *ControlTestPageFlags) ([]conditionalOps, error) {
+func (c *Control) ServeTestPage(ctx context.Context, flags any, _ []string) error {
+	fv := flags.(*ControlTestPageFlags)
+	ctx, loader, err := c.setup(ctx, &fv.ControlFlags)
+	if err != nil {
+		return err
+	}
+
+	mux := http.NewServeMux()
+	runner, url, err := fv.CreateWebServer(ctx, mux)
+	if err != nil {
+		return err
+	}
+
+	pages := fv.TestServerPages()
+	rerender := createSystemRenderer(&fv.ConfigFileFlags, loader, pages)
+
+	webassets.AppendTestServerPages(mux,
+		fv.SystemFile,
+		pages,
+	)
+
+	dc, err := webapi.NewDeviceControlServer(ctx, rerender)
+	if err != nil {
+		return err
+	}
+	dc.AppendEndpoints(ctx, mux)
+
+	_ = browser.OpenURL(url)
+	return runner()
+}
+
+func findPreconditions(ctx context.Context, system devices.System, cf *ConfigFileFlags) ([]conditionalOps, error) {
 	dedup := map[string]bool{}
 	cops := make([]conditionalOps, 0, 10)
 
-	scheds, err := loadSchedules(ctx, &fv.ConfigFileFlags, system)
+	scheds, err := loadSchedules(ctx, cf, system)
 	if err != nil {
 		return nil, err
 	}
@@ -211,28 +241,17 @@ func findPreconditions(ctx context.Context, system devices.System, fv *ControlTe
 	return cops, nil
 }
 
-func (c *Control) ServeTestPage(ctx context.Context, flags any, _ []string) error {
-	fv := flags.(*ControlTestPageFlags)
-	ctx, loader, err := c.setup(ctx, &fv.ControlFlags)
-	if err != nil {
-		return err
-	}
-
-	mux := http.NewServeMux()
-	runner, url, err := fv.CreateWebServer(ctx, mux, c.logger)
-	if err != nil {
-		return err
-	}
-
-	tm := tableManager{html: true, jsapi: true}
-	pages := fv.TestServerPages()
-
+func createSystemRenderer(cf *ConfigFileFlags,
+	loader func(ctx context.Context) (devices.System, error),
+	pages *webassets.TestServerPages,
+) func(ctx context.Context) (devices.System, error) {
 	rerender := func(ctx context.Context) (devices.System, error) {
+		tm := tableManager{html: true, jsapi: true}
 		system, err := loader(ctx)
 		if err != nil {
 			return devices.System{}, err
 		}
-		cops, err := findPreconditions(ctx, system, fv)
+		cops, err := findPreconditions(ctx, system, cf)
 		if err != nil {
 			return devices.System{}, err
 		}
@@ -246,21 +265,7 @@ func (c *Control) ServeTestPage(ctx context.Context, flags any, _ []string) erro
 			webassets.DeviceConditionsPage:      tm.RenderHTML(tm.DeviceConditions(system)),
 			webassets.ConditionalOperationsPage: tm.RenderHTML(tm.ConditionalOperations(cops)),
 		})
-
 		return system, nil
 	}
-
-	webassets.AppendTestServerPages(mux,
-		fv.SystemFile,
-		pages,
-	)
-
-	dc, err := webapi.NewDeviceControlServer(ctx, rerender, c.logger)
-	if err != nil {
-		return err
-	}
-	dc.AppendEndpoints(ctx, mux)
-
-	_ = browser.OpenURL(url)
-	return runner()
+	return rerender
 }

@@ -142,3 +142,38 @@ func AppendTestServerPages(mux *http.ServeMux,
 		}
 	})
 }
+
+func AppendControlPages(mux *http.ServeMux,
+	systemfile string,
+	pages *TestServerPages,
+) {
+
+	mux.HandleFunc("/controllers", func(w http.ResponseWriter, _ *http.Request) {
+		err := pages.RunOpsPage(w, systemfile, "controller operations", ControllerOperationsPage)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	})
+
+	mux.HandleFunc("/devices", func(w http.ResponseWriter, _ *http.Request) {
+		err := pages.RunOpsPage(w, systemfile, "device operations", DeviceOperationsPage)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	})
+
+	mux.HandleFunc("/conditions", func(w http.ResponseWriter, _ *http.Request) {
+		err := pages.RunOpsPage(w, systemfile, "device conditions", DeviceConditionsPage)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	})
+
+	mux.HandleFunc("/conditionally", func(w http.ResponseWriter, _ *http.Request) {
+		err := pages.RunOpsPage(w, systemfile, "conditional device operations", ConditionalOperationsPage)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	})
+
+}

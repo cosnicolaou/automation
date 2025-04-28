@@ -48,7 +48,7 @@ function runConditionally(opDev, op, op_args, condDev, cond, cond_args) {
     let cargs = cond_args.map(function (value) {
         return { name: 'carg', value: value };
     });
-    console.log('runConditiolnall', opDev, op, op_args, condDev, cond, cond_args);
+    console.log('runConditionally', opDev, op, op_args, condDev, cond, cond_args);
     let cgiArgs = $.param([
         { name: 'odev', value: opDev },
         { name: 'op', value: op },

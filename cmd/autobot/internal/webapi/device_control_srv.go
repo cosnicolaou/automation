@@ -9,13 +9,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 	"net/url"
 	"slices"
 	"strings"
 	"sync"
 
+	"cloudeng.io/logging/ctxlog"
 	"github.com/cosnicolaou/automation/devices"
 )
 
@@ -23,7 +23,6 @@ type DeviceControlServer struct {
 	mu       sync.Mutex
 	loaded   devices.System
 	reloader func(ctx context.Context) (devices.System, error)
-	l        *slog.Logger
 }
 
 func (dc *DeviceControlServer) system() devices.System {
@@ -44,14 +43,14 @@ func (dc *DeviceControlServer) reload(ctx context.Context) error {
 }
 
 func (dc *DeviceControlServer) Reload(ctx context.Context, w http.ResponseWriter, r *http.Request) {
-	dc.l.Log(ctx, slog.LevelInfo, "reload", "request", r.URL.String())
+	ctxlog.Info(ctx, "reload", "request", r.URL.String())
 	if err := dc.reload(ctx); err != nil {
 		dc.httpError(ctx, w, r.URL, "reload", err.Error(), http.StatusInternalServerError)
 		return
 	}
 }
 
-func NewDeviceControlServer(ctx context.Context, systemLoader func(context.Context) (devices.System, error), l *slog.Logger) (*DeviceControlServer, error) {
+func NewDeviceControlServer(ctx context.Context, systemLoader func(context.Context) (devices.System, error)) (*DeviceControlServer, error) {
 	system, err := systemLoader(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load system: %v", err)
@@ -59,7 +58,6 @@ func NewDeviceControlServer(ctx context.Context, systemLoader func(context.Conte
 	return &DeviceControlServer{
 		reloader: systemLoader,
 		loaded:   system,
-		l:        l.With("component", "webapi"),
 	}, nil
 }
 
@@ -92,7 +90,7 @@ func (a Action) String() string {
 // RunOperationConditionally runs an operation iff the condition
 // is true.
 func (dc *DeviceControlServer) RunOperationConditionally(ctx context.Context, writer io.Writer, action, condition Action) (*OperationResult, error) {
-
+	ctx = ctxlog.ContextWith(ctx, "component", "webapi")
 	cr, err := dc.RunCondition(ctx, io.Discard, condition)
 	if err != nil {
 		return nil, fmt.Errorf("failed to run condition: %v: %v", condition.Op, err)
@@ -108,7 +106,7 @@ func (dc *DeviceControlServer) RunOperationConditionally(ctx context.Context, wr
 }
 
 func (dc *DeviceControlServer) RunOperation(ctx context.Context, writer io.Writer, action Action) (*OperationResult, error) {
-
+	ctx = ctxlog.ContextWith(ctx, "component", "webapi")
 	_, cok := dc.system().Controllers[action.Device]
 	_, dok := dc.system().Devices[action.Device]
 	if !cok && !dok {
@@ -158,6 +156,7 @@ func (dc *DeviceControlServer) RunOperation(ctx context.Context, writer io.Write
 }
 
 func (dc *DeviceControlServer) RunCondition(ctx context.Context, writer io.Writer, action Action) (*ConditionResult, error) {
+	ctx = ctxlog.ContextWith(ctx, "component", "webapi")
 	_, cok := dc.system().Controllers[action.Device]
 	_, dok := dc.system().Devices[action.Device]
 	if !cok && !dok {
@@ -215,12 +214,12 @@ func decodeConditionArgs(r *http.Request) (Action, error) {
 }
 
 func (dc *DeviceControlServer) httpError(ctx context.Context, w http.ResponseWriter, u *url.URL, msg, err string, statusCode int) {
-	dc.l.Log(ctx, slog.LevelInfo, msg, "request", u.String(), "code", statusCode, "error", err)
+	ctxlog.Info(ctx, msg, "component", "webapi", "request", u.String(), "code", statusCode, "error", err)
 	http.Error(w, err, http.StatusBadRequest)
 }
 
 func (dc *DeviceControlServer) ServeOperation(ctx context.Context, w http.ResponseWriter, r *http.Request) {
-	dc.l.Log(ctx, slog.LevelInfo, "op-start", "request", r.URL.String(), "code", http.StatusOK)
+	ctxlog.Info(ctx, "op-start", "component", "webapi", "request", r.URL.String(), "code", http.StatusOK)
 	action, err := decodeOperationArgs(r)
 	if err != nil {
 		dc.httpError(ctx, w, r.URL, "op-end", err.Error(), http.StatusBadRequest)
@@ -236,7 +235,7 @@ func (dc *DeviceControlServer) ServeOperation(ctx context.Context, w http.Respon
 }
 
 func (dc *DeviceControlServer) ServeOperationConditionally(ctx context.Context, w http.ResponseWriter, r *http.Request) {
-	dc.l.Log(ctx, slog.LevelInfo, "op-start", "request", r.URL.String(), "code", http.StatusOK)
+	ctxlog.Info(ctx, "op-start", "component", "webapi", "request", r.URL.String(), "code", http.StatusOK)
 	opAction, err := decodeOperationArgs(r)
 	if err != nil {
 		dc.httpError(ctx, w, r.URL, "op-end", err.Error(), http.StatusBadRequest)
@@ -267,7 +266,7 @@ func (dc *DeviceControlServer) ServeOperationConditionally(ctx context.Context, 
 }
 
 func (dc *DeviceControlServer) ServeCondition(ctx context.Context, w http.ResponseWriter, r *http.Request) {
-	dc.l.Log(ctx, slog.LevelInfo, "cond-start", "request", r.URL.String())
+	ctxlog.Info(ctx, "cond-start", "component", "webapi", "request", r.URL.String())
 	action, err := decodeConditionArgs(r)
 	if err != nil {
 		dc.httpError(ctx, w, r.URL, "cond-end", err.Error(), http.StatusBadRequest)
@@ -282,7 +281,7 @@ func (dc *DeviceControlServer) ServeCondition(ctx context.Context, w http.Respon
 }
 
 func (dc *DeviceControlServer) serveJSON(ctx context.Context, w http.ResponseWriter, u *url.URL, msg string, result any) {
-	dc.l.Log(ctx, slog.LevelInfo, msg, "request", u.String(), "code", http.StatusOK)
+	ctxlog.Info(ctx, msg, "component", "webapi", "request", u.String(), "code", http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(result); err != nil {
 		dc.httpError(ctx, w, u, msg, fmt.Sprintf("failed to encode json response: %v", err), http.StatusInternalServerError)
