@@ -1,13 +1,16 @@
 module github.com/cosnicolaou/automation
 
-go 1.23.1
+go 1.23.3
+
+toolchain go1.24.2
 
 require (
-	cloudeng.io/algo v0.0.0-20250119024745-8a46e9bdda10
-	cloudeng.io/cmdutil v0.0.0-20250119024745-8a46e9bdda10
-	cloudeng.io/datetime v0.0.0-20250119024745-8a46e9bdda10
+	cloudeng.io/algo v0.0.0-20250428223124-bb967ac9f3f8
+	cloudeng.io/cmdutil v0.0.0-20250428223124-bb967ac9f3f8
+	cloudeng.io/datetime v0.0.0-20250428223124-bb967ac9f3f8
 	cloudeng.io/errors v0.0.10
-	cloudeng.io/geospatial v0.0.0-20250119024745-8a46e9bdda10
+	cloudeng.io/geospatial v0.0.0-20250428223124-bb967ac9f3f8
+	cloudeng.io/logging v0.0.0-20250428223124-bb967ac9f3f8
 	cloudeng.io/sync v0.0.8
 	github.com/reiver/go-telnet v0.0.0-20180421082511-9ff0b2ab096e
 	github.com/ziutek/telnet v0.1.0
@@ -16,7 +19,7 @@ require (
 )
 
 require (
-	cloudeng.io/file v0.0.0-20250119024745-8a46e9bdda10 // indirect
+	cloudeng.io/file v0.0.0-20250428223124-bb967ac9f3f8 // indirect
 	cloudeng.io/net v0.0.0-20250119024745-8a46e9bdda10 // indirect
 	cloudeng.io/webapi/clients/nws v0.0.0-20250116040431-a16229cf0935 // indirect
 	cloudeng.io/webapi/operations v0.0.0-20250116040431-a16229cf0935 // indirect

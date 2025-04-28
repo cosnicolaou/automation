@@ -9,21 +9,21 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"log/slog"
 	"slices"
 	"time"
 
+	"cloudeng.io/logging/ctxlog"
 	"github.com/cosnicolaou/automation/net/streamconn"
 )
 
 type tlsConn struct {
 	conn    *tls.Conn
 	rd      *bufio.Reader
+	addr    string
 	timeout time.Duration
-	logger  *slog.Logger
 }
 
-func Dial(ctx context.Context, addr string, version string, timeout time.Duration, logger *slog.Logger) (streamconn.Transport, error) {
+func Dial(ctx context.Context, addr string, version string, timeout time.Duration) (streamconn.Transport, error) {
 	ids := []uint16{}
 	for _, cs := range tls.CipherSuites() {
 		ids = append(ids, cs.ID)
@@ -45,27 +45,26 @@ func Dial(ctx context.Context, addr string, version string, timeout time.Duratio
 	default:
 		return nil, fmt.Errorf("unsupported tls version: %v", version)
 	}
-	logger.Log(ctx, slog.LevelInfo, "dialing tls", "addr", addr, "version", version)
+	ctxlog.Info(ctx, "tls: dialing", "addr", addr, "version", version)
 	conn, err := tls.Dial("tcp", addr, &cfg)
 	if err != nil {
-		logger.Log(ctx, slog.LevelWarn, "dial tls failed", "addr", addr, "err", err)
+		ctxlog.Error(ctx, "tls: dial failed", "addr", addr, "err", err)
 		return nil, err
 	}
-	logger = logger.With("protocol", "tls", "addr", conn.RemoteAddr().String())
 	rd := bufio.NewReader(conn)
-	return &tlsConn{conn: conn, rd: rd, timeout: timeout, logger: logger}, nil
+	return &tlsConn{conn: conn, rd: rd, addr: addr, timeout: timeout}, nil
 }
 
 func (tc *tlsConn) send(ctx context.Context, buf []byte, sensitive bool) (int, error) {
 	if err := tc.conn.SetWriteDeadline(time.Now().Add(tc.timeout)); err != nil {
-		tc.logger.Log(ctx, slog.LevelWarn, "send failed to set read deadline", "err", err)
+		ctxlog.Error(ctx, "tls: send failed to set read deadline", "addr", tc.addr, "err", err)
 		return -1, err
 	}
 	n, err := tc.conn.Write(buf)
 	if sensitive {
-		tc.logger.Log(ctx, slog.LevelInfo, "sent", "text", "***", "err", err)
+		ctxlog.Info(ctx, "tls: sent", "addr", tc.addr, "text", "***", "err", err)
 	} else {
-		tc.logger.Log(ctx, slog.LevelInfo, "sent", "text", string(buf), "err", err)
+		ctxlog.Info(ctx, "tls: sent", "addr", tc.addr, "text", string(buf), "err", err)
 	}
 	return n, err
 }
@@ -113,22 +112,23 @@ func (tc *tlsConn) readUntil(ctx context.Context, expected []string) ([]byte, er
 
 func (tc *tlsConn) ReadUntil(ctx context.Context, expected []string) ([]byte, error) {
 	if err := tc.conn.SetReadDeadline(time.Now().Add(tc.timeout)); err != nil {
-		tc.logger.Log(ctx, slog.LevelWarn, "readUntil failed to set read deadline", "err", err)
+		ctxlog.Error(ctx, "tls: readUntil failed to set read deadline", "addr", tc.addr, "err", err)
 		return nil, err
 	}
 	buf, err := tc.readUntil(ctx, expected)
 	if err != nil {
-		tc.logger.Log(ctx, slog.LevelWarn, "readUntil failed", "text", expected, "err", err)
+		ctxlog.Error(ctx, "tls: readUntil failed", "addr", tc.addr, "text", expected, "err", err)
 		return nil, err
 	}
-	tc.logger.Log(ctx, slog.LevelInfo, "readUntil", "text", expected)
+	ctxlog.Info(ctx, "tls: readUntil", "addr", tc.addr, "text", expected)
 	return buf, err
 }
 
 func (tc *tlsConn) Close(ctx context.Context) error {
 	if err := tc.conn.Close(); err != nil {
-		tc.logger.Log(ctx, slog.LevelWarn, "close failed", "err", err)
+		ctxlog.Error(ctx, "tls: close failed", "addr", tc.addr, "err", err)
+		return err
 	}
-	tc.logger.Log(ctx, slog.LevelInfo, "close")
+	ctxlog.Info(ctx, "tls: close", "addr", tc.addr)
 	return nil
 }
