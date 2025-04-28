@@ -74,14 +74,14 @@ func (s *Scheduler) runSingleOp(ctx context.Context, due time.Time, action sched
 }
 
 func (s *Scheduler) runSingleOpWithRetries(ctx context.Context, due time.Time, action schedule.Active[Action]) (aborted bool, err error) {
-	max_retries := max(action.T.Device.Config().RetryConfig.Retries, 1)
-	for i := range max_retries {
+	retries := max(action.T.Device.Config().RetryConfig.Retries, 1)
+	for i := range retries {
 		aborted, err = s.runSingleOp(ctx, due, action)
 		if err == nil || aborted || errors.Is(err, context.Canceled) {
 			return
 		}
-		timeout := action.T.Device.Config().RetryConfig.Timeout
-		ctxlog.Info(ctx, "scheduler: retrying", "op", action.T.Name, "device", action.T.DeviceName, "retries", i, "max_retries", max_retries, "timeout", timeout, "err", err)
+		timeout := action.T.Device.Config().Timeout
+		ctxlog.Info(ctx, "scheduler: retrying", "op", action.T.Name, "device", action.T.DeviceName, "retries", i, "max_retries", retries, "timeout", timeout, "err", err)
 		time.Sleep(timeout)
 	}
 	return
