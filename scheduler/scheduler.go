@@ -74,7 +74,7 @@ func (s *Scheduler) runSingleOp(ctx context.Context, due time.Time, action sched
 }
 
 func (s *Scheduler) runSingleOpWithRetries(ctx context.Context, due time.Time, action schedule.Active[Action]) (aborted bool, err error) {
-	retries := max(action.T.Device.Config().RetryConfig.Retries, 1)
+	retries := max(action.T.Device.Config().Retries, 1)
 	for i := range retries {
 		aborted, err = s.runSingleOp(ctx, due, action)
 		if err == nil || aborted || errors.Is(err, context.Canceled) {
