@@ -13,17 +13,23 @@
     <link href="static/status.css" rel="stylesheet" />
     <script src="/static/api.js"></script>
 
-     <script src={{.Script}}></script>
+    <script src={{.Script}}></script>
 
 </head>
 <body>
     <header>
         <h1>Status for {{.Name}}</h1>
+        <h3>{{.DateTime}}</h3>
+        <h3>Started: {{.Started}}</h3>
         <nav>
             <a href="/">Status Summary</a>
             <a href="/completed">All Completed</a>
-            <a href="/pending">AllPending</a>
+            <a href="/pending">All Pending</a>
             <a href="/calendar">Calendar</a>
+            <a href="/controllers">Controllers</a>
+            <a href="/devices">Devices</a>
+            <a href="/conditions">Conditions</a>
+            <a href="/conditionally">Conditional Operations</a>
             <a href="" id="reload-page">Reload Page</a>
         </nav>
     </header>
