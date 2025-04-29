@@ -8,12 +8,12 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log/slog"
 	"os"
 	"slices"
 	"strings"
 
 	"cloudeng.io/datetime/schedule"
+	"cloudeng.io/logging/ctxlog"
 	"github.com/cosnicolaou/automation/devices"
 	"github.com/cosnicolaou/automation/scheduler"
 	"gopkg.in/yaml.v3"
@@ -78,11 +78,8 @@ func formatAction(a schedule.ActionSpec[scheduler.Action]) string {
 func (c *Config) Display(ctx context.Context, flags any, _ []string) error {
 	fv := flags.(*ConfigFlags)
 
-	deviceOpts := []devices.Option{
-		devices.WithLogger(slog.New(slog.NewTextHandler(os.Stderr, nil))),
-	}
-
-	ctx, system, err := loadSystem(ctx, &fv.ConfigFileFlags, deviceOpts...)
+	ctx = ctxlog.NewJSONLogger(ctx, os.Stderr, nil)
+	ctx, system, err := loadSystem(ctx, &fv.ConfigFileFlags)
 	if err != nil {
 		return err
 	}
@@ -138,10 +135,8 @@ func opNames[Map ~map[string]V, V any](m Map) []string {
 
 func (c *Config) Operations(ctx context.Context, flags any, _ []string) error {
 	fv := flags.(*ConfigFlags)
-	opts := []devices.Option{
-		devices.WithLogger(slog.New(slog.NewTextHandler(os.Stderr, nil)))}
-
-	system, err := devices.ParseSystemConfigFile(ctx, fv.SystemFile, opts...)
+	ctx = ctxlog.NewJSONLogger(ctx, os.Stderr, nil)
+	system, err := devices.ParseSystemConfigFile(ctx, fv.SystemFile)
 	if err != nil {
 		return err
 	}
