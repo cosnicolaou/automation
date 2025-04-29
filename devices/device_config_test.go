@@ -70,7 +70,7 @@ var supportedControllers = devices.SupportedControllers{
 }
 
 var supportedDevices = devices.SupportedDevices{
-	"device": func(_ string, o devices.Options) (devices.Device, error) {
+	"device": func(_ string, _ devices.Options) (devices.Device, error) {
 		md := testutil.NewMockDevice("on", "off")
 		md.SetOutput(true)
 		return md, nil

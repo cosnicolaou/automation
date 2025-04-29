@@ -38,7 +38,7 @@ func NewIdleTimer(d time.Duration) *IdleTimer {
 }
 
 // Reset resets the idle timer.
-func (d *IdleTimer) Reset(ctx context.Context) {
+func (d *IdleTimer) Reset(_ context.Context) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	if d.ticker != nil {

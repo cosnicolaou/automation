@@ -33,23 +33,14 @@ type Session interface {
 }
 
 type session struct {
-	session_lock sync.Mutex
-	mu           sync.Mutex
-	err          error
-	conn         Transport
-	idle         netutil.IdleReset
+	mu   sync.Mutex
+	err  error
+	conn Transport
+	idle netutil.IdleReset
 }
 
 func NewSession(t Transport, idle netutil.IdleReset) Session {
 	return &session{conn: t, idle: idle}
-}
-
-func (s *session) Reserve() {
-	s.session_lock.Lock()
-}
-
-func (s *session) Release() {
-	s.session_lock.Unlock()
 }
 
 func (s *session) Err() error {

@@ -47,7 +47,7 @@ func TestClient(t *testing.T) {
 
 	logRecorder := bytes.NewBuffer(nil)
 	logger := slog.New(slog.NewJSONHandler(logRecorder, nil))
-	ctx = ctxlog.Context(ctx, logger)
+	ctx = ctxlog.WithLogger(ctx, logger)
 	addr := server.Addr().String()
 
 	transport, err := telnet.Dial(ctx, addr, time.Minute)

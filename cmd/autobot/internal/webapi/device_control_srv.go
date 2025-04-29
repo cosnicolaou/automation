@@ -90,7 +90,7 @@ func (a Action) String() string {
 // RunOperationConditionally runs an operation iff the condition
 // is true.
 func (dc *DeviceControlServer) RunOperationConditionally(ctx context.Context, writer io.Writer, action, condition Action) (*OperationResult, error) {
-	ctx = ctxlog.ContextWith(ctx, "component", "webapi")
+	ctx = ctxlog.WithAttributes(ctx, "component", "webapi")
 	cr, err := dc.RunCondition(ctx, io.Discard, condition)
 	if err != nil {
 		return nil, fmt.Errorf("failed to run condition: %v: %v", condition.Op, err)
@@ -106,7 +106,7 @@ func (dc *DeviceControlServer) RunOperationConditionally(ctx context.Context, wr
 }
 
 func (dc *DeviceControlServer) RunOperation(ctx context.Context, writer io.Writer, action Action) (*OperationResult, error) {
-	ctx = ctxlog.ContextWith(ctx, "component", "webapi")
+	ctx = ctxlog.WithAttributes(ctx, "component", "webapi")
 	_, cok := dc.system().Controllers[action.Device]
 	_, dok := dc.system().Devices[action.Device]
 	if !cok && !dok {
@@ -156,7 +156,7 @@ func (dc *DeviceControlServer) RunOperation(ctx context.Context, writer io.Write
 }
 
 func (dc *DeviceControlServer) RunCondition(ctx context.Context, writer io.Writer, action Action) (*ConditionResult, error) {
-	ctx = ctxlog.ContextWith(ctx, "component", "webapi")
+	ctx = ctxlog.WithAttributes(ctx, "component", "webapi")
 	_, cok := dc.system().Controllers[action.Device]
 	_, dok := dc.system().Devices[action.Device]
 	if !cok && !dok {

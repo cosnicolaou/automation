@@ -32,7 +32,7 @@ func (s *Scheduler) invokeOp(ctx context.Context, action Action, opts devices.Op
 			Writer: opts.Writer,
 			Args:   pre.Args,
 		}
-		ctx = ctxlog.ContextWith(ctx, slog.Group("precondition", "name", pre.Name, "args", opts.Args))
+		ctx = ctxlog.WithAttributes(ctx, slog.Group("precondition", "name", pre.Name, "args", opts.Args))
 		_, ok, err := pre.Condition(ctx, preOpts)
 		if err != nil {
 			s.logger.Error("precondition", "op", action.Name, "err", err)
@@ -74,14 +74,14 @@ func (s *Scheduler) runSingleOp(ctx context.Context, due time.Time, action sched
 }
 
 func (s *Scheduler) runSingleOpWithRetries(ctx context.Context, due time.Time, action schedule.Active[Action]) (aborted bool, err error) {
-	max_retries := max(action.T.Device.Config().RetryConfig.Retries, 1)
-	for i := range max_retries {
+	retries := max(action.T.Device.Config().Retries, 1)
+	for i := range retries {
 		aborted, err = s.runSingleOp(ctx, due, action)
 		if err == nil || aborted || errors.Is(err, context.Canceled) {
 			return
 		}
-		timeout := action.T.Device.Config().RetryConfig.Timeout
-		ctxlog.Info(ctx, "scheduler: retrying", "op", action.T.Name, "device", action.T.DeviceName, "retries", i, "max_retries", max_retries, "timeout", timeout, "err", err)
+		timeout := action.T.Device.Config().Timeout
+		ctxlog.Info(ctx, "scheduler: retrying", "op", action.T.Name, "device", action.T.DeviceName, "retries", i, "max_retries", retries, "timeout", timeout, "err", err)
 		time.Sleep(timeout)
 	}
 	return
@@ -149,7 +149,7 @@ func (s *Scheduler) RunDay(ctx context.Context, place datetime.Place, active sch
 		var aborted bool
 		var err error
 		if !s.dryRun {
-			ctx = ctxlog.Context(ctx, s.logger.With("device", active.T.DeviceName, "op", active.T.Name))
+			ctx = ctxlog.WithAttributes(ctx, "device", active.T.DeviceName, "op", active.T.Name)
 			aborted, err = s.runSingleOpWithRetries(ctx, dueAt, active)
 		}
 		logging.WriteCompletion(

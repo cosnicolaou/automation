@@ -77,7 +77,6 @@ type ZIPCodeLookup interface {
 type Option func(*Options)
 
 type Options struct {
-	//Logger        *slog.Logger
 	Interactive   io.Writer
 	Session       streamconn.Session
 	Devices       SupportedDevices
