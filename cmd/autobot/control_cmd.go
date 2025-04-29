@@ -39,9 +39,7 @@ type ControlTestPageFlags struct {
 	WebUIFlags
 }
 
-type Control struct {
-	//logger *slog.Logger
-}
+type Control struct{}
 
 func (c *Control) setup(ctx context.Context, fv *ControlFlags) (context.Context, func(ctx context.Context) (devices.System, error), error) {
 	ctx = ctxlog.NewJSONLogger(ctx, os.Stderr, nil)

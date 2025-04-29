@@ -177,7 +177,7 @@ func (s *Schedule) Run(ctx context.Context, flags any, _ []string) error {
 		scheduler.WithStatusRecorder(sr),
 	}
 
-	system_loader := func(ctx context.Context) (devices.System, error) {
+	systemLoader := func(ctx context.Context) (devices.System, error) {
 		_, sys, err := loadSystem(ctx, &fv.ConfigFileFlags)
 		if err != nil {
 			return devices.System{}, err
@@ -185,7 +185,7 @@ func (s *Schedule) Run(ctx context.Context, flags any, _ []string) error {
 		return sys, nil
 	}
 
-	if err := s.serveStatusUI(ctx, &fv.ConfigFileFlags, fv.WebUIFlags, sr, system_loader); err != nil {
+	if err := s.serveStatusUI(ctx, &fv.ConfigFileFlags, fv.WebUIFlags, sr, systemLoader); err != nil {
 		return err
 	}
 
@@ -245,7 +245,7 @@ func (s *Schedule) Simulate(ctx context.Context, flags any, args []string) error
 
 	logger.Info("starting simulated schedules", "period", period.String(), "loc", s.system.Location.TimeLocation.String(), "zip", s.system.Location.ZIPCode, "latitude", s.system.Location.Latitude, "longitude", s.system.Location.Longitude)
 
-	system_loader := func(ctx context.Context) (devices.System, error) {
+	systemLoader := func(ctx context.Context) (devices.System, error) {
 		_, sys, err := loadSystem(ctx, &fv.ConfigFileFlags)
 		if err != nil {
 			return devices.System{}, err
@@ -253,7 +253,7 @@ func (s *Schedule) Simulate(ctx context.Context, flags any, args []string) error
 		return sys, nil
 	}
 
-	if err := s.serveStatusUI(ctx, &fv.ConfigFileFlags, fv.WebUIFlags, sr, system_loader); err != nil {
+	if err := s.serveStatusUI(ctx, &fv.ConfigFileFlags, fv.WebUIFlags, sr, systemLoader); err != nil {
 		return err
 	}
 	return scheduler.RunSimulation(ctx, s.schedules, s.system, period, schedulerOpts...)
