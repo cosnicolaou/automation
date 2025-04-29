@@ -20,13 +20,6 @@ require (
 
 require (
 	cloudeng.io/file v0.0.0-20250428223124-bb967ac9f3f8 // indirect
-	cloudeng.io/net v0.0.0-20250428004842-3ae3ab52e2d8 // indirect
-	cloudeng.io/webapi/clients/nws v0.0.0-20250428214600-1bf039e55dba // indirect
-	cloudeng.io/webapi/operations v0.0.0-20250428214600-1bf039e55dba // indirect
-	github.com/cosnicolaou/elk v0.0.0-20250429004942-49060542fec2 // indirect
-	github.com/cosnicolaou/lutron v0.0.0-20250428235810-f262a33a2d35 // indirect
-	github.com/cosnicolaou/pentair v0.0.0-20250429003442-7b49970321e2 // indirect
-	github.com/cosnicolaou/weather v0.0.0-20250428221622-5f7fd0899ee0 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/mooncaker816/learnmeeus/v3 v3.0.0-20180601123323-8217f4131761 // indirect
 	github.com/nathan-osman/go-sunrise v1.1.0 // indirect
