@@ -8,6 +8,8 @@ import (
 	"context"
 	"sync"
 	"time"
+
+	"cloudeng.io/logging/ctxlog"
 )
 
 // IdleTimer is a timer that expires after a period of inactivity.
@@ -36,7 +38,7 @@ func NewIdleTimer(d time.Duration) *IdleTimer {
 }
 
 // Reset resets the idle timer.
-func (d *IdleTimer) Reset() {
+func (d *IdleTimer) Reset(_ context.Context) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	if d.ticker != nil {
@@ -44,10 +46,11 @@ func (d *IdleTimer) Reset() {
 	}
 }
 
-// Wait waits for the idle to expire, for the channel to be closed or the
-// context to be canceled. The close function is called when the idle timer
-// expires or the context canceled, but not when the channel is closed.
+// Wait waits for the idle time to expire and then calls expired.
+// It returns when the idle timer expires, StopWait is called or the
+// context is canceled.
 func (d *IdleTimer) Wait(ctx context.Context, expired func(context.Context)) {
+	ctxlog.Info(ctx, "idle timer: waiting", "idleTime", d.idleTime.String())
 	d.mu.Lock()
 	d.expired = false
 	d.ticker = time.NewTicker(d.idleTime)
@@ -68,6 +71,7 @@ func (d *IdleTimer) Wait(ctx context.Context, expired func(context.Context)) {
 			d.mu.Unlock()
 			return
 		case <-ctx.Done():
+			ctxlog.Info(ctx, "idle timer: context done")
 			return
 		case <-d.stopCh:
 			return

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"cloudeng.io/datetime"
+	"cloudeng.io/logging/ctxlog"
 	"github.com/cosnicolaou/automation/cmd/autobot/internal/webapi"
 	"github.com/cosnicolaou/automation/cmd/autobot/internal/webassets"
 	"github.com/cosnicolaou/automation/devices"
@@ -77,21 +78,31 @@ func (s *Schedule) loadFiles(ctx context.Context, fv *ConfigFileFlags, deviceOpt
 	return ctx, nil
 }
 
-func (s *Schedule) serveStatusUI(ctx context.Context, systemfile string, fv WebUIFlags, logger *slog.Logger, statusRecorder *logging.StatusRecorder) error {
+func (s *Schedule) serveStatusUI(ctx context.Context, cf *ConfigFileFlags, fv WebUIFlags, statusRecorder *logging.StatusRecorder, loader func(ctx context.Context) (devices.System, error)) error {
 	if len(fv.HTTPAddr) == 0 && len(fv.HTTPSAddr) == 0 {
 		return nil
 	}
 	mux := http.NewServeMux()
-	runner, url, err := fv.CreateWebServer(ctx, mux, logger)
+	runner, url, err := fv.CreateWebServer(ctx, mux)
 	if err != nil {
 		return err
 	}
-	pages := fv.StatusPages()
+	statusPages := fv.StatusPages()
+	controlPages := fv.TestServerPages()
 
-	cc := webapi.NewStatusServer(logger, statusRecorder, s.calendar)
+	statusServer := webapi.NewStatusServer(statusRecorder, s.calendar)
 
-	cc.AppendEndpoints(ctx, mux)
-	webassets.AppendStatusPages(mux, systemfile, pages)
+	rerender := createSystemRenderer(cf, loader, controlPages)
+	controlServer, err := webapi.NewDeviceControlServer(ctx, rerender)
+	if err != nil {
+		return err
+	}
+
+	statusServer.AppendEndpoints(ctx, mux)
+	controlServer.AppendEndpoints(ctx, mux)
+	webassets.AppendStatusPages(mux, cf.SystemFile, statusPages)
+	webassets.AppendControlPages(mux, cf.SystemFile, controlPages)
+
 	go func() {
 		_ = browser.OpenURL(url)
 		_ = runner()
@@ -145,19 +156,9 @@ func (s *Schedule) Run(ctx context.Context, flags any, _ []string) error {
 	}
 	defer cleanup()
 
-	deviceOpts := []devices.Option{
-		devices.WithLogger(logger),
-	}
+	ctx = ctxlog.WithLogger(ctx, logger)
 
-	sr := logging.NewStatusRecorder()
-	schedulerOpts := []scheduler.Option{
-		scheduler.WithLogger(logger),
-		scheduler.WithOperationWriter(io.Discard),
-		scheduler.WithDryRun(fv.DryRun),
-		scheduler.WithStatusRecorder(sr),
-	}
-
-	ctx, err = s.loadFiles(ctx, &fv.ConfigFileFlags, deviceOpts)
+	ctx, err = s.loadFiles(ctx, &fv.ConfigFileFlags, nil)
 	if err != nil {
 		return err
 	}
@@ -168,7 +169,23 @@ func (s *Schedule) Run(ctx context.Context, flags any, _ []string) error {
 
 	logger.Info("starting schedules", "start", start.String(), "loc", s.system.Location.TimeLocation.String(), "zip", s.system.Location.ZIPCode, "latitude", s.system.Location.Latitude, "longitude", s.system.Location.Longitude)
 
-	if err := s.serveStatusUI(ctx, fv.SystemFile, fv.WebUIFlags, logger, sr); err != nil {
+	sr := logging.NewStatusRecorder()
+	schedulerOpts := []scheduler.Option{
+		scheduler.WithLogger(logger),
+		scheduler.WithOperationWriter(io.Discard),
+		scheduler.WithDryRun(fv.DryRun),
+		scheduler.WithStatusRecorder(sr),
+	}
+
+	system_loader := func(ctx context.Context) (devices.System, error) {
+		_, sys, err := loadSystem(ctx, &fv.ConfigFileFlags)
+		if err != nil {
+			return devices.System{}, err
+		}
+		return sys, nil
+	}
+
+	if err := s.serveStatusUI(ctx, &fv.ConfigFileFlags, fv.WebUIFlags, sr, system_loader); err != nil {
 		return err
 	}
 
@@ -204,9 +221,7 @@ func (s *Schedule) Simulate(ctx context.Context, flags any, args []string) error
 	}
 	defer cleanup()
 
-	deviceOpts := []devices.Option{
-		devices.WithLogger(logger),
-	}
+	ctx = ctxlog.WithLogger(ctx, logger)
 
 	sr := logging.NewStatusRecorder()
 	schedulerOpts := []scheduler.Option{
@@ -217,7 +232,7 @@ func (s *Schedule) Simulate(ctx context.Context, flags any, args []string) error
 		scheduler.WithDryRun(fv.DryRun),
 	}
 
-	ctx, err = s.loadFiles(ctx, &fv.ConfigFileFlags, deviceOpts)
+	ctx, err = s.loadFiles(ctx, &fv.ConfigFileFlags, nil)
 	if err != nil {
 		return err
 	}
@@ -230,7 +245,15 @@ func (s *Schedule) Simulate(ctx context.Context, flags any, args []string) error
 
 	logger.Info("starting simulated schedules", "period", period.String(), "loc", s.system.Location.TimeLocation.String(), "zip", s.system.Location.ZIPCode, "latitude", s.system.Location.Latitude, "longitude", s.system.Location.Longitude)
 
-	if err := s.serveStatusUI(ctx, fv.SystemFile, fv.WebUIFlags, logger, sr); err != nil {
+	system_loader := func(ctx context.Context) (devices.System, error) {
+		_, sys, err := loadSystem(ctx, &fv.ConfigFileFlags)
+		if err != nil {
+			return devices.System{}, err
+		}
+		return sys, nil
+	}
+
+	if err := s.serveStatusUI(ctx, &fv.ConfigFileFlags, fv.WebUIFlags, sr, system_loader); err != nil {
 		return err
 	}
 	return scheduler.RunSimulation(ctx, s.schedules, s.system, period, schedulerOpts...)
@@ -254,10 +277,8 @@ func (s *Schedule) Print(ctx context.Context, flags any, args []string) error {
 	}
 
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
-	deviceOpts := []devices.Option{
-		devices.WithLogger(logger),
-	}
-	_, err := s.loadFiles(ctx, &fv.ConfigFileFlags, deviceOpts)
+	ctx = ctxlog.WithLogger(ctx, logger)
+	_, err := s.loadFiles(ctx, &fv.ConfigFileFlags, nil)
 	if err != nil {
 		return err
 	}

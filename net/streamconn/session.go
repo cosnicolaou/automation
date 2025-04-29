@@ -11,6 +11,7 @@ import (
 	"github.com/cosnicolaou/automation/net/netutil"
 )
 
+// Transport is the interface for a transport layer.
 type Transport interface {
 	Send(ctx context.Context, buf []byte) (int, error)
 	// SendSensitive avoids logging the contents of the buffer, use
@@ -20,6 +21,7 @@ type Transport interface {
 	Close(ctx context.Context) error
 }
 
+// Redesign this to support exclusivity.
 type Session interface {
 	Send(ctx context.Context, buf []byte)
 	// SendSensitive avoids logging the contents of the buffer, use
@@ -53,7 +55,7 @@ func (s *session) Send(ctx context.Context, buf []byte) {
 	if s.err != nil {
 		return
 	}
-	s.idle.Reset()
+	s.idle.Reset(ctx)
 	_, s.err = s.conn.Send(ctx, buf)
 }
 
@@ -63,7 +65,7 @@ func (s *session) SendSensitive(ctx context.Context, buf []byte) {
 	if s.err != nil {
 		return
 	}
-	s.idle.Reset()
+	s.idle.Reset(ctx)
 	_, s.err = s.conn.SendSensitive(ctx, buf)
 }
 
@@ -73,7 +75,7 @@ func (s *session) ReadUntil(ctx context.Context, expected ...string) []byte {
 	if s.err != nil {
 		return nil
 	}
-	s.idle.Reset()
+	s.idle.Reset(ctx)
 	out, err := s.conn.ReadUntil(ctx, expected)
 	if err != nil {
 		s.err = err

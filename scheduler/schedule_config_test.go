@@ -279,7 +279,7 @@ var supportedDevices = devices.SupportedDevices{
 	"device": func(string, devices.Options) (devices.Device, error) {
 		md := testutil.NewMockDevice("On", "Off", "Another", "a", "b", "c", "d")
 		md.AddCondition("weather", true)
-		md.SetOutput(false, true)
+		md.SetOutput(true)
 		return md, nil
 	},
 	"slow_device": func(string, devices.Options) (devices.Device, error) {
