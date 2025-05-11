@@ -56,10 +56,14 @@ func TestClient(t *testing.T) {
 	}
 
 	idle := netutil.NewIdleTimer(10 * time.Minute)
-	s := streamconn.NewSession(transport, idle)
+	mgr := &streamconn.SessionManager{}
+	s := mgr.New(transport, idle)
 	s.Send(ctx, []byte("hello\r\n"))
 	s.Send(ctx, []byte("world\r\n"))
-	read := s.ReadUntil(ctx, "world\r\n")
+	read, err := s.ReadUntil(ctx, "world\r\n")
+	if err != s.Err() {
+		t.Fatal(err)
+	}
 	if err := s.Err(); err != nil {
 		t.Fatal(err)
 	}
@@ -70,7 +74,10 @@ func TestClient(t *testing.T) {
 
 	s.Send(ctx, []byte("and\r\n"))
 	s.Send(ctx, []byte("again\r\n"))
-	read = s.ReadUntil(ctx, "again\r\n")
+	read, err = s.ReadUntil(ctx, "again\r\n")
+	if err != s.Err() {
+		t.Fatal(err)
+	}
 	if err := s.Err(); err != nil {
 		t.Fatal(err)
 	}

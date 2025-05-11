@@ -49,7 +49,7 @@ func TestIdleManager(t *testing.T) {
 	sm := &sessionMgr{eventCh: eventCh}
 
 	mc := netutil.NewIdleManager(sm, idle)
-	_, err := mc.Connection(ctx)
+	_, _, err := mc.Connection(ctx)
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
 	}
@@ -84,13 +84,13 @@ func TestIdleManagerReset(t *testing.T) {
 		for i := 0; i < numResets; i++ {
 			time.Sleep(resetDelay)
 			idle.Reset(ctx)
-			if _, err := mc.Connection(ctx); err != nil {
+			if _, _, err := mc.Connection(ctx); err != nil {
 				panic(err)
 			}
 		}
 	}()
 
-	_, err := mc.Connection(ctx)
+	_, _, err := mc.Connection(ctx)
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
 	}
@@ -124,10 +124,12 @@ func TestOnDemand(t *testing.T) {
 	timeCh := make(chan time.Time, 1000)
 
 	sm := &sessionMgr{eventCh: eventCh, timeCh: timeCh}
-	odm := netutil.NewOnDemandConnection(sm,
-		func(err error) *session { return &session{err: err} })
+	odm := netutil.NewOnDemandConnection(sm)
 	odm.SetKeepAlive(time.Millisecond)
-	s := odm.Connection(ctx)
+	s, _, err := odm.Connection(ctx)
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
 	time.Sleep(5 * time.Millisecond)
 	if got, want := <-eventCh, "connect"; got != want {
 		t.Errorf("got %v, want %v", got, want)
@@ -143,12 +145,11 @@ func TestOnDemand(t *testing.T) {
 	timeCh = make(chan time.Time, 1000)
 
 	sm = &sessionMgr{eventCh: eventCh, timeCh: timeCh}
-	odm = netutil.NewOnDemandConnection(sm,
-		func(err error) *session { return &session{err: err} })
+	odm = netutil.NewOnDemandConnection(sm)
 	odm.SetKeepAlive(time.Minute * 10)
-	s1 := odm.Connection(ctx)
+	s1, _, _ := odm.Connection(ctx)
 	time.Sleep(5 * time.Millisecond)
-	s2 := odm.Connection(ctx)
+	s2, _, _ := odm.Connection(ctx)
 	if got, want := s1, s2; got != want {
 		t.Errorf("got %v, want %v", got, want)
 	}

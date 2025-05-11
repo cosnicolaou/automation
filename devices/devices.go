@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"cloudeng.io/datetime"
-	"github.com/cosnicolaou/automation/net/streamconn"
 	"gopkg.in/yaml.v3"
 )
 
@@ -78,7 +77,6 @@ type Option func(*Options)
 
 type Options struct {
 	Interactive   io.Writer
-	Session       streamconn.Session
 	Devices       SupportedDevices
 	Controllers   SupportedControllers
 	loc           *time.Location
@@ -111,12 +109,6 @@ func WithLatLong(lat, long float64) Option {
 func WithZIPCode(zip string) Option {
 	return func(o *Options) {
 		o.zipCode = zip
-	}
-}
-
-func WithSession(c streamconn.Session) Option {
-	return func(o *Options) {
-		o.Session = c
 	}
 }
 
