@@ -10,10 +10,10 @@ require (
 	cloudeng.io/macos v0.0.0-20250428223124-bb967ac9f3f8
 	cloudeng.io/sync v0.0.8
 	cloudeng.io/webapp v0.0.0-20250428223124-bb967ac9f3f8
-	github.com/cosnicolaou/automation v0.0.0-20250428235220-63c5b2ef90d7
-	github.com/cosnicolaou/elk v0.0.0-20250429004942-49060542fec2
-	github.com/cosnicolaou/lutron v0.0.0-20250429000935-e0a51dd5d404
-	github.com/cosnicolaou/pentair v0.0.0-20250429003442-7b49970321e2
+	github.com/cosnicolaou/automation v0.0.0-20250511224936-0ce968442790
+	github.com/cosnicolaou/elk v0.0.0-20250511230558-2e6eaadb473e
+	github.com/cosnicolaou/lutron v0.0.0-20250511232802-20e6e4b26c4b
+	github.com/cosnicolaou/pentair v0.0.0-20250511230341-293abec2c79d
 	github.com/cosnicolaou/weather v0.0.0-20250428221622-5f7fd0899ee0
 	github.com/jedib0t/go-pretty/v6 v6.6.7
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
@@ -36,6 +36,6 @@ require (
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/soniakeys/unit v1.0.0 // indirect
 	github.com/ziutek/telnet v0.1.0 // indirect
-	golang.org/x/sys v0.32.0 // indirect
-	golang.org/x/text v0.24.0 // indirect
+	golang.org/x/sys v0.33.0 // indirect
+	golang.org/x/text v0.25.0 // indirect
 )

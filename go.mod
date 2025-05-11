@@ -14,7 +14,7 @@ require (
 	cloudeng.io/sync v0.0.8
 	github.com/reiver/go-telnet v0.0.0-20180421082511-9ff0b2ab096e
 	github.com/ziutek/telnet v0.1.0
-	golang.org/x/text v0.24.0
+	golang.org/x/text v0.25.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 

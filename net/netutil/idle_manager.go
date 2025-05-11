@@ -47,23 +47,23 @@ func NewIdleManager[T any, F Managed[T]](managed F, idle *IdleTimer) *IdleManage
 
 // Connection returns the current connection, or creates a new one if the idle
 // timer has expired.
-func (m *IdleManager[T, F]) Connection(ctx context.Context) (T, error) {
+func (m *IdleManager[T, F]) Connection(ctx context.Context) (T, *IdleTimer, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.connected {
 		ctxlog.Info(ctx, "idlemanager: returning existing connection")
-		return m.conn, nil
+		return m.conn, m.idle, nil
 	}
 	conn, err := m.connector.Connect(ctx, m.idle)
 	if err != nil {
 		var empty T
-		return empty, err
+		return empty, nil, err
 	}
 	m.conn = conn
 	m.connected = true
 	go m.idle.Wait(context.WithoutCancel(ctx), m.expired)
 	ctxlog.Info(ctx, "idlemanager: returning new connection")
-	return conn, nil
+	return conn, m.idle, nil
 }
 
 func (m *IdleManager[T, F]) closeUnderlyingUnlocked(ctx context.Context) error {
@@ -102,17 +102,15 @@ func (m *IdleManager[T, F]) Stop(ctx context.Context, timeout time.Duration) err
 // OnDemandConnection wraps an IdleManager to reuse or recreate a connection
 // as required.
 type OnDemandConnection[T any, F Managed[T]] struct {
-	mu              sync.Mutex
-	managed         F
-	idleManager     *IdleManager[T, F]
-	keepAlive       time.Duration
-	newErrorSession func(error) T
+	mu          sync.Mutex
+	managed     F
+	idleManager *IdleManager[T, F]
+	keepAlive   time.Duration
 }
 
-func NewOnDemandConnection[T any, F Managed[T]](managed F, newErrorSession func(error) T) *OnDemandConnection[T, F] {
+func NewOnDemandConnection[T any, F Managed[T]](managed F) *OnDemandConnection[T, F] {
 	return &OnDemandConnection[T, F]{
-		managed:         managed,
-		newErrorSession: newErrorSession,
+		managed: managed,
 	}
 }
 
@@ -122,17 +120,13 @@ func (sm *OnDemandConnection[T, F]) SetKeepAlive(keepAlive time.Duration) {
 	sm.keepAlive = keepAlive
 }
 
-func (sm *OnDemandConnection[T, F]) Connection(ctx context.Context) T {
+func (sm *OnDemandConnection[T, F]) Connection(ctx context.Context) (T, *IdleTimer, error) {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 	if sm.idleManager == nil {
 		sm.idleManager = NewIdleManager(sm.managed, NewIdleTimer(sm.keepAlive))
 	}
-	sess, err := sm.idleManager.Connection(ctx)
-	if err != nil {
-		return sm.newErrorSession(err)
-	}
-	return sess
+	return sm.idleManager.Connection(ctx)
 }
 
 func (sm *OnDemandConnection[T, F]) Close(ctx context.Context) error {
