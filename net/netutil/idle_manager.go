@@ -102,11 +102,10 @@ func (m *IdleManager[T, F]) Stop(ctx context.Context, timeout time.Duration) err
 // OnDemandConnection wraps an IdleManager to reuse or recreate a connection
 // as required.
 type OnDemandConnection[T any, F Managed[T]] struct {
-	mu              sync.Mutex
-	managed         F
-	idleManager     *IdleManager[T, F]
-	keepAlive       time.Duration
-	newErrorSession func(error) T
+	mu          sync.Mutex
+	managed     F
+	idleManager *IdleManager[T, F]
+	keepAlive   time.Duration
 }
 
 func NewOnDemandConnection[T any, F Managed[T]](managed F) *OnDemandConnection[T, F] {

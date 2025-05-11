@@ -15,7 +15,6 @@ import (
 
 type session struct {
 	mu  sync.Mutex
-	err error
 	msg string
 }
 
