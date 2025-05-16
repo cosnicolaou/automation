@@ -219,7 +219,8 @@ func (dc *DeviceControlServer) httpError(ctx context.Context, w http.ResponseWri
 }
 
 func (dc *DeviceControlServer) ServeOperation(ctx context.Context, w http.ResponseWriter, r *http.Request) {
-	ctxlog.Info(ctx, "op-start", "component", "webapi", "request", r.URL.String(), "code", http.StatusOK)
+	ctx = ctxlog.WithAttributes(ctx, "component", "webapi", "request", r.URL.String())
+	ctxlog.Info(ctx, "op-start")
 	action, err := decodeOperationArgs(r)
 	if err != nil {
 		dc.httpError(ctx, w, r.URL, "op-end", err.Error(), http.StatusBadRequest)
@@ -235,7 +236,8 @@ func (dc *DeviceControlServer) ServeOperation(ctx context.Context, w http.Respon
 }
 
 func (dc *DeviceControlServer) ServeOperationConditionally(ctx context.Context, w http.ResponseWriter, r *http.Request) {
-	ctxlog.Info(ctx, "op-start", "component", "webapi", "request", r.URL.String(), "code", http.StatusOK)
+	ctx = ctxlog.WithAttributes(ctx, "component", "webapi", "request", r.URL.String())
+	ctxlog.Info(ctx, "op-start")
 	opAction, err := decodeOperationArgs(r)
 	if err != nil {
 		dc.httpError(ctx, w, r.URL, "op-end", err.Error(), http.StatusBadRequest)
@@ -266,7 +268,8 @@ func (dc *DeviceControlServer) ServeOperationConditionally(ctx context.Context, 
 }
 
 func (dc *DeviceControlServer) ServeCondition(ctx context.Context, w http.ResponseWriter, r *http.Request) {
-	ctxlog.Info(ctx, "cond-start", "component", "webapi", "request", r.URL.String())
+	ctx = ctxlog.WithAttributes(ctx, "component", "webapi", "request", r.URL.String())
+	ctxlog.Info(ctx, "cond-start")
 	action, err := decodeConditionArgs(r)
 	if err != nil {
 		dc.httpError(ctx, w, r.URL, "cond-end", err.Error(), http.StatusBadRequest)
@@ -281,7 +284,7 @@ func (dc *DeviceControlServer) ServeCondition(ctx context.Context, w http.Respon
 }
 
 func (dc *DeviceControlServer) serveJSON(ctx context.Context, w http.ResponseWriter, u *url.URL, msg string, result any) {
-	ctxlog.Info(ctx, msg, "component", "webapi", "request", u.String(), "code", http.StatusOK)
+	ctxlog.Info(ctx, msg, "code", http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(result); err != nil {
 		dc.httpError(ctx, w, u, msg, fmt.Sprintf("failed to encode json response: %v", err), http.StatusInternalServerError)
