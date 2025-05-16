@@ -7,7 +7,9 @@ package streamconn
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 
+	"cloudeng.io/logging/ctxlog"
 	"github.com/cosnicolaou/automation/net/netutil"
 )
 
@@ -29,14 +31,26 @@ type SessionManager struct {
 	mu sync.Mutex
 }
 
+var sessionID int64
+
 func (sm *SessionManager) New(t Transport, idle netutil.IdleReset) *Session {
 	sm.mu.Lock()
 	return &Session{
 		conn: t,
 		idle: idle,
+		id:   atomic.AddInt64(&sessionID, 1),
 		mgr:  sm,
 	}
 }
+
+func (sm *SessionManager) NewWithContext(ctx context.Context, t Transport, idle netutil.IdleReset) (context.Context, *Session) {
+	sess := sm.New(t, idle)
+	ctx = ctxlog.WithAttributes(ctx, "session", sess.ID())
+	return ctx, sess
+}
+
+// Release releases the session and allows the manager to create a new session.
+// It must be called after the session is no longer needed.
 
 func (sm *SessionManager) release() {
 	sm.mu.Unlock()
@@ -49,6 +63,7 @@ func (sm *SessionManager) release() {
 // the Send/SendSensitive calls or the ReadUntil call.
 type Session struct {
 	mu   sync.Mutex
+	id   int64
 	err  error
 	conn Transport
 	idle netutil.IdleReset
@@ -58,6 +73,10 @@ type Session struct {
 // Release releases the session and allows the manager to create a new session.
 func (s *Session) Release() {
 	s.mgr.release()
+}
+
+func (s *Session) ID() int64 {
+	return s.id
 }
 
 // Err returns the error if any occurred during the session.
