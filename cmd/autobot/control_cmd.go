@@ -16,7 +16,7 @@ import (
 	"strings"
 	"time"
 
-	"cloudeng.io/cmdutil/keystore"
+	"cloudeng.io/cmdutil/unsafekeystore"
 	"cloudeng.io/datetime"
 	"cloudeng.io/logging/ctxlog"
 	"github.com/cosnicolaou/automation/cmd/autobot/internal/webapi"
@@ -57,7 +57,7 @@ func (c *Control) setup(ctx context.Context, fv *ControlFlags) (context.Context,
 	}
 	opts = append(opts, devices.WithZIPCodeLookup(zdb))
 
-	ctx = keystore.ContextWithAuth(ctx, keys)
+	ctx = unsafekeystore.ContextWithAuth(ctx, keys)
 
 	loader := func(ctx context.Context) (devices.System, error) {
 		system, err := devices.ParseSystemConfigFile(ctx, fv.SystemFile, opts...)
