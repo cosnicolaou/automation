@@ -1,25 +1,25 @@
 module github.com/cosnicolaou/automation
 
-go 1.23.3
+go 1.24.2
 
-toolchain go1.24.2
+toolchain go1.24.4
 
 require (
-	cloudeng.io/algo v0.0.0-20250428223124-bb967ac9f3f8
-	cloudeng.io/cmdutil v0.0.0-20250428223124-bb967ac9f3f8
-	cloudeng.io/datetime v0.0.0-20250428223124-bb967ac9f3f8
-	cloudeng.io/errors v0.0.10
-	cloudeng.io/geospatial v0.0.0-20250428223124-bb967ac9f3f8
-	cloudeng.io/logging v0.0.0-20250428223124-bb967ac9f3f8
+	cloudeng.io/algo v0.0.0-20250820215211-e1b65c305908
+	cloudeng.io/cmdutil v0.0.0-20250820215211-e1b65c305908
+	cloudeng.io/datetime v0.0.0-20250820215211-e1b65c305908
+	cloudeng.io/errors v0.0.12
+	cloudeng.io/geospatial v0.0.0-20250820215211-e1b65c305908
+	cloudeng.io/logging v0.0.0-20250820215211-e1b65c305908
 	cloudeng.io/sync v0.0.8
 	github.com/reiver/go-telnet v0.0.0-20180421082511-9ff0b2ab096e
 	github.com/ziutek/telnet v0.1.0
-	golang.org/x/text v0.25.0
+	golang.org/x/text v0.28.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
-	cloudeng.io/file v0.0.0-20250428223124-bb967ac9f3f8 // indirect
+	cloudeng.io/file v0.0.0-20250820215211-e1b65c305908 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/mooncaker816/learnmeeus/v3 v3.0.0-20180601123323-8217f4131761 // indirect
 	github.com/nathan-osman/go-sunrise v1.1.0 // indirect

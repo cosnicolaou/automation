@@ -13,7 +13,7 @@ import (
 	"strings"
 	"unicode"
 
-	"cloudeng.io/cmdutil/keystore"
+	"cloudeng.io/cmdutil/unsafekeystore"
 	"cloudeng.io/geospatial/zipcode"
 	"github.com/cosnicolaou/automation/cmd/autobot/internal"
 	"github.com/cosnicolaou/automation/cmd/autobot/internal/zipfs"
@@ -38,7 +38,7 @@ func loadSystem(ctx context.Context, fv *ConfigFileFlags, opts ...devices.Option
 		return nil, devices.System{}, fmt.Errorf("failed to parse system config file: %q: %w", fv.SystemFile, err)
 	}
 
-	return keystore.ContextWithAuth(ctx, keys), system, nil
+	return unsafekeystore.ContextWithAuth(ctx, keys), system, nil
 }
 
 func loadSchedules(ctx context.Context, fv *ConfigFileFlags, sys devices.System) (scheduler.Schedules, error) {

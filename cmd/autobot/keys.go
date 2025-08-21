@@ -7,9 +7,9 @@ package main
 import (
 	"context"
 
-	"cloudeng.io/cmdutil/keystore"
+	"cloudeng.io/cmdutil/unsafekeystore"
 )
 
-func ReadKeysFile(ctx context.Context, path string) (keystore.Keys, error) {
-	return keystore.ParseConfigURI(ctx, path, URIHandlers)
+func ReadKeysFile(ctx context.Context, path string) (unsafekeystore.Keys, error) {
+	return unsafekeystore.ParseConfigURI(ctx, path, URIHandlers)
 }
