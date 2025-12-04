@@ -15,7 +15,7 @@ func ReadKeysFile(ctx context.Context, path string) (context.Context, error) {
 	ims := keys.NewInMemoryKeyStore()
 	fs := unsafekeystore.New()
 	if err := ims.ReadYAML(ctx, fs, path); err != nil {
-		return ctx, err
+		return nil, err
 	}
 	return keys.ContextWithKeyStore(ctx, ims), nil
 }
