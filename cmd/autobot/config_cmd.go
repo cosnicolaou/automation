@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strings"
 
+	"cloudeng.io/cmdutil/keys"
 	"cloudeng.io/datetime/schedule"
 	"cloudeng.io/logging/ctxlog"
 	"github.com/cosnicolaou/automation/devices"
@@ -85,14 +86,18 @@ func (c *Config) Display(ctx context.Context, flags any, _ []string) error {
 	}
 
 	// Reread the keys file in order to enumerate all the keys.
-	keys, err := ReadKeysFile(ctx, fv.KeysFile)
+	ctx, err = ReadKeysFile(ctx, fv.KeysFile)
 	if err != nil {
 		return fmt.Errorf("failed to read keys file: %q: %w", fv.KeysFile, err)
 	}
 
 	fmt.Fprintf(c.out, "Keys:\n")
-	for _, key := range keys {
-		fmt.Fprintf(c.out, "  %v\n", key)
+	ims, ok := keys.KeyStoreFromContext(ctx)
+	if !ok {
+		return fmt.Errorf("no keystore in context")
+	}
+	for id := range ims.KeyOwners() {
+		fmt.Fprintf(c.out, "  %s\n", id)
 	}
 
 	fmt.Fprintf(c.out, "\nLocation: %v\n\n", system.Location)
