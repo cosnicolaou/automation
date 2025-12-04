@@ -96,7 +96,7 @@ func (c *Config) Display(ctx context.Context, flags any, _ []string) error {
 	if !ok {
 		return fmt.Errorf("no keystore in context")
 	}
-	for id := range ims.KeyOwners() {
+	for _, id := range ims.KeyOwners() {
 		fmt.Fprintf(c.out, "  %s\n", id)
 	}
 
