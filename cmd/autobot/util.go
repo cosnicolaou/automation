@@ -13,7 +13,6 @@ import (
 	"strings"
 	"unicode"
 
-	"cloudeng.io/cmdutil/unsafekeystore"
 	"cloudeng.io/geospatial/zipcode"
 	"github.com/cosnicolaou/automation/cmd/autobot/internal"
 	"github.com/cosnicolaou/automation/cmd/autobot/internal/zipfs"
@@ -22,7 +21,7 @@ import (
 )
 
 func loadSystem(ctx context.Context, fv *ConfigFileFlags, opts ...devices.Option) (context.Context, devices.System, error) {
-	keys, err := ReadKeysFile(ctx, fv.KeysFile)
+	ctx, err := ReadKeysFile(ctx, fv.KeysFile)
 	if err != nil {
 		return nil, devices.System{}, fmt.Errorf("failed to read keys file: %q: %w", fv.KeysFile, err)
 	}
@@ -38,7 +37,7 @@ func loadSystem(ctx context.Context, fv *ConfigFileFlags, opts ...devices.Option
 		return nil, devices.System{}, fmt.Errorf("failed to parse system config file: %q: %w", fv.SystemFile, err)
 	}
 
-	return unsafekeystore.ContextWithAuth(ctx, keys), system, nil
+	return ctx, system, nil
 }
 
 func loadSchedules(ctx context.Context, fv *ConfigFileFlags, sys devices.System) (scheduler.Schedules, error) {

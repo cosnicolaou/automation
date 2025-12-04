@@ -7,9 +7,15 @@ package main
 import (
 	"context"
 
-	"cloudeng.io/cmdutil/unsafekeystore"
+	"cloudeng.io/cmdutil/keys"
+	"cloudeng.io/cmdutil/keys/unsafekeystore"
 )
 
-func ReadKeysFile(ctx context.Context, path string) (unsafekeystore.Keys, error) {
-	return unsafekeystore.ParseConfigURI(ctx, path, URIHandlers)
+func ReadKeysFile(ctx context.Context, path string) (context.Context, error) {
+	ims := keys.NewInMemoryKeyStore()
+	fs := unsafekeystore.New()
+	if err := ims.ReadYAML(ctx, fs, path); err != nil {
+		return nil, err
+	}
+	return keys.ContextWithKeyStore(ctx, ims), nil
 }

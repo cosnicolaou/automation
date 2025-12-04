@@ -16,7 +16,6 @@ import (
 	"strings"
 	"time"
 
-	"cloudeng.io/cmdutil/unsafekeystore"
 	"cloudeng.io/datetime"
 	"cloudeng.io/logging/ctxlog"
 	"github.com/cosnicolaou/automation/cmd/autobot/internal/webapi"
@@ -46,7 +45,7 @@ func (c *Control) setup(ctx context.Context, fv *ControlFlags) (context.Context,
 
 	opts := []devices.Option{}
 
-	keys, err := ReadKeysFile(ctx, fv.KeysFile)
+	ctx, err := ReadKeysFile(ctx, fv.KeysFile)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to read keys file: %q: %w", fv.KeysFile, err)
 	}
@@ -56,8 +55,6 @@ func (c *Control) setup(ctx context.Context, fv *ControlFlags) (context.Context,
 		return nil, nil, fmt.Errorf("failed to load zip database: %q: %w", fv.ZIPDatabase, err)
 	}
 	opts = append(opts, devices.WithZIPCodeLookup(zdb))
-
-	ctx = unsafekeystore.ContextWithAuth(ctx, keys)
 
 	loader := func(ctx context.Context) (devices.System, error) {
 		system, err := devices.ParseSystemConfigFile(ctx, fv.SystemFile, opts...)
